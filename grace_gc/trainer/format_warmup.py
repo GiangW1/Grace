@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from grace_gc.data.format_prompt import format_sft_answer_prefix, format_sft_lead
+from grace_gc.data.format_prompt import format_sft_lead
 from grace_gc.data.math_data import MathRecord
 from grace_gc.logging_util.ledger import Timer
 
@@ -32,7 +32,7 @@ def _sft_summary(steps: int, n_examples: int, losses: list[float], skipped: bool
         "skipped": skipped,
         "last_loss": None if not losses else float(losses[-1]),
         "mean_loss": None if not losses else float(sum(losses) / len(losses)),
-        "trained": "lead+Answer: prefix",
+        "trained": "reasoning lead",
         "gold_in_loss": False,
         "eos_in_loss": False,
     }
@@ -61,9 +61,8 @@ def run_format_warmup_tiny(actor, records: list[MathRecord], vocab: int, cfg: di
         for rec in batch:
             prompt = tiny_encode(rec.prompt, vocab, max_prompt)
             lead = tiny_encode(format_sft_lead(), vocab, 32)
-            cue = tiny_encode(format_sft_answer_prefix(), vocab, 16)
-            seqs.append(prompt + lead + cue)
-            prompt_lens.append((len(prompt), len(prompt) + len(lead) + len(cue)))
+            seqs.append(prompt + lead)
+            prompt_lens.append((len(prompt), len(prompt) + len(lead)))
         width = max(len(seq) for seq in seqs)
         ids = torch.full((len(seqs), width), int(actor.eos_id), dtype=torch.long)
         for i, seq in enumerate(seqs):
@@ -101,7 +100,7 @@ def _encode_sft_pair(tokenizer, rec: MathRecord, max_prompt: int) -> tuple[list[
     from grace_gc.data.tokenize import encode_prompt_hf_detail
 
     prompt_ids, _meta = encode_prompt_hf_detail(tokenizer, rec.prompt, max_prompt, rec.messages)
-    resp_ids = _encode_sft_ids(tokenizer, format_sft_lead() + format_sft_answer_prefix())
+    resp_ids = _encode_sft_ids(tokenizer, format_sft_lead())
     if not resp_ids:
         raise ValueError("format warmup produced an empty response")
     return list(prompt_ids), resp_ids, len(resp_ids)

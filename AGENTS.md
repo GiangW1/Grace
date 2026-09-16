@@ -16,7 +16,7 @@
 - G 表示梯度上升方向；标准优化器的 .grad 对应 -G。全部 q/v LoRA A/B 属于目标；token log-prob 求和。
 - actor、baseline、basis、predictor 在一个批次内保持不变；选择只读前缀；停止者 reward=null。这些是算法定义，不是额外流程。
 - 保存每次运行的配置、seed、可获得的版本信息、结果和实际时间。缺少可选 hash/登记文件时照常运行并记录缺失。
-- 官方 DAPO parquet 直接加载：同一题面金标冲突的整组丢掉并写入 `data_conflicts.json`，不要改回硬失败。MATH-500 套 DAPO 同款 `Answer:` 指令。`format_warmup` 是共享格式 SFT，不是 `predictor.warmup_steps`。SFT 训练推理开头和 `Answer:`，不训金标数字、不追加 EOS，避免 5-token 交卷。
+- 官方 DAPO parquet 直接加载：同一题面金标冲突的整组丢掉并写入 `data_conflicts.json`，不要改回硬失败。MATH-500 套 DAPO 同款 `Answer:` 指令。`format_warmup` 是共享格式 SFT，不是 `predictor.warmup_steps`。SFT 只训推理开头，不训 `Answer:`、金标和 EOS，避免短答交卷。
 - `backend=gpu_verl` 只是配置别名，实现是 HF actor + vLLM 两阶段，不是 verl PPO。第一份 GPU 作业先 Full-PG。`lora/step-N` 是 vLLM adapter id（首次 sync 为 `step-2`），不是 `state.step`。
 - 只有会使程序无法执行或算法计算无效的输入才报错，例如文件不可读、p≤0、维度不一致。小样本、未达论文目标、宽置信区间都正常输出结果。
 - 论文中用于分析的筛选条件和阈值作为可配置的统计选项，报告全部观测与所选子集；不作为启动/继续实验的条件。
@@ -33,3 +33,5 @@
 - .planning/REQUIREMENTS.md：精简功能清单。
 - .planning/MINIMAL_FALSIFICATION.md：实验脚本的用法设想。
 - .planning/research/PITFALLS.md：数学与实现笔记，按实现需要查阅。
+- docs/TEST_STATUS.md：已跑/未跑测试；不写虚构 GPU 数字。
+- README.md：服务器全流程。现役工作树若未推送，clone GitHub 拿到的是上一份。

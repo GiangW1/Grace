@@ -33,6 +33,36 @@ def extract_boxed(text: str) -> str | None:
     return "".join(out).strip() or None
 
 
+def _boxed_span_end(text: str) -> int | None:
+    key = "\\boxed{"
+    start = text.rfind(key)
+    if start < 0:
+        return None
+    i = start + len(key)
+    depth = 1
+    while i < len(text) and depth:
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+        i += 1
+    if depth != 0:
+        return None
+    return i
+
+
+def answer_already_emitted(text: str | None) -> bool:
+    """True only when the prefix already committed a final-line answer."""
+    if not text:
+        return False
+    s = str(text)
+    finals = list(FINAL.finditer(s))
+    if finals and not s[finals[-1].end() :].strip():
+        return True
+    end = _boxed_span_end(s)
+    return end is not None and not s[end:].strip()
+
+
 def extract_answer(text: str) -> str | None:
     if text is None:
         return None

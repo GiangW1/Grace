@@ -189,12 +189,17 @@ def prescan_unseen_baselines(
             )
         rewards = []
         plen = len(prompt_ids[i])
+        roll = getattr(engines, "last_rollout", None) or {}
+        prefix_frs = list(roll.get("prefix_finish_reasons") or [])
         for j, full in enumerate(fulls):
             if full is None:
                 raise ValueError("prescan generate_prefix returned no sequence")
             resp = full[plen:]
             text = engines.decode(resp) if engines.decode else ""
-            truncated = _length_truncated(full, plen, int(max_new), bool(finished[j]), engines.eos_id)
+            fr = prefix_frs[j] if j < len(prefix_frs) else None
+            truncated = _length_truncated(
+                full, plen, int(max_new), bool(finished[j]), engines.eos_id, finish_reason=fr
+            )
             scored = engines.reward_fn(full, golds[i], truncated=truncated, text=text)
             rewards.append(0.0 if scored is None else float(scored))
         state.baseline.values[pid] = float(np.mean(rewards)) if rewards else 0.5

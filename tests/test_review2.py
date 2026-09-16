@@ -308,8 +308,10 @@ def test_natural_eos_at_budget_is_not_truncated():
     assert _traj_natural_finish(False, [1, 2], 9, generated=0, requested=8) is True
     assert _traj_natural_finish(False, [1, 2, 3, 4], 9, generated=2, requested=8, finish_reason="length") is False
     assert _traj_natural_finish(False, [1, 2, 3, 4], 9, generated=2, requested=8, finish_reason="stop") is True
+    assert _traj_natural_finish(False, [1, 2, 3, 4], 9, generated=2, requested=8, finish_reason="FinishReason.LENGTH") is False
     assert _length_truncated([1, 2, 3, 4], 2, 8, False, 9, finish_reason="length") is True
     assert _length_truncated([1, 2, 3, 9], 2, 8, True, 9, finish_reason="stop") is False
+    assert _length_truncated([1, 2, 3, 4], 2, 8, False, 9, finish_reason="FinishReason.LENGTH") is True
 
 
 def test_unknown_split_raises(tmp_path: Path):
@@ -656,6 +658,101 @@ def test_audit_selected_continuation_none_raises():
             seed=0,
             encode_fn=encode,
         )
+
+
+def test_audit_uses_each_continuation_finish_reason(monkeypatch):
+    pytest.importorskip("torch")
+
+    from grace_gc.audit import run as audit_run
+    from grace_gc.audit.run import _bundles_from_engines
+    from grace_gc.core.layout import collect_lora_layout
+    from grace_gc.data.math_data import MathRecord
+    from grace_gc.trainer.cpu_tiny import TinyLoRAActor
+    from grace_gc.trainer.tiny_engine import make_tiny_engines
+
+    seen = []
+
+    def capture_truncated(full_ids, prompt_len, max_new, finished, eos_id, finish_reason=None):
+        seen.append(finish_reason)
+        return False
+
+    monkeypatch.setattr(audit_run, "_length_truncated", capture_truncated)
+
+    actor = TinyLoRAActor()
+    engines = make_tiny_engines(actor, actor.vocab)
+    engines.generate_prefix = lambda prompts, max_new, rng, stream: (
+        [list(p) + [1, 2] for p in prompts],
+        np.zeros(len(prompts), dtype=bool),
+    )
+    reasons = iter(["stop", "length"])
+
+    def cont(prefixes, selected, max_new, rng):
+        reason = next(reasons)
+        engines.last_rollout = {"continue_finish_reasons": {0: reason}}
+        return [list(prefixes[0]) + [3, 4]]
+
+    engines.continue_selected = cont
+    rec = MathRecord("p", "q add two", "1")
+
+    def encode(_rec, n):
+        return [[1, 2]] * n, ["p"] * n, ["1"] * n
+
+    _bundles_from_engines(
+        [rec],
+        engines,
+        collect_lora_layout(actor.named_lora_params()),
+        n_prefixes=1,
+        n_cont=2,
+        decision=2,
+        max_new=8,
+        seed=0,
+        encode_fn=encode,
+    )
+    assert seen[-2:] == ["stop", "length"]
+
+
+def test_audit_finished_prefix_ignores_stale_continue_finish(monkeypatch):
+    pytest.importorskip("torch")
+
+    from grace_gc.audit import run as audit_run
+    from grace_gc.audit.run import _bundles_from_engines
+    from grace_gc.core.layout import collect_lora_layout
+    from grace_gc.data.math_data import MathRecord
+    from grace_gc.trainer.cpu_tiny import TinyLoRAActor
+    from grace_gc.trainer.tiny_engine import make_tiny_engines
+
+    seen = []
+
+    def capture_truncated(full_ids, prompt_len, max_new, finished, eos_id, finish_reason=None):
+        seen.append(finish_reason)
+        return False
+
+    monkeypatch.setattr(audit_run, "_length_truncated", capture_truncated)
+
+    actor = TinyLoRAActor()
+    engines = make_tiny_engines(actor, actor.vocab)
+    engines.last_rollout = {"continue_finish_reasons": {0: "length"}}
+    engines.generate_prefix = lambda prompts, max_new, rng, stream: (
+        [list(p) + [1, actor.eos_id] for p in prompts],
+        np.ones(len(prompts), dtype=bool),
+    )
+    rec = MathRecord("p", "q add two", "1")
+
+    def encode(_rec, n):
+        return [[1, 2]] * n, ["p"] * n, ["1"] * n
+
+    _bundles_from_engines(
+        [rec],
+        engines,
+        collect_lora_layout(actor.named_lora_params()),
+        n_prefixes=1,
+        n_cont=2,
+        decision=2,
+        max_new=8,
+        seed=0,
+        encode_fn=encode,
+    )
+    assert seen[-1] is None
 
 
 def test_prescan_sets_baseline_to_sample_mean():
@@ -1188,6 +1285,10 @@ def test_audit_prefix_at_t_is_nested():
     assert _keep_prefix_at_t(pref2, 2, 2, fin2)
     assert not _keep_prefix_at_t(pref8, 2, 8, fin8)
     assert fin3 and _keep_prefix_at_t(pref3, 2, 3, fin3)
+    truncated = [1, 2, 10, 11]
+    pref_short, fin_short = _prefix_at_t(truncated, 2, 8, False, 99)
+    assert not fin_short
+    assert _keep_prefix_at_t(pref_short, 2, 8, fin_short)
 
 
 def test_variance_cost_uses_actual_prefix_tokens():

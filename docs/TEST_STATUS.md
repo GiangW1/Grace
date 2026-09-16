@@ -12,13 +12,13 @@
 - `tests/test_methods.py`：八个方法入口、assemble_ghat 数值、Reward-CV 不同 q 不同 p、成功头随前缀特征变化、GRPO-short 为每题 16 起步
 - `tests/test_layout_and_reduce.py`：LoRA 布局、缺名报错、全局 N、非零 f 校正
 - `tests/test_data_eval_audit.py`：去重分割互斥、标记 split、嵌套 boxed、parse_rate=2/3、ρ_L≠1、DAPO 对话列表与 ground_truth、JSON 字符串字段还原、GPU chat_template 编码、保留 role/content 消息、未闭合 thinking 硬失败、超长对话先缩短 user 文本以保住 assistant 头，模板本身超长才退回截尾、未标记 DAPO 规模语料预留校准 256/审计 240 且评测拒绝整库 DAPO、审计 PLC 用 t_L 后 token 代理、verl 风格 `extra_info.index=0` 保留为题号以免 256/240 划分被静默打乱；冲突金标整组丢掉；`\left`/`\dfrac`/`\frac{\pi}{n}` 规范化；`\text{Evelyn}` 字面匹配；verify 先看抽出的 pred；MATH-500 格式指令与 `looks_like_math500` 用加载数不是截断后的 8；health 记 baseline b 与 A 零梯度是否因 B≈0
-- `tests/test_format_warmup.py`：tiny LoRA B 在格式 SFT 后会动；训练写 `format_warmup.json`
+- `tests/test_format_warmup.py`：tiny LoRA B 在格式 SFT 后会动；只编码推理开头；`format_warmup.json` 写 `trained=reasoning lead`、`gold_in_loss=false`、`eos_in_loss=false`
 - `tests/test_config_loop.py`：配置、checkpoint、CPU 训练逐步写轨迹/`steps.jsonl`/`run.log`/账本/逐步快照；同名 run-dir 再跑加 UTC 后缀
 - `tests/test_grpo.py`：组均值优势、GRPO 必续写、抽题在池够大时无放回以免同题两组合成一组
 - `tests/test_multistep_and_eval.py`：多步训练、续训、评测/审计自行生成、Prompt-CV 用题目特征
 - `tests/test_gpu_entry.py::test_u7_amp_reduce_clip_order_cpu_reference`：clip/N 的 CPU 参考
-- `tests/test_gpu_entry.py`：`n_gpu>1` 在 `train()` 入口硬失败；FSDP 无 process group 硬失败；GPU 审计入口不再是 stub；vLLM `finish_reason=stop` 且 token 里没有 EOS 时标 finished，只在 `stop_reason` 属于 stop 集合时才补 token（不把 Qwen3-Base 的 `<|endoftext|>` 当成 ChatML `<|im_end|>`）；`finish_reason` 枚举 `STOP` 也标结束，`LENGTH` 不标；`SamplingParams` 带上 `stop_token_ids`、空 `stop`、`repetition_penalty=1`、`min_p=0` 且显式 `top_k=-1`；拒收 `stop_token_ids` 时硬失败，只允许丢掉 `min_p`/`repetition_penalty`；Qwen ChatML 同时停 `<|im_end|>` 与 `<|endoftext|>`；输出条数必须等于 prompt 数，且必须带 `prompt_token_ids` 且不能乱序；空 completion 报错；同题多起步若 rollout 完全相同则硬失败（list SamplingParams 只生效第一条种子会塌掉 GRPO/GRACE）；GPU 评测 avg@4 若四次生成完全相同也硬失败，避免忽略种子后把 avg@1 报成 avg@4；LoRA 同步后必须 `add_lora`、清 prefix cache 且写入新目录，请求名带 id，路径为绝对路径，保存后必须有 `adapter_config.json` 和权重文件；多步训练先 `remove_lora` 再加新适配器，避免 `max_loras=4` 挤掉当前快照；`add_lora`/`reset_prefix_cache` 不得返回未等待的 awaitable；`require_gpu_stack` 不再把没用到的 verl 当作硬依赖；GPU 评测没有 checkpoint 会报错；vLLM 拒收 seed 时硬失败而不是无种子采样；GPU 训练入口会套上方法默认预算；actor/vLLM 加载带 `trust_remote_code`；vLLM `generation_config="vllm"` 以免 Qwen3-Base 的 2048 上限裁掉评测 4096，且 TypeError 时不得丢掉该参数；vLLM 默认 `gpu_memory_utilization=0.5`、`max_model_len=5120` 以便和同卡 HF actor 共存且评测 4096 放得下；GPU 评测先写 LoRA 再释放 actor 后才建 vLLM；yaml 里过短的 `max_model_len` 也会被抬到 prompt+eval；logprob 前向不取 hidden states
-- `tests/test_review2.py`：方差×成本、answer 0、split 冲突、pass@k、assemble_ghat、EOS、轨迹级 natural_finish、GRPO-short 每题 16 起步、审计 grid/嵌套前缀、frozen predictor、LoRA-only ckpt、fit/eval 按 path 切开、残差长度混合、审计长度不绑 GRPO-short 训练 1024、续训检查 U 维、Reward-CV 风险头/成功头和 LoRA 参数名顺序、提前结束的路径不进入更大的 t、方差×成本用实际前缀长度、next_n 把前缀算进 token 预算、t_A 用 Var(R)、ρ_L 用 M/(M-1)、门内曲线、ρ 分母用最早前缀、审计 G 用独立 16 样本通过率、EMA 从 0.5 起步、题级 EMA 用批均值、未见题 4 样本预扫初始化 b(x)、headline t_L 用判定半边上置信界、曲线按题平均、答案已写出的前缀退出主曲线、GRPO-short 截断仍保留已解析奖励、续写剩余步数按实际前缀长度、审计 JL 在生成时降维且大 d 用 count-sketch、GRPO-short 评测默认 4096 不继承训练 1024、GPU 无 eval 段时也用 4096 以免和 GRPO-short 对不齐、next_n 改变 N 时仍保持每题 16 起步、审计/预扫/评测空续写硬失败、真实流逐条 backward 与整批 backward 的 `.grad` 一致、评测 CLI 打印 avg@k 而不是「n 次里至少对一次」、`--answers` 无配置时用 jsonl 的 n 作 k、vLLM abort 不记成自然结束、length 提前停也算截断、Wilson 与 per-t λ、smoke 不是 256/512 stub
+- `tests/test_gpu_entry.py`：`n_gpu>1` 在 `train()` 入口硬失败；FSDP 无 process group 硬失败；GPU 审计入口不再是 stub；vLLM `finish_reason=stop` 且 token 里没有 EOS 时标 finished，只在 `stop_reason` 属于 stop 集合时才补 token（不把 Qwen3-Base 的 `<|endoftext|>` 当成 ChatML `<|im_end|>`）；`finish_reason` 枚举 `STOP` 也标结束，`LENGTH` 不标；`SamplingParams` 带上 `stop_token_ids`、空 `stop`、`repetition_penalty=1`、`min_p=0` 且显式 `top_k=-1`；拒收 `stop_token_ids` 时硬失败，只允许丢掉 `min_p`/`repetition_penalty`；Qwen ChatML 同时停 `<|im_end|>` 与 `<|endoftext|>`；输出条数必须等于 prompt 数，且必须带 `prompt_token_ids` 且不能乱序；空 completion 报错；同题多起步若 rollout 完全相同则硬失败（list SamplingParams 只生效第一条种子会塌掉 GRPO/GRACE）；GPU 评测 avg@4 若四次生成完全相同也硬失败，避免忽略种子后把 avg@1 报成 avg@4；LoRA 同步后必须 `add_lora`、清 prefix cache 且写入新目录，请求名带 id，路径为绝对路径，保存后必须有 `adapter_config.json` 和权重文件；多步训练先 `remove_lora` 再加新适配器，避免 `max_loras=4` 挤掉当前快照；`add_lora`/`reset_prefix_cache` 不得返回未等待的 awaitable；`require_gpu_stack` 不再把没用到的 verl 当作硬依赖；GPU 评测没有 checkpoint 会报错；vLLM 拒收 seed 时硬失败而不是无种子采样；GPU 训练入口会套上方法默认预算；actor/vLLM 加载带 `trust_remote_code`；vLLM `generation_config="vllm"` 以免 Qwen3-Base 的 2048 上限裁掉评测 4096，且 TypeError 时不得丢掉该参数；vLLM 默认 `gpu_memory_utilization=0.5`；`max_model_len` 按 `prompt+生成+64` 抬（下限 5120，Pilot 评测 4096 为 5184）；GPU 评测先写 LoRA 再释放 actor 后才建 vLLM；`FinishReason.LENGTH` 规范名按截断计；logprob 前向不取 hidden states
+- `tests/test_review2.py`：方差×成本、answer 0、split 冲突、pass@k、assemble_ghat、EOS、轨迹级 natural_finish、GRPO-short 每题 16 起步、审计 grid/嵌套前缀、frozen predictor、LoRA-only ckpt、fit/eval 按 path 切开、残差长度混合、审计长度不绑 GRPO-short 训练 1024、续训检查 U 维、Reward-CV 风险头/成功头和 LoRA 参数名顺序、提前结束的路径不进入更大的 t、方差×成本用实际前缀长度、next_n 把前缀算进 token 预算、t_A 用 Var(R)、ρ_L 用 M/(M-1)、门内曲线、ρ 分母用最早前缀、审计 G 用独立 16 样本通过率、EMA 从 0.5 起步、题级 EMA 用批均值、未见题 4 样本预扫初始化 b(x)、headline t_L 用判定半边上置信界、曲线按题平均、答案已写出的前缀退出主曲线（只认最后一行交卷，过程 boxed 不算）、截断短前缀仍进入 64/128、审计多次续写各自记 finish_reason、GRPO-short 截断仍保留已解析奖励、续写剩余步数按实际前缀长度、审计 JL 在生成时降维且大 d 用 count-sketch、GRPO-short 评测默认 4096 不继承训练 1024、GPU 无 eval 段时也用 4096 以免和 GRPO-short 对不齐、next_n 改变 N 时仍保持每题 16 起步、审计/预扫/评测空续写硬失败、真实流逐条 backward 与整批 backward 的 `.grad` 一致、评测 CLI 打印 avg@k 而不是「n 次里至少对一次」、`--answers` 无配置时用 jsonl 的 n 作 k、vLLM abort 不记成自然结束、length 提前停也算截断、Wilson 与 per-t λ、smoke 不是 256/512 stub
 
 ## 需要服务器 GPU 再跑
 
@@ -32,16 +32,19 @@
 ## 本机最近一次结果（2026-09-16）
 
 ```text
-199 passed, 1 skipped
+214 passed, 9 deselected
 ```
 
-本次覆盖：官方 DAPO 冲突题整组丢掉、rule_reward 先验抽出答案再 verify、MATH-500 格式指令、`looks_like_math500` 用加载数、审计长度跟 eval/audit 而不是 GRPO-short 训练帽、共享格式 SFT、smoke 1024/2048、`\text{}`/`\pi` 归一、baseline/LoRA health 字段。跳过项：`test_u6_gpu_fp64_entry_is_defined`（无 CUDA；有 stack 时会跑 FP64 对照）。
+命令：`python -m pytest tests -k "not complete_final_expression and not u6_gpu"`。  
+`complete_final_expression` 在 Windows 上会踩 math-verify 的 WinError 6；`u6_gpu` 要 CUDA。有 stack 时 U6 会跑 FP64 对照。
+
+本次相对已推送的 `bd5f64f`：SFT 只训推理开头；`FinishReason.LENGTH` 按截断；审计只认最后一行交卷；截断短前缀不丢 64/128；续写结束原因按次记录；vLLM 上下文留 64 token 余量。没有真实 GPU 数字。
 
 ## 如何跑
 
 ```bash
-python -m pytest tests
+python -m pytest tests -k "not complete_final_expression and not u6_gpu"
 python scripts/train.py --config configs/experiments/minimal.yaml --run-dir runs/cpu-smoke
 ```
 
-GPU 按 README 全流程：先 smoke Full-PG，再 Pilot。不把 tiny / 旧 smoke 数字写成实测。
+GPU 按 README 全流程：先 smoke Full-PG，再 Pilot。不把 tiny / 2026-09-16 两次服务器 smoke 写成实测。

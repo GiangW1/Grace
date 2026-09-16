@@ -129,6 +129,7 @@ def test_length_finish_short_of_budget_is_truncated():
         name = "LENGTH"
 
     assert generated_was_truncated(100, 4096, False, _Length()) is True
+    assert generated_was_truncated(100, 4096, False, "FinishReason.LENGTH") is True
 
 
 def test_qwen_chat_stop_ids_include_im_end_and_endoftext():
@@ -740,8 +741,15 @@ def test_eval_writes_lora_before_starting_vllm():
     assert src.index("del actor") < src.index("llm = build_vllm_engine")
     assert src.index("apply_lora_request") < src.index("generate_answers_vllm")
     assert "max_model_len" in src
-    assert "max(have, 5120, need)" in src
-    assert src.index("prompt_max_tokens") < src.index("llm = build_vllm_engine")
+    assert src.index("vllm_needed_max_model_len") < src.index("llm = build_vllm_engine")
+    assert "prompt_max_tokens" in src
+
+
+def test_vllm_needed_max_model_len_has_slack():
+    from grace_gc.backends.verl_trainer import vllm_needed_max_model_len
+
+    assert vllm_needed_max_model_len({"prompt_max_tokens": 1024, "eval": {"max_new_tokens": 4096}}) == 5184
+    assert vllm_needed_max_model_len({"vllm": {"max_model_len": 8192}}, 4096) == 8192
 
 
 def test_ensure_bf16_casts_ignored_dtype():

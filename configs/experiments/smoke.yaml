@@ -1,7 +1,7 @@
 # First GPU chain check. Finish this before Pilot scale.
 # predictor.warmup_steps=0 means allocation starts immediately. health.json
 # allocating_with_untrained_predictor is true only while the reservoir is empty.
-# 1024/2048 plus format SFT (lead + Answer:, no gold/EOS).
+# 1024/2048 plus format SFT (reasoning lead only; no Answer:/gold/EOS).
 # Still not Pilot (2048/4096).
 method: grace
 backend: gpu_verl

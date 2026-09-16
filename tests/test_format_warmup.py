@@ -14,11 +14,11 @@ def test_format_warmup_accepts_hf_batch_encoding():
         chat_template = None
 
         def __call__(self, text, **kwargs):
-            from grace_gc.data.format_prompt import format_sft_answer_prefix, format_sft_lead
+            from grace_gc.data.format_prompt import format_sft_lead
 
             raw = str(text)
             table = {
-                format_sft_lead() + format_sft_answer_prefix(): [1, 2, 7],
+                format_sft_lead(): [1, 2],
                 "2": [8],
                 "1+1": [4, 5, 6],
             }
@@ -27,8 +27,9 @@ def test_format_warmup_accepts_hf_batch_encoding():
 
     prompt, response, n_train = _encode_sft_pair(Tokenizer(), MathRecord("1", "1+1", "2"), 2)
     assert prompt == [4, 5]
-    assert response == [1, 2, 7]
-    assert n_train == 3
+    assert response == [1, 2]
+    assert n_train == 2
+    assert 7 not in response
     assert 8 not in response
     assert 9 not in response
 
@@ -73,5 +74,6 @@ def test_format_warmup_tiny_moves_lora_b(tmp_path: Path):
     out = run_training(cfg, tmp_path / "fw")
     assert out["run_status"] == "complete"
     payload = json.loads((tmp_path / "fw" / "format_warmup.json").read_text(encoding="utf-8"))
+    assert payload["trained"] == "reasoning lead"
     assert payload["gold_in_loss"] is False
     assert payload["eos_in_loss"] is False

@@ -245,7 +245,7 @@ def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, 
         if not ckpt:
             raise ValueError("GPU evaluation needs a training checkpoint")
         from grace_gc.backends.hf_actor import named_lora_params
-        from grace_gc.backends.verl_trainer import build_vllm_engine, load_lora_actor
+        from grace_gc.backends.verl_trainer import build_vllm_engine, load_lora_actor, vllm_needed_max_model_len
         from grace_gc.backends.weight_sync import apply_lora_request, make_lora_request, reset_vllm_prefix_cache, save_lora_adapter
         from grace_gc.data.tokenize import load_hf_tokenizer, tokenizer_inventory
         from grace_gc.data.reward import require_math_verify
@@ -267,9 +267,7 @@ def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         vllm_cfg = dict(cfg.get("vllm") or {})
-        need = int(cfg.get("prompt_max_tokens", 1024)) + int(max_new)
-        have = int(vllm_cfg.get("max_model_len", 0) or 0)
-        vllm_cfg["max_model_len"] = max(have, 5120, need)
+        vllm_cfg["max_model_len"] = vllm_needed_max_model_len(cfg, max_new)
         llm = build_vllm_engine(str(cfg["model_path"]), vllm_cfg, int(cfg.get("lora", {}).get("rank", 16)))
         if getattr(build_vllm_engine, "last", None):
             RunDirectory(run_dir).write_json("vllm_engine.json", build_vllm_engine.last)

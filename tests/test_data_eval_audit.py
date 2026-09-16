@@ -368,6 +368,15 @@ def test_format_sft_trains_last_line_not_immediate_answer():
     assert (lead + format_sft_answer_prefix()).startswith(lead)
 
 
+def test_answer_already_emitted_ignores_process_boxed():
+    from grace_gc.data.reward import answer_already_emitted
+
+    assert answer_already_emitted("work \\boxed{27} more steps") is False
+    assert answer_already_emitted("the answer is 10\nnow continue") is False
+    assert answer_already_emitted("work\nAnswer: 343/27") is True
+    assert answer_already_emitted("done \\boxed{27}") is True
+
+
 def test_extract_prefers_later_answer_line():
     from grace_gc.data.reward import extract_answer
 

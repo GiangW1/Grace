@@ -68,8 +68,8 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
         engines = box.get("engines")
         if engines is not None:
             roll = dict(engines.last_rollout or {})
-            finish_map = {}
-            stop_map = {}
+            finish_map = dict(roll.get("continue_finish_reasons") or {})
+            stop_map = dict(roll.get("continue_stop_reasons") or {})
             if phase is not None:
                 for j, i in enumerate(idx):
                     if phase.finish_reasons:

@@ -94,6 +94,15 @@ def _shutdown_vllm_engine(llm) -> None:
         core.shutdown()
 
 
+def vllm_needed_max_model_len(cfg: dict[str, Any], max_new: int | None = None) -> int:
+    """Leave slack so prompt + eval 4096 is not exactly max_model_len."""
+    prompt = int(cfg.get("prompt_max_tokens", 1024) or 1024)
+    ev = cfg.get("eval") or {}
+    gen = int(max_new if max_new is not None else ev.get("max_new_tokens") or cfg.get("max_new_tokens") or 4096)
+    have = int((cfg.get("vllm") or {}).get("max_model_len") or cfg.get("max_model_len") or 0)
+    return max(have, 5120, prompt + int(gen) + 64)
+
+
 def build_vllm_engine(model_path: str, cfg: dict[str, Any], lora_rank: int):
     from grace_gc.backends.vllm_two_phase import _require_vllm
 
@@ -214,7 +223,9 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         info = run_format_warmup_hf(actor, tokenizer, train_recs, cfg, ledger)
         run.write_json("format_warmup.json", info)
         print(f"format warmup steps={info.get('steps')} last_loss={info.get('last_loss')}")
-    llm = build_vllm_engine(str(model_path), cfg.get("vllm", {}), int(cfg.get("lora", {}).get("rank", 16)))
+    vllm_cfg = dict(cfg.get("vllm") or {})
+    vllm_cfg["max_model_len"] = vllm_needed_max_model_len(cfg)
+    llm = build_vllm_engine(str(model_path), vllm_cfg, int(cfg.get("lora", {}).get("rank", 16)))
     if getattr(build_vllm_engine, "last", None):
         run.write_json("vllm_engine.json", build_vllm_engine.last)
     engines, extra = make_gpu_engines(actor, llm, tokenizer, cfg, Path(run.root) / "lora")

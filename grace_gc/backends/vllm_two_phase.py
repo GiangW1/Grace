@@ -115,12 +115,10 @@ def _usable_stop_reason(stop_reason, stop_set: set[int]) -> int | None:
 def _finish_name(finish_reason) -> str | None:
     if finish_reason is None:
         return None
-    if isinstance(finish_reason, str):
-        return finish_reason.lower()
-    name = getattr(finish_reason, "name", None)
-    if name is not None:
-        return str(name).lower()
-    return str(finish_reason).lower()
+    if not isinstance(finish_reason, str):
+        name = getattr(finish_reason, "name", None)
+        finish_reason = str(name) if name is not None else str(finish_reason)
+    return str(finish_reason).lower().rsplit(".", 1)[-1]
 
 
 def _is_stop_finish(finish_reason) -> bool:
@@ -251,7 +249,7 @@ def generate_phase(
         token_ids.append(full)
         prompt_lens.append(len(prompt))
         finished.append(ended)
-        finish_reasons.append(None if raw_finish is None else str(raw_finish))
+        finish_reasons.append(_finish_name(raw_finish))
         stop_reasons.append(None if raw_stop is None else raw_stop)
     # Independent draws can coincide, especially for short format-SFT answers.
     sampling = getattr(build_sampling_params, "last", None)

@@ -11,7 +11,7 @@ from grace_gc.audit.prefix_audit import PrefixBundle, audit_bundles, jl_project
 from grace_gc.core.layout import collect_lora_layout, pack_grads
 from grace_gc.data.format_prompt import apply_solve_instruction
 from grace_gc.data.math_data import MathRecord
-from grace_gc.data.reward import extract_answer, rule_reward
+from grace_gc.data.reward import answer_already_emitted, rule_reward
 from grace_gc.logging_util.forensics import persist_load_report, write_failed
 from grace_gc.logging_util.ledger import ComputeLedger, Timer
 from grace_gc.logging_util.run_dir import RunDirectory, resolve_run_dir, utc_now
@@ -20,6 +20,20 @@ from grace_gc.versions import collect_environment
 from grace_gc.trainer.algorithm import _length_truncated, _traj_natural_finish
 from grace_gc.trainer.checkpoint import load_checkpoint
 from grace_gc.trainer.state_io import load_numpy_module_state
+
+
+def _prefix_finish_reasons(engines) -> list:
+    roll = getattr(engines, "last_rollout", None) or {}
+    return list(roll.get("prefix_finish_reasons") or [])
+
+
+def _continue_finish_reason(engines, index: int = 0):
+    """Read the finish_reason written by the continue that just ran."""
+    roll = getattr(engines, "last_rollout", None) or {}
+    cont = roll.get("continue_finish_reasons") or {}
+    if index in cont:
+        return cont[index]
+    return cont.get(str(index))
 
 
 def _independent_pass_rate(engines, rec: MathRecord, encode_fn, n_base: int, max_new: int, rng, eos_id) -> float:
@@ -31,11 +45,15 @@ def _independent_pass_rate(engines, rec: MathRecord, encode_fn, n_base: int, max
     finished = np.asarray(finished, dtype=bool).reshape(-1)
     if len(fulls) != len(prompts) or finished.shape[0] != len(prompts):
         raise ValueError(f"audit pass-rate generate_prefix returned {len(fulls)} for {len(prompts)} samples")
+    prefix_frs = _prefix_finish_reasons(engines)
     rewards = []
     for i, full in enumerate(fulls):
         resp = full[len(prompts[i]) :]
         text = engines.decode(resp) if engines.decode else ""
-        truncated = _length_truncated(full, len(prompts[i]), int(max_new), bool(finished[i]), eos_id)
+        fr = prefix_frs[i] if i < len(prefix_frs) else None
+        truncated = _length_truncated(
+            full, len(prompts[i]), int(max_new), bool(finished[i]), eos_id, finish_reason=fr
+        )
         scored = rule_reward(text, rec.answer, truncated=truncated)
         rewards.append(0.0 if scored is None else float(scored))
     return float(np.mean(rewards)) if rewards else 0.5
@@ -101,7 +119,7 @@ def _prefix_at_t(long_ids, prompt_len: int, t: int, finished_long: bool, eos_id:
     if eos_id is not None and cut and is_stop_token(cut[-1], eos_id):
         return prefix, True
     if len(cut) < int(t):
-        return prefix, True
+        return prefix, bool(finished_long)
     return prefix, False
 
 
@@ -208,26 +226,28 @@ def _bundles_from_engines(
                 rem = max(0, int(max_new) - (len(prefix) - prompt_len))
                 if finished[loc] or rem <= 0:
                     # One observation: cloning n_cont identical rows would overweight this prefix.
+                    # Do not reuse a previous continue's finish_reason.
                     fulls = [prefix]
+                    finish_reasons = [None]
                 else:
                     fulls = []
+                    finish_reasons = []
                     for _ in range(n_cont):
                         one = engines.continue_selected([prefix], np.ones(1, dtype=bool), rem, rng)
                         if one[0] is None:
                             raise ValueError("continuation returned no sequence for a selected audit prefix")
                         fulls.append(one[0])
+                        finish_reasons.append(_continue_finish_reason(engines, 0))
                 rewards = []
                 grads = []
                 costs = []
                 suffix_texts = []
-                for full in fulls:
+                for full, cont_fr in zip(fulls, finish_reasons):
                     if full is None:
                         raise ValueError("audit continuation produced an empty sequence")
                     resp = full[prompt_len:]
                     text = engines.decode(resp) if engines.decode else ""
                     gen_cont = max(len(full) - len(prefix), 0)
-                    roll = getattr(engines, "last_rollout", None) or {}
-                    cont_fr = (roll.get("continue_finish_reasons") or {}).get(0)
                     traj_fin = _traj_natural_finish(
                         bool(finished[loc]),
                         full,
@@ -273,7 +293,7 @@ def _bundles_from_engines(
                         c_hat=c_list[loc],
                         finished=bool(finished[loc]),
                         prefix_tokens=max(len(prefix) - prompt_len, 0),
-                        answer_emitted=extract_answer(prefix_text) is not None,
+                        answer_emitted=answer_already_emitted(prefix_text),
                         prefix_text=prefix_text,
                         suffix_texts=suffix_texts,
                         prompt_truncated=prompt_truncated,
@@ -433,7 +453,7 @@ def generate_bundles_gpu(
 
         from grace_gc.backends.gpu_engine import make_gpu_engines
         from grace_gc.backends.hf_actor import named_lora_params
-        from grace_gc.backends.verl_trainer import build_vllm_engine, load_lora_actor
+        from grace_gc.backends.verl_trainer import build_vllm_engine, load_lora_actor, vllm_needed_max_model_len
         from grace_gc.data.reward import require_math_verify
         from grace_gc.data.tokenize import encode_records_hf, load_hf_tokenizer, tokenizer_inventory
         from grace_gc.trainer.state_io import check_snapshot_identity
@@ -451,7 +471,9 @@ def generate_bundles_gpu(
         payload = load_checkpoint(ckpt)
         check_snapshot_identity(payload, cfg)
         load_numpy_module_state(named_lora_params(actor), payload.get("actor") or {})
-        llm = build_vllm_engine(str(model_path), cfg.get("vllm", {}), int(cfg.get("lora", {}).get("rank", 16)))
+        vllm_cfg = dict(cfg.get("vllm") or {})
+        vllm_cfg["max_model_len"] = vllm_needed_max_model_len(cfg, _audit_max_new(cfg))
+        llm = build_vllm_engine(str(model_path), vllm_cfg, int(cfg.get("lora", {}).get("rank", 16)))
         if work_dir is not None and getattr(build_vllm_engine, "last", None):
             from grace_gc.logging_util.run_dir import RunDirectory
 

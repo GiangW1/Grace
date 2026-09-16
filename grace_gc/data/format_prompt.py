@@ -58,7 +58,8 @@ def apply_solve_instruction(records: list[MathRecord]) -> list[MathRecord]:
     return out
 
 
-# First tokens of the SFT target. CE trains these so generation does not start at Answer:.
+# SFT trains only this opener. The DAPO prompt already asks for a last-line Answer:.
+# Do not train "Answer: " or gold: that made smoke emit Answer+digits+EOS.
 FORMAT_SFT_LEAD = "I will solve this step by step.\n\n"
 FORMAT_SFT_ANSWER_PREFIX = "Answer: "
 

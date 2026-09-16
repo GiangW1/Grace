@@ -20,7 +20,7 @@
 - [x] **CODE-10**: 实现分布式固定全局 N、完整参数布局、负预测校正、AMP/归约/clip 顺序，以及 FP64 对照和 U6/U7 测试入口。
 - [x] **CODE-11**: 保存和恢复 actor、optimizer、预测器、baseline、basis/reservoir 与 RNG 等实际续训状态。
 - [x] **CODE-12**: 实现 Full-PG、Uniform-HT、Uniform-CV、Reward-CV、Prompt-CV、GRACE；提供独立实用轨道 GRPO、GRPO-short 配置。
-- [x] **CODE-13**: 实现数学数据去重与训练/校准/审计/评测分割；官方 DAPO 冲突金标整组丢掉并写 `data_conflicts.json`；MATH-500 套 `Answer:` 指令；`format_warmup` 共享格式 SFT；规则奖励含 boxed/`\text{}`/`\pi` 归一，以及答案首次可解析位置与自然结束/截断处理。
+- [x] **CODE-13**: 实现数学数据去重与训练/校准/审计/评测分割；官方 DAPO 冲突金标整组丢掉并写 `data_conflicts.json`；MATH-500 套 `Answer:` 指令；`format_warmup` 共享格式 SFT（只训推理开头，不训 `Answer:`/金标/EOS）；规则奖励含 boxed/`\text{}`/`\pi` 归一，以及答案首次可解析位置与自然结束/截断处理。
 - [x] **CODE-14**: 实现部署/研究成本记录，按 GPU 预留墙钟记时、处理重叠并另列 CPU 时间，不把不同 GPU 时间直接折算。
 - [x] **CODE-15**: 实现独立完整作答评测：论文数学基准配置、avg/pass@k、解析/截断率、time-to-target 和真实验证的困难题首次成功 HVD。
 - [x] **CODE-16**: 实现可调规模的同前缀独立续写审计、全空间/JL 核对、正交补诊断、rho_L/rho_A、t_L/t_A、ELF/LAG/PLC 与区间统计。
