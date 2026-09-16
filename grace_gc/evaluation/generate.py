@@ -193,6 +193,12 @@ def generate_answers_vllm(
                 vllm_finish_reasons=vllm_finish_reasons,
             )
         )
+        print(
+            f"phase=eval_problem_done problems={len(items)}/{len(records)} "
+            f"samples={sample_i} problem_id={rec.problem_id} "
+            f"response_tokens={sum(response_tokens)} truncated={sum(truncated)}",
+            flush=True,
+        )
     return items
 
 
