@@ -14,7 +14,7 @@
 | GPU rollout | vLLM，明确两阶段请求与独立 RNG 合同 | 候选 verl 发布要求 vLLM ≥0.18；不能仅靠该下界选择任意最新版；中 |
 | 模型 | Qwen/Qwen3-4B-Base，q_proj/v_proj LoRA r=16 α=32 dropout=0 | 官方 config 已核实；使用时记录可获得的 revision；高 |
 | 数学数据与奖励 | BytedTsinghua-SIA/DAPO-Math-17k、Hugging Face Math-Verify | 官方入口核实；使用时记录实际来源、版本和数据分割；高 |
-| 部署 | Linux/NVIDIA，CPU 与 GPU extras 分离 | A100 4 卡优先，5090 两组 8 卡随后；硬件兼容待实测 |
+| 部署 | Linux/NVIDIA，CPU 与 GPU extras 分离 | 规划仍是 4×A100 与后续 8×5090；**代码只接受单卡**，`n_gpu>1` 会拒绝。硬件兼容待实测 |
 
 ## Version Policy
 

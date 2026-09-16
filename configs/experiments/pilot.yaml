@@ -5,6 +5,9 @@ n_start: 512
 n_prompts: 64
 decision_tokens: 512
 max_new_tokens: 2048
+format_warmup:
+  steps: 256
+  batch_size: 8
 predictor:
   k: 8
   warmup_steps: 20

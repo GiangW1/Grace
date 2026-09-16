@@ -129,19 +129,26 @@ def _problem_id(raw: dict, fallback: str) -> str:
     )
 
 
-def _read_parquet_rows(path: Path) -> list[dict]:
+def _read_parquet_rows(path: Path):
     try:
         import pyarrow.parquet as pq
 
-        return pq.read_table(path).to_pylist()
+        pf = pq.ParquetFile(path)
     except Exception:
-        try:
-            import pandas as pd
-        except Exception as exc:
-            raise ImportError(
-                f"reading {path} needs pyarrow or pandas; export JSONL or install one of them"
-            ) from exc
-        return pd.read_parquet(path).to_dict(orient="records")
+        pf = None
+    if pf is not None:
+        for batch in pf.iter_batches(batch_size=8192):
+            for raw in batch.to_pylist():
+                yield raw
+        return
+    try:
+        import pandas as pd
+    except Exception as exc:
+        raise ImportError(
+            f"reading {path} needs pyarrow or pandas; export JSONL or install one of them"
+        ) from exc
+    for raw in pd.read_parquet(path).to_dict(orient="records"):
+        yield raw
 
 
 def _raw_rows(path: Path):
@@ -163,14 +170,40 @@ def _raw_rows(path: Path):
         yield line_no, raw
 
 
+def last_load_report() -> dict | None:
+    report = getattr(load_math_records, "last", None)
+    return None if report is None else dict(report)
+
+
+def looks_like_math500(records=None, path=None, n_source=None) -> bool:
+    hint = str(path or "").replace("\\", "/").lower()
+    if "math-500" in hint or "math500" in hint or "math_500" in hint:
+        return True
+    if n_source is not None and int(n_source) == 500:
+        return True
+    recs = list(records or [])
+    if n_source is None and len(recs) == 500:
+        return True
+    for rec in recs[:16]:
+        src = str(getattr(rec, "source", "") or "").lower()
+        if "math-500" in src or "math500" in src or "math_500" in src:
+            return True
+    return False
+
+
 def load_math_records(path: str | Path) -> list[MathRecord]:
     path = Path(path)
     if not path.is_file():
         raise FileNotFoundError(f"data file is not readable: {path}")
     seen: dict[str, MathRecord] = {}
-    out: list[MathRecord] = []
+    order: list[str] = []
+    conflict_keys: dict[str, dict] = {}
+    first_loc: dict[str, int] = {}
+    n_raw = 0
+    n_same = 0
     known_splits = {"train", "calib", "audit", "eval"}
     for loc, raw in _raw_rows(path):
+        n_raw += 1
         prompt = _prompt_text(raw.get("prompt") if raw.get("prompt") is not None else raw.get("problem") or raw.get("question"))
         answer = _answer_text(raw)
         if not prompt:
@@ -191,15 +224,51 @@ def load_math_records(path: str | Path) -> list[MathRecord]:
         )
         if key in seen:
             prev = seen[key]
-            if prev.answer != rec.answer or (
-                prev.split is not None and rec.split is not None and prev.split != rec.split
-            ):
-                raise ValueError(f"duplicate prompt conflict at {path}:{loc}")
+            if prev.split is not None and rec.split is not None and prev.split != rec.split:
+                raise ValueError(f"duplicate prompt split conflict at {path}:{loc}")
+            if prev.answer != rec.answer:
+                info = conflict_keys.setdefault(
+                    key,
+                    {
+                        "prompt_hash": key,
+                        "problem_id": prev.problem_id,
+                        "answers": {prev.answer},
+                        "first_loc": first_loc.get(key, loc),
+                    },
+                )
+                info["answers"].add(rec.answer)
+                continue
+            n_same += 1
             if prev.split is None and rec.split is not None:
                 prev.split = rec.split
             continue
         seen[key] = rec
-        out.append(rec)
+        order.append(key)
+        first_loc[key] = loc
+    conflicts = []
+    out: list[MathRecord] = []
+    for key in order:
+        if key in conflict_keys:
+            info = conflict_keys[key]
+            conflicts.append(
+                {
+                    "prompt_hash": info["prompt_hash"],
+                    "problem_id": info["problem_id"],
+                    "answers": sorted(info["answers"]),
+                    "first_loc": info["first_loc"],
+                }
+            )
+            continue
+        out.append(seen[key])
+    report = {
+        "path": str(path),
+        "n_raw": n_raw,
+        "n_kept": len(out),
+        "n_same_answer_dedup": n_same,
+        "n_conflict_groups": len(conflicts),
+        "conflicts": conflicts,
+    }
+    load_math_records.last = report
     return out
 
 

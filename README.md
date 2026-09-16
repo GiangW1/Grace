@@ -1,8 +1,197 @@
 # GRACE-GC
 
-Qwen3-4B-Base 上的 GRACE 训练、评测和前缀审计。本机先做 CPU 检查；服务器从下面第 1 步开始。
+Qwen3-4B-Base 上的 GRACE 训练、评测和前缀审计。本机先做 CPU 检查；服务器按下面全流程做。
 
 显示名用 **GRACE-GC**，避免和另外两篇同名工作混淆。多卡 allreduce 还没接上，**先单卡**。
+
+下面是一条能按顺序做完的全流程。第 1–7 节是同一条线的细节，卡住时再翻。
+
+## 全流程
+
+顺序：**环境 → 资源 → 绑卡/tmux → smoke Full-PG → Pilot Full-PG → Pilot GRACE → 其余对照**。先看 Full-PG 会不会学，再跑 GRACE。不要一上来就用 `grace` 做第一份 GPU 作业。
+
+5090 把下面所有 `configs/hardware/a100_1.yaml` 换成 `configs/hardware/rtx5090_1.yaml`。两种卡分别记时，不要折成 A100-hours。
+
+### A. 本机（没有 GPU 也做）
+
+```bash
+pip install -e ".[cpu,dev]"
+python -m pytest tests
+```
+
+### B. 服务器环境
+
+```bash
+conda create -n grace python=3.11 -y
+conda activate grace
+```
+
+先装 vLLM（或 `pip install "verl[vllm]==0.9.0"`），再进仓库：
+
+```bash
+git clone https://github.com/yiweinanzi/Grace.git
+cd Grace
+pip install -e ".[gpu,dev]"
+pip install pyarrow
+python -c "import torch, vllm, transformers, peft, math_verify; print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), torch.version.cuda); print('vllm', vllm.__version__); print('gpu', torch.cuda.get_device_name(0) if torch.cuda.is_available() else None)"
+```
+
+`torch.cuda.is_available()` 必须是 `True`。`backend=gpu_verl` 只是配置别名，实现是 **HF actor + vLLM 两阶段**，不是 verl PPO。启动时会打印 `implementation=gpu_vllm_hf`，并写 `startup.json`。
+
+### C. 模型和数据
+
+```bash
+python scripts/fetch_assets.py --root data
+# 把脚本打印的三行 export 贴进当前 shell
+test -d "$MODEL" && test -f "$TRAIN_DATA" && test -f "$EVAL_DATA" && echo ok
+```
+
+官方 DAPO parquet 可直接加载。同一题面金标冲突的整组丢掉，写入 `data_conflicts.json`（大约 12 组），不会硬失败。MATH-500 套与 DAPO 相同的 `Answer:` 指令。`format_warmup` 是共享格式 SFT（LoRA 上教 `Answer:`），不是 `predictor.warmup_steps`。
+
+### D. 绑卡和会话
+
+```bash
+export CUDA_VISIBLE_DEVICES=0
+tmux new -s grace
+```
+
+`hardware.n_gpu` 保持 1。训练、评测、审计都在这个 tmux 里做；断 SSH 用 `Ctrl-b d`，回来 `tmux attach -t grace`。同一张卡不要并行开两份作业。
+
+### E. Smoke：先 Full-PG（4 步）
+
+短跑是 1024/2048 token + 32 步格式 SFT，评测/审计各 8 题。只确认链路，不是 Pilot。
+
+```bash
+export CUDA_VISIBLE_DEVICES=0
+python scripts/train.py \
+  --config configs/default.yaml \
+  --config configs/experiments/smoke.yaml \
+  --config configs/hardware/a100_1.yaml \
+  --method full_pg \
+  --backend gpu_verl \
+  --model-path "$MODEL" \
+  --data-path "$TRAIN_DATA" \
+  --num-steps 4 \
+  --run-dir runs/smoke-fullpg
+
+python scripts/evaluate.py --generate \
+  --config configs/default.yaml \
+  --config configs/experiments/smoke.yaml \
+  --config configs/hardware/a100_1.yaml \
+  --backend gpu_verl \
+  --model-path "$MODEL" \
+  --data-path "$EVAL_DATA" \
+  --checkpoint runs/smoke-fullpg/checkpoint.npz \
+  --run-dir runs/smoke-eval-fullpg
+
+python scripts/audit.py --generate \
+  --config configs/default.yaml \
+  --config configs/experiments/smoke.yaml \
+  --config configs/hardware/a100_1.yaml \
+  --backend gpu_verl \
+  --model-path "$MODEL" \
+  --data-path "$TRAIN_DATA" \
+  --checkpoint runs/smoke-fullpg/checkpoint.npz \
+  --run-dir runs/smoke-audit-fullpg
+```
+
+看 `run.log` 里有没有 `phase=prescan` / `phase=prefix` / `phase=continue_done` / `step N`。第一份适配器叫 `lora/step-2`，那是 vLLM adapter id（首次 sync），**不是**已经训完 2 步。`health.json` 里 `lora_A_grad_zero_expected` 在 B≈0 时可以为真（PEFT ΔW=B·A）。`all_reward_zero` 且 `n_baseline_zero>0` 时，`baseline_collapsed_with_zero_reward` 为真，优势会是 0。审计里 `Var(R)=0` 时 ρ 是 NaN，这是公式，不是崩了。
+
+### F. Pilot：先 Full-PG 30 步
+
+```bash
+export CUDA_VISIBLE_DEVICES=0
+python scripts/train.py \
+  --config configs/default.yaml \
+  --config configs/experiments/pilot.yaml \
+  --config configs/hardware/a100_1.yaml \
+  --method full_pg \
+  --seed 17 \
+  --backend gpu_verl \
+  --model-path "$MODEL" \
+  --data-path "$TRAIN_DATA" \
+  --num-steps 30 \
+  --run-dir runs/fullpg-seed17
+
+python scripts/evaluate.py --generate \
+  --config configs/default.yaml \
+  --config configs/experiments/pilot.yaml \
+  --config configs/hardware/a100_1.yaml \
+  --backend gpu_verl \
+  --model-path "$MODEL" \
+  --data-path "$EVAL_DATA" \
+  --checkpoint runs/fullpg-seed17/checkpoint.npz \
+  --run-dir runs/eval-fullpg-seed17
+```
+
+完整 Pilot 审计（240 题 × 16 前缀 × 8 个 t × 16 续写）很大，确认训练和评测没问题后再开：
+
+```bash
+python scripts/audit.py --generate \
+  --config configs/default.yaml \
+  --config configs/experiments/pilot.yaml \
+  --config configs/hardware/a100_1.yaml \
+  --backend gpu_verl \
+  --model-path "$MODEL" \
+  --data-path "$TRAIN_DATA" \
+  --checkpoint runs/fullpg-seed17/checkpoint.npz \
+  --run-dir runs/audit-fullpg-seed17
+```
+
+### G. Pilot：再 GRACE 30 步
+
+GRACE 的 warmup 是 20 步，`--num-steps` 必须大于 20。评测/审计必须用**该方法自己的** `checkpoint.npz`。
+
+```bash
+export CUDA_VISIBLE_DEVICES=0
+python scripts/train.py \
+  --config configs/default.yaml \
+  --config configs/experiments/pilot.yaml \
+  --config configs/hardware/a100_1.yaml \
+  --method grace \
+  --seed 17 \
+  --backend gpu_verl \
+  --model-path "$MODEL" \
+  --data-path "$TRAIN_DATA" \
+  --num-steps 30 \
+  --run-dir runs/grace-seed17
+
+python scripts/evaluate.py --generate \
+  --config configs/default.yaml \
+  --config configs/experiments/pilot.yaml \
+  --config configs/hardware/a100_1.yaml \
+  --backend gpu_verl \
+  --model-path "$MODEL" \
+  --data-path "$EVAL_DATA" \
+  --checkpoint runs/grace-seed17/checkpoint.npz \
+  --run-dir runs/eval-grace-seed17
+```
+
+### H. 其余对照
+
+每个方法单独目录，换 `--method` 和 `--run-dir`。机制对照：`uniform_ht`、`uniform_cv`、`reward_cv`、`prompt_cv`。实用对照：`grpo`、`grpo_short`。续训的 `--num-steps` 是再跑多少步，不是累计到多少。
+
+已有生成结果时只重算统计：
+
+```bash
+python scripts/evaluate.py --answers runs/eval-fullpg-seed17/eval_per_problem.jsonl --run-dir runs/eval-recompute
+python scripts/audit.py --bundles runs/audit-fullpg-seed17/audit_bundles.jsonl --run-dir runs/audit-recompute
+```
+
+### 读目录时别搞错
+
+| 现象 | 含义 |
+|---|---|
+| `implementation=gpu_vllm_hf` | 实际是 HF+vLLM，不是 verl PPO |
+| `lora/step-2` 在第 1 步前就出现 | adapter id，首次 sync；不是 `state.step` |
+| `phase=prescan` 很久没新日志 | 未见过的题各抽 4 条满长样本写 baseline；现在会打心跳 |
+| `data_conflicts.json` | 官方 DAPO 冲突题面已丢掉 |
+| `format_warmup.json` | 共享格式 SFT，默认 Pilot 256 步、smoke 32 步 |
+| `baseline_collapsed_with_zero_reward` | 全零奖励且 b=0，优势为 0 |
+| `lora_A_grad_zero_expected` | B≈0 时 A 梯度应为 0 |
+| 审计 ρ 为 NaN | 该子集 `Var(R)=0`，按公式就是 NaN |
+
+同一个 `--run-dir` 再跑一次（非续训）会改写成 `原名-时间`，不会盖掉上一次。不写 `--run-dir` 时目录是 `runs/train-YYYYMMDD-HHMMSS`。
 
 ## 1. 环境
 
@@ -109,9 +298,10 @@ export TRAIN_DATA=$(find "$PWD/data/dapo" -name '*.parquet' | head -n 1)
 export EVAL_DATA=$(find "$PWD/data/math500" \( -name '*.parquet' -o -name '*.jsonl' \) | head -n 1)
 ```
 
-- 训练文件是官方 DAPO 的 JSONL 或 parquet。`prompt` 可以是对话列表，答案读 `reward_model.ground_truth`。
-- 评测必须是单独的 MATH-500，字段用 `problem`/`prompt` 和 `answer`。不要把 DAPO 再切 10% 当考卷。
+- 训练文件是官方 DAPO 的 JSONL 或 parquet。`prompt` 可以是对话列表，答案读 `reward_model.ground_truth`。官方 parquet 可直接加载；同一题面金标冲突的整组会丢掉，并写入 `data_conflicts.json`（大约 12 组）。
+- 评测必须是单独的 MATH-500，字段用 `problem`/`prompt` 和 `answer`。不要把 DAPO 再切 10% 当考卷。MATH-500 会套上与 DAPO 相同的 `Answer:` 格式指令。
 - 未标记且够大的 DAPO 会按 seed 17 切出校准 256、审计 240，其余训练。缺金标会报错。
+- `format_warmup` 是论文要求的共享格式 SFT（LoRA 上教 `Answer:`），不是预测器的 `predictor.warmup_steps`。默认 256 步；续训会跳过。
 
 检查路径存在再往下：
 
@@ -149,6 +339,8 @@ tmux new -s grace
 完整 Pilot 审计先别和训练抢盘、抢卡；确认训练和评测完成后再开。
 
 ## 4. 先打通（短跑）
+
+第一份短跑用 Full-PG（见上面全流程 E）。下面是同一套命令换成 `grace` 的写法。
 
 ```bash
 export CUDA_VISIBLE_DEVICES=0
@@ -188,7 +380,7 @@ python scripts/audit.py --generate \
   --run-dir runs/smoke-audit
 ```
 
-训练、评测、审计都过了，再放大。短跑评测只跑 8 题（`eval.n_problems`）；不设这个字段时评测仍是 MATH-500 整份。短跑数字只用来确认链路。不写 `--run-dir` 时目录是 `runs/train-YYYYMMDD-HHMMSS`（评测/审计同理）。同一个 `--run-dir` 再跑一次（非续训）会改写成 `原名-时间`，不会盖掉上一次。
+训练、评测、审计都过了，再放大。短跑是 1024/2048 token 加 32 步格式 SFT，评测 8 题（`eval.n_problems`）；不设这个字段时评测仍是 MATH-500 整份。短跑数字只用来确认链路，不是 Pilot。不写 `--run-dir` 时目录是 `runs/train-YYYYMMDD-HHMMSS`（评测/审计同理）。同一个 `--run-dir` 再跑一次（非续训）会改写成 `原名-时间`，不会盖掉上一次。
 
 ## 5. 最小证伪（Pilot 规模、单卡）
 
@@ -262,17 +454,17 @@ python scripts/train.py \
 
 每个方法单独目录。机制对照：`full_pg`、`uniform_ht`、`uniform_cv`、`reward_cv`、`prompt_cv`、`grace`。实用对照：`grpo`、`grpo_short`。
 
-先看 Full-PG 或 GRPO 会不会学，再跑 GRACE。
+先看 Full-PG 或 GRPO 会不会学，再跑 GRACE。命令顺序见上面全流程 F–H。
 
 ## 7. 看哪些文件
 
 | 目录里的文件 | 内容 |
 |---|---|
-| `run_meta.json` / `summary.json` | 开始/结束 UTC 时间、实际目录。同名目录再跑会写成 `原名-YYYYMMDD-HHMMSS` |
-| `run.log` | 标准输出和异常 |
-| `summary.json` | `complete` 或 `failed` |
-| `steps.jsonl` / `health.json` | 每步汇总；全零奖励/优势、全 p=1、LoRA A/B、未训预测器分配、nvidia-smi、logprob 对照 |
-| `data_splits.json` / `tokenizer.json` / `vllm_engine.json` / `sampling.json` | 切分、tokenizer stop、实际引擎参数 |
+| `config.yaml` / `environment.json` / `run_meta.json` / `startup.json` | 实际配置、包版本、进程、开始时间、实际目录；GPU 启动时写明 `gpu_vllm_hf` |
+| `summary.json` | `complete` 或 `failed`，以及开始/结束 UTC。同名再跑写成 `原名-YYYYMMDD-HHMMSS` |
+| `run.log` | 标准输出和异常；GPU 训练有 `phase=prescan` / `prefix` / `continue_done` |
+| `steps.jsonl` / `health.json` | 每步汇总；全零奖励/优势、baseline b、LoRA A/B（缺梯度 vs 零梯度）、未训预测器分配、nvidia-smi、logprob 对照 |
+| `data_splits.json` / `data_conflicts.json` / `format_warmup.json` / `tokenizer.json` / `vllm_engine.json` / `sampling.json` | 切分、丢掉的冲突题、格式 SFT、tokenizer stop、实际引擎参数 |
 | `logprob_probe.jsonl` | 同序列 HF vs vLLM logprob（不可用则记原因） |
 | `trajectories.jsonl` | 每条起步：p/Z/f/r̂/ĉ/优势/长度/结束原因/答案/token |
 | `compute_ledger.json` / `compute_ledger.jsonl` | 按步、按阶段的墙钟 |

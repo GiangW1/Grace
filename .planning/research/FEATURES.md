@@ -1,14 +1,14 @@
 # GRACE 功能范围
 
-**Updated:** 2026-09-15
+**Updated:** 2026-09-16
 
 ## 本轮全部实现
 
 - 全空间HT、受限概率分配、CPU参考与tiny LoRA。
 - 历史梯度审计、reservoir、basis、坐标/风险/成本头、IPW。
-- verl/vLLM/FSDP两阶段生成、双流更新和checkpoint。
+- HF actor + vLLM 两阶段生成（配置别名 `gpu_verl`）、双流更新和checkpoint；`n_gpu>1` 未接线。
 - 机制六方法及实用GRPO、GRPO-short；已有参数自然支持的消融直接用配置。
-- 数学数据和规则验证、真实成本记录、独立解题评测和HVD。
+- 数学数据（官方 DAPO 冲突整组丢掉）、共享格式 SFT、规则验证、真实成本记录、独立解题评测和HVD。
 - 同前缀审计、全空间/JL核查、统计与作图、小规模及完整Pilot参数。
 - A100/5090运行配置与简短README。
 

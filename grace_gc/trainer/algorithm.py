@@ -147,6 +147,11 @@ def _pad_features(feats: np.ndarray, k: int) -> np.ndarray:
     return np.pad(feats, ((0, 0), (0, k - feats.shape[1])))
 
 
+def _gpu_progress(cfg: dict[str, Any] | None, msg: str) -> None:
+    if str((cfg or {}).get("backend", "")) == "gpu_verl":
+        print(msg, flush=True)
+
+
 def prescan_unseen_baselines(
     engines: StepEngines,
     state: TrainState,
@@ -226,10 +231,19 @@ def run_algorithm1_step(
     audit_s = float(pred_cfg.get("audit_s", 0.125))
     n_prescan = int((cfg.get("baseline") or {}).get("prescan", 0) or 0)
     timer = Timer()
+    if n_prescan > 0:
+        _gpu_progress(
+            cfg,
+            f"phase=prescan n={n} n_prescan={n_prescan} max_new={max_new} "
+            f"(unseen problems, {n_prescan} full samples each)",
+        )
     n_prescanned = prescan_unseen_baselines(
         engines, state, prompt_ids, problem_ids, golds, max_new, n_prescan
     )
     timings = {"prescan": timer.lap()}
+    if n_prescanned:
+        _gpu_progress(cfg, f"phase=prescan_done n_prescanned={n_prescanned} wall_s={timings['prescan']:.1f}")
+    _gpu_progress(cfg, f"phase=prefix n={n} decision={decision}")
 
     prefixes, finished = engines.generate_prefix(prompt_ids, decision, state.rng, "token")
     finished = np.asarray(finished, dtype=bool).reshape(-1)
@@ -358,6 +372,7 @@ def run_algorithm1_step(
             reward = 0.0
         rewards.append(reward)
     timings["continue"] = timer.lap()
+    _gpu_progress(cfg, f"phase=continue_done n_rewards={len(rewards)} wall_s={timings['continue']:.1f}")
 
     adv = advantages_for_method(state.spec.objective, rewards, problem_ids, state.baseline)
     named = engines.named_lora()

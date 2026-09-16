@@ -10,7 +10,8 @@ import numpy as np
 from grace_gc.config import default_config, load_config, merge_configs, require_training_leaves_warmup, validate_config
 from grace_gc.core.layout import collect_lora_layout
 from grace_gc.core.rng import IsolatedRNG, seed_all
-from grace_gc.data.math_data import MathRecord, load_math_records, split_records
+from grace_gc.data.format_prompt import apply_solve_instruction
+from grace_gc.data.math_data import MathRecord, last_load_report, load_math_records, split_records
 from grace_gc.data.reward import rule_reward
 from grace_gc.data.tokenize import encode_records_tiny
 from grace_gc.logging_util.forensics import persist_training_step, reset_run_artifacts, trajectory_row, write_data_inventory, write_failed
@@ -125,12 +126,15 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
     rng = IsolatedRNG.create(int(cfg.get("seed", 17)))
     data_source = "synthetic"
     if cfg.get("data_path"):
-        buckets = split_records(load_math_records(cfg["data_path"]), seed=int(cfg.get("split_seed", 17)))
+        buckets = split_records(
+            apply_solve_instruction(load_math_records(cfg["data_path"])),
+            seed=int(cfg.get("split_seed", 17)),
+        )
         train_recs = buckets["train"]
         if not train_recs:
             raise ValueError("training split is empty")
         data_source = "file"
-        write_data_inventory(run, buckets, cfg.get("data_path"), source="file")
+        write_data_inventory(run, buckets, cfg.get("data_path"), source="file", load_report=last_load_report())
     else:
         train_recs = _synthetic_records()
         write_data_inventory(run, {"train": train_recs}, None, source="synthetic")
@@ -174,6 +178,12 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
     steps = int(cfg.get("num_steps", 1))
     if ledger is None:
         ledger = ComputeLedger(n_gpu=0, hardware="cpu")
+    if not resume:
+        from grace_gc.trainer.format_warmup import format_warmup_steps, run_format_warmup_tiny
+
+        if format_warmup_steps(cfg):
+            info = run_format_warmup_tiny(actor, train_recs, actor.vocab, cfg, ledger)
+            run.write_json("format_warmup.json", info)
     last = {}
     for _ in range(steps):
         if last.get("next_n"):
@@ -246,6 +256,11 @@ def run_training(cfg: dict[str, Any], run_dir: str | Path) -> dict[str, Any]:
     try:
         with RunLog(run.root / "run.log"):
             print(f"run start {started} method={spec.name} backend={backend} dir={run.root}")
+            if backend == "gpu_verl":
+                print(
+                    "implementation=gpu_vllm_hf "
+                    "(HF actor + vLLM two-phase; config alias gpu_verl is not verl PPO)"
+                )
             if Path(run.root).resolve() != requested.resolve():
                 print(f"run-dir {requested} already had artifacts; writing to {run.root}")
             if not cfg.get("single_batch_smoke"):
@@ -317,7 +332,7 @@ def maybe_load_data(cfg: dict[str, Any]) -> dict[str, list] | None:
     path = cfg.get("data_path")
     if not path:
         return None
-    return split_records(load_math_records(path), seed=int(cfg.get("split_seed", 17)))
+    return split_records(apply_solve_instruction(load_math_records(path)), seed=int(cfg.get("split_seed", 17)))
 
 
 def score_text(text: str | None, gold: str, truncated: bool = False) -> float | None:

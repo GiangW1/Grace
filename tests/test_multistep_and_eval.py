@@ -84,6 +84,22 @@ def test_eval_and_audit_generate(tmp_path: Path):
         tmp_path / "eval-cap",
     )
     assert capped["n_problems"] == 1
+    cap_splits = json.loads((tmp_path / "eval-cap" / "data_splits.json").read_text(encoding="utf-8"))
+    assert cap_splits["n_source"] == 3
+    assert cap_splits["looks_like_math500"] is False
+    run_eval(
+        recs,
+        {
+            "backend": "cpu_tiny",
+            "eval": {"n_problems": 1, "k": 1, "n": 1},
+            "max_new_tokens": 3,
+            "seed": 1,
+            "data_path": str(tmp_path / "MATH-500.jsonl"),
+        },
+        tmp_path / "eval-m500",
+    )
+    m500 = json.loads((tmp_path / "eval-m500" / "data_splits.json").read_text(encoding="utf-8"))
+    assert m500["looks_like_math500"] is True
     eval_rows = [
         json.loads(line)
         for line in (tmp_path / "eval" / "eval_per_problem.jsonl").read_text(encoding="utf-8").splitlines()

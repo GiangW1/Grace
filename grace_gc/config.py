@@ -63,6 +63,9 @@ def validate_config(cfg: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("decision_tokens and max_new_tokens must be positive")
     if decision > max_new:
         raise ValueError(f"decision_tokens {decision} exceeds max_new_tokens {max_new}")
+    fw_steps = int((cfg.get("format_warmup") or {}).get("steps", 0) or 0)
+    if fw_steps < 0:
+        raise ValueError(f"format_warmup.steps must be >= 0, got {fw_steps}")
     method = str(cfg.get("method", "grace")).replace("-", "_").lower()
     model_path = cfg.get("model_path")
     if model_path is not None and str(model_path):
@@ -117,6 +120,7 @@ def default_config() -> dict[str, Any]:
         },
         "lora": {"rank": 16, "alpha": 32.0, "dropout": 0.0, "targets": ["q_proj", "v_proj"]},
         "optim": {"lr": 1e-4, "betas": [0.9, 0.99], "weight_decay": 0.0, "grad_clip": 1.0},
+        "format_warmup": {"steps": 0, "batch_size": 4},
         "baseline": {"ema_alpha": 0.7, "prescan": 4},
         "hardware": {"name": "cpu", "n_gpu": 0},
         "analysis": {

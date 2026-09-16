@@ -316,13 +316,31 @@ def test_unknown_split_raises(tmp_path: Path):
 
 
 def test_duplicate_prompt_conflict(tmp_path: Path):
+    from grace_gc.data.math_data import last_load_report
+
     path = tmp_path / "d.jsonl"
     rows = [
         {"problem_id": "a", "prompt": "same", "answer": "1"},
         {"problem_id": "b", "prompt": "same", "answer": "2"},
+        {"problem_id": "c", "prompt": "other", "answer": "3"},
     ]
     path.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="duplicate prompt"):
+    recs = load_math_records(path)
+    assert [r.problem_id for r in recs] == ["c"]
+    report = last_load_report()
+    assert report["n_conflict_groups"] == 1
+    assert report["n_kept"] == 1
+    assert sorted(report["conflicts"][0]["answers"]) == ["1", "2"]
+
+
+def test_duplicate_prompt_split_conflict_raises(tmp_path: Path):
+    path = tmp_path / "s.jsonl"
+    rows = [
+        {"problem_id": "a", "prompt": "same", "answer": "1", "split": "train"},
+        {"problem_id": "b", "prompt": "same", "answer": "1", "split": "eval"},
+    ]
+    path.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="split conflict"):
         load_math_records(path)
 
 
@@ -911,6 +929,17 @@ def test_eval_does_not_inherit_grpo_short_train_budget():
     assert (k, n, max_new, temperature, top_p) == (4, 4, 4096, 0.2, 0.7)
 
 
+def test_smoke_yaml_is_not_token_stub():
+    from grace_gc.trainer.loop import build_run_config
+
+    cfg = build_run_config(["configs/experiments/smoke.yaml"], {})
+    assert cfg["max_new_tokens"] == 1024
+    assert cfg["eval"]["max_new_tokens"] == 2048
+    assert cfg["audit"]["max_new_tokens"] == 2048
+    assert cfg["format_warmup"]["steps"] == 32
+    assert cfg["predictor"]["warmup_steps"] == 0
+
+
 def test_build_run_config_eval_matches_paper_avg4():
     from grace_gc.trainer.loop import build_run_config
 
@@ -952,11 +981,23 @@ def test_audit_rejects_decision_past_max_new(tmp_path: Path):
         run_audit([], {"decision_tokens": 8, "max_new_tokens": 4, "backend": "cpu_tiny"}, tmp_path / "bad")
 
 
-def test_audit_drops_grid_past_method_budget(tmp_path: Path):
+def test_audit_does_not_inherit_grpo_short_train_budget(tmp_path: Path):
     pytest.importorskip("torch")
-    from grace_gc.audit.run import run_audit
+    from grace_gc.audit.run import _audit_max_new, run_audit
     from grace_gc.data.math_data import MathRecord
 
+    assert (
+        _audit_max_new(
+            {
+                "backend": "cpu_tiny",
+                "method": "grpo_short",
+                "max_new_tokens": 2048,
+                "eval": {"max_new_tokens": 4096},
+            }
+        )
+        == 4096
+    )
+    assert _audit_max_new({"backend": "gpu_verl", "method": "grpo_short", "max_new_tokens": 1024}) == 4096
     recs = [MathRecord("1", "add two", "1")]
     out = run_audit(
         recs,
@@ -964,17 +1005,59 @@ def test_audit_drops_grid_past_method_budget(tmp_path: Path):
             "backend": "cpu_tiny",
             "method": "grpo_short",
             "max_new_tokens": 2048,
-            "decision_tokens": 16,
-            "audit": {"n_prefixes": 1, "n_continuations": 1, "decision_grid": [8, 1536]},
+            "decision_tokens": 8,
+            "eval": {"max_new_tokens": 32},
+            "audit": {"n_prefixes": 1, "n_continuations": 1, "decision_grid": [8, 16]},
             "seed": 0,
             "prompt_max_tokens": 8,
         },
         tmp_path / "gs-audit",
     )
-    assert 1536 not in out["times"]
+    assert 16 in out["times"]
     assert 8 in out["times"]
-    assert out["max_new_tokens"] == 1024
-    assert out["decision_grid_dropped"] == [1536]
+    assert out["max_new_tokens"] == 32
+    assert "decision_grid_dropped" not in out
+
+
+def test_audit_prefers_audit_max_new(tmp_path: Path):
+    pytest.importorskip("torch")
+    from grace_gc.audit.run import _audit_max_new, run_audit
+    from grace_gc.data.math_data import MathRecord
+
+    assert (
+        _audit_max_new(
+            {
+                "max_new_tokens": 2048,
+                "eval": {"max_new_tokens": 4096},
+                "audit": {"max_new_tokens": 16},
+            }
+        )
+        == 16
+    )
+    recs = [MathRecord("1", "add two", "1")]
+    out = run_audit(
+        recs,
+        {
+            "backend": "cpu_tiny",
+            "method": "grpo_short",
+            "max_new_tokens": 2048,
+            "decision_tokens": 8,
+            "eval": {"max_new_tokens": 4096},
+            "audit": {
+                "n_prefixes": 1,
+                "n_continuations": 1,
+                "decision_grid": [8, 64],
+                "max_new_tokens": 16,
+            },
+            "seed": 0,
+            "prompt_max_tokens": 8,
+        },
+        tmp_path / "gs-audit-cap",
+    )
+    assert 64 not in out["times"]
+    assert 8 in out["times"]
+    assert out["max_new_tokens"] == 16
+    assert out["decision_grid_dropped"] == [64]
 
 
 def test_tiny_eval_rejects_lora_only_checkpoint(tmp_path: Path):

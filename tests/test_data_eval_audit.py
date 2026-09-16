@@ -290,12 +290,68 @@ def test_marked_split_honored(tmp_path: Path):
 
 
 def test_reward_and_parse_position():
+    from grace_gc.data.reward import normalize_answer
+
     text = "think \\boxed{42} done"
     assert rule_reward(text, "42") == 1.0
     assert first_parseable_index(["think ", "\\boxed{42}", " done"]) == 1
     assert rule_reward(None, "1") is None
     assert extract_boxed("x \\boxed{\\frac{1}{2}} y") == "\\frac{1}{2}"
     assert rule_reward("think \\boxed{\\frac{1}{2}}", "\\frac{1}{2}") == 1.0
+    assert normalize_answer(r"\left( 3, \dfrac{\pi}{2} \right)") == r"(3,\pi/2)"
+    assert normalize_answer("(3, \u03c0/2)") == r"(3,\pi/2)"
+    assert normalize_answer(r"\frac{\pi}{2}") == r"\pi/2"
+    assert rule_reward(r"think \boxed{(3,\pi/2)}", r"\left( 3, \dfrac{\pi}{2} \right)") == 1.0
+    assert rule_reward("The girl is Evelyn.", r"\text{Evelyn}") == 1.0
+    assert rule_reward(r"think \boxed{Evelyn}", r"\text{Evelyn}") == 1.0
+    assert rule_reward("The girl is Alice.", r"\text{Evelyn}") == 0.0
+
+
+def test_rule_reward_verifies_extracted_pred(monkeypatch):
+    calls = []
+
+    def parse(value):
+        return str(value)
+
+    def verify(gold, pred):
+        calls.append(pred)
+        return pred == "1/2"
+
+    monkeypatch.setattr("grace_gc.data.reward.math_verify_fns", lambda: (parse, verify))
+    looping = r"\boxed{1/2} " + ("x" * 80)
+    assert rule_reward(looping, r"\frac{1}{2}") == 1.0
+    assert calls[0] == "1/2"
+
+
+def test_rule_reward_none_pred_still_tries_verify(monkeypatch):
+    def parse(value):
+        return str(value)
+
+    def verify(gold, pred):
+        return "42" in pred and "42" in gold
+
+    monkeypatch.setattr("grace_gc.data.reward.math_verify_fns", lambda: (parse, verify))
+    assert rule_reward("the value is 42.", "42") == 1.0
+
+
+def test_solve_instruction_and_math500_flag():
+    from grace_gc.data.format_prompt import apply_solve_instruction, ensure_solve_instruction, has_solve_instruction
+    from grace_gc.data.math_data import looks_like_math500
+
+    bare = "How many primes?"
+    wrapped = ensure_solve_instruction(bare)
+    assert "Answer: $Answer" in wrapped
+    assert has_solve_instruction(wrapped)
+    assert ensure_solve_instruction(wrapped) == wrapped
+    assert has_solve_instruction("Solve the following math problem step by step.\n\n1+1")
+    recs = apply_solve_instruction([MathRecord("1", bare, "2")])
+    assert "Answer: $Answer" in recs[0].prompt
+    assert recs[0].messages[0]["content"] == recs[0].prompt
+    eight = [MathRecord(str(i), "q", "1") for i in range(8)]
+    assert looks_like_math500(eight) is False
+    assert looks_like_math500(eight, n_source=500) is True
+    assert looks_like_math500(eight, path="data/MATH-500/test.parquet") is True
+    assert looks_like_math500([MathRecord("1", "q", "1", source="HuggingFaceH4/MATH-500")]) is True
 
 
 def test_eval_metrics():
@@ -355,3 +411,77 @@ def test_unfinished_single_row_cond_var_is_nan():
 
     assert np.isnan(_cond_var(np.array([[1.0, 0.0]]), finished=False))
     assert _cond_var(np.array([[1.0, 0.0]]), finished=True) == 0.0
+
+
+def test_text_gold_and_pi_frac_do_not_need_verify(monkeypatch):
+    monkeypatch.setattr("grace_gc.data.reward.math_verify_fns", lambda: None)
+    from grace_gc.data.reward import text_gold_in_response
+
+    assert text_gold_in_response("The girl is Evelyn.", r"\text{Evelyn}")
+    assert not text_gold_in_response("The girl is Alice.", r"\text{Evelyn}")
+    assert rule_reward("The girl is Evelyn.", r"\text{Evelyn}") == 1.0
+    assert rule_reward("The girl is Alice.", r"\text{Evelyn}") == 0.0
+    assert rule_reward(r"\boxed{(3,\pi/2)}", r"\left( 3, \frac{\pi}{2} \right)") == 1.0
+
+
+def test_lora_and_baseline_health_fields():
+    from grace_gc.logging_util.forensics import lora_param_health, step_health
+    from grace_gc.trainer.grace_step import StartRecord
+
+    class _P:
+        def __init__(self, data, grad=None):
+            self._data = np.asarray(data, dtype=np.float32)
+            self.grad = None if grad is None else _P(grad)
+
+        def detach(self):
+            return self
+
+        def float(self):
+            return self
+
+        def cpu(self):
+            return self
+
+        def numpy(self):
+            return self._data
+
+    health = lora_param_health(
+        [
+            ("q_proj.lora_A", _P([[1.0]], None)),
+            ("q_proj.lora_B", _P([[0.0]], [[0.0]])),
+        ]
+    )
+    assert health["n_lora_A_grad_missing"] == 1
+    assert health["n_lora_B_grad_zero"] == 1
+    assert health["lora_B_near_zero"] is True
+    assert health["lora_A_grad_zero_expected"] is True
+
+    rec = StartRecord(
+        problem_id="p",
+        finished=True,
+        p=1.0,
+        z=1.0,
+        f=np.zeros(1),
+        r_hat=0.0,
+        c_hat=1.0,
+        reward=0.0,
+        advantage=0.0,
+        g=None,
+        audited=False,
+    )
+    state = type(
+        "S",
+        (),
+        {
+            "step": 1,
+            "spec": type("M", (), {"use_predictor": False})(),
+            "reservoir": None,
+            "baseline": type("B", (), {"values": {"p": 0.0, "q": 0.5}})(),
+            "basis_id": None,
+        },
+    )()
+    out = step_health(state, {"records": [rec]})
+    assert out["mean_baseline_b"] == pytest.approx(0.25)
+    assert out["n_baseline"] == 2
+    assert out["n_baseline_zero"] == 1
+    assert out["baseline_collapsed_with_zero_reward"] is True

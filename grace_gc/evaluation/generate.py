@@ -5,10 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from grace_gc.data.math_data import MathRecord
+from grace_gc.data.format_prompt import apply_solve_instruction
+from grace_gc.data.math_data import MathRecord, looks_like_math500
 from grace_gc.data.reward import extract_answer
 from grace_gc.evaluation.eval_full import EvalItem, evaluate_items
-from grace_gc.logging_util.forensics import persist_eval_items, write_failed
+from grace_gc.logging_util.forensics import persist_eval_items, persist_load_report, write_failed
 from grace_gc.logging_util.ledger import ComputeLedger, Timer
 from grace_gc.logging_util.run_dir import RunDirectory, resolve_run_dir, utc_now
 from grace_gc.logging_util.run_log import RunLog
@@ -297,6 +298,9 @@ def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, 
 
 def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path) -> dict:
     backend = cfg.get("backend", "cpu_tiny")
+    n_source = len(records)
+    math500 = looks_like_math500(records, path=cfg.get("data_path"), n_source=n_source)
+    records = apply_solve_instruction(records)
     records = limit_eval_records(records, cfg)
     k, n, max_new, temperature, top_p = _eval_hparams(cfg)
     requested = Path(run_dir)
@@ -330,14 +334,23 @@ def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path
 
             if getattr(build_sampling_params, "last", None):
                 run.write_json("sampling.json", build_sampling_params.last)
+            report = persist_load_report(run, data_path=cfg.get("data_path"))
             run.write_json(
                 "data_splits.json",
                 {
                     "data_path": cfg.get("data_path"),
                     "eval_split": cfg.get("eval_split", "eval"),
+                    "n_source": n_source,
                     "n_loaded": len(records),
                     "n_problems": result.get("n_problems"),
-                    "looks_like_math500": len(records) == 500 or result.get("n_problems") == 500,
+                    "looks_like_math500": math500,
+                    "load": None
+                    if report is None
+                    else {
+                        "n_raw": report.get("n_raw"),
+                        "n_kept": report.get("n_kept"),
+                        "n_conflict_groups": report.get("n_conflict_groups"),
+                    },
                 },
             )
             print(f"eval done avg={result.get('avg')} pass_at_k={result.get('pass_at_k')}")

@@ -25,10 +25,10 @@
 
 ### Validated
 
-- [x] GRACE 全空间 HT、续写分配、tiny LoRA 与 CPU 数学测试（本机 pytest 43 passed）。
+- [x] GRACE 全空间 HT、续写分配、tiny LoRA 与 CPU 数学测试（本机 pytest 199 passed / 1 skipped，2026-09-16）。
 - [x] reservoir / basis / 预测器 / IPW / 审计梯度。
 - [x] 八个方法入口、checkpoint、分布式归约顺序的 CPU 参考。
-- [x] 数据分割、规则奖励、独立评测、前缀审计、账本、A100/5090 配置与 README。
+- [x] 数据分割、DAPO 冲突丢掉、格式 SFT、规则奖励、独立评测、前缀审计、账本、单卡配置与 README 全流程。
 
 GPU 两阶段真实训练与 U6 尚未在服务器验证。没有真实实验结果。
 
@@ -36,7 +36,7 @@ GPU 两阶段真实训练与 U6 尚未在服务器验证。没有真实实验结
 
 - [x] 实现 GRACE 全空间无偏梯度补全、续写分配和 CPU 参考测试。
 - [x] 实现历史梯度 reservoir、低秩基底、坐标/风险/成本预测器、IPW 与随机审计。
-- [x] 接入 verl/vLLM/FSDP 两阶段 rollout、分布式双流更新与保存恢复（代码已写，待 GPU）。
+- [x] 接入 HF actor + vLLM 两阶段 rollout、分布式双流更新与保存恢复（代码已写，待 GPU；`n_gpu>1` 拒绝）。
 - [x] 实现核心机制对照及 GRPO、GRPO-short，提供数学数据和独立评测入口。
 - [x] 实现真实成本记录、前缀审计、指标与图表脚本，提供小规模与完整 Pilot 参数。
 - [x] 提供 A100/5090 的运行配置和简短运行说明。
@@ -54,9 +54,9 @@ GPU 两阶段真实训练与 U6 尚未在服务器验证。没有真实实验结
 - 实际原稿：仓库根目录 GRACE_ICLR论文框架_v3.md；用户最初给出的嵌套路径不存在。
 - 原稿 SHA256：20b111105c42f116dbcc488355744bb72c5a90b08b8fdba333591bd63dc9a3e4。原稿保留不变。
 - 核心实现依据：§4–§6、§8、§13 和附录 B/F/G。
-- 仓库尚无实现代码。已有技术笔记供写对应模块时参考，不要求重新跑一遍调研流程。
-- 本机 Windows/PowerShell；Python 3.11.7、NumPy 1.26.4、torch 2.7.1+cpu、pytest 7.4.0 已查到安装元数据，尚未执行算法测试。
-- 首个实验目标为4×A100；未来两组各8×RTX5090，具体显存和拓扑通过配置适应。
+- 最近一次推送是 GitHub `master`（712c9e6）。其后本地还有未提交改动，不以该 hash 当作现役工作树。技术笔记供实现查阅，不要求重跑调研。
+- 本机 Windows 无 GPU；CPU 测试已跑。服务器按 README 全流程单卡起步。
+- 规划硬件为 4×A100，随后两组各 8×RTX5090；现在 `n_gpu>1` 不能启动。
 - GPU-hours 按硬件分别记录，不把5090时间直接叫作 A100-hours。
 
 ## 必须实现正确的数学内容
@@ -83,4 +83,4 @@ GPU 两阶段真实训练与 U6 尚未在服务器验证。没有真实实验结
 随代码更新勾选功能、记录重要方法偏离与已跑测试。已有论文与技术笔记保持可查，实际结果出来后再扩展实验计划。
 
 ---
-*Last updated: 2026-09-15 after user requested code-first implementation and Occam's razor*
+*Last updated: 2026-09-16 after format warmup, DAPO conflict drop, reward/heartbeat health fields, and README full-flow were aligned*

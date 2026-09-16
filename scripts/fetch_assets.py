@@ -94,6 +94,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise FileNotFoundError(f"no parquet/jsonl under {dest}")
             paths["EVAL_DATA"] = data
     print("# add these to the shell, then run training")
+    print("# official DAPO parquet is used as-is; conflicting gold groups are dropped at load")
     for key in ("MODEL", "TRAIN_DATA", "EVAL_DATA"):
         if key in paths:
             print(f"export {key}={paths[key]}")

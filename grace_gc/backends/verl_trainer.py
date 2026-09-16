@@ -13,8 +13,10 @@ from grace_gc.backends.gpu_engine import make_gpu_engines
 from grace_gc.backends.hf_actor import named_lora_params
 from grace_gc.core.layout import collect_lora_layout
 from grace_gc.core.rng import IsolatedRNG, seed_all
-from grace_gc.data.math_data import load_math_records, split_records
+from grace_gc.data.format_prompt import apply_solve_instruction
+from grace_gc.data.math_data import last_load_report, load_math_records, split_records
 from grace_gc.data.tokenize import encode_records_hf, load_hf_tokenizer, tokenizer_inventory
+from grace_gc.trainer.format_warmup import format_warmup_steps, run_format_warmup_hf
 from grace_gc.logging_util.forensics import persist_training_step, write_data_inventory
 from grace_gc.logging_util.ledger import ComputeLedger, Timer
 from grace_gc.logging_util.run_dir import RunDirectory
@@ -137,23 +139,42 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         packed = None
         if not data_path:
             raise ValueError("data_path or prompt_token_ids is required for GPU training")
-        buckets = split_records(load_math_records(data_path), seed=int(cfg.get("split_seed", 17)))
+        loaded = apply_solve_instruction(load_math_records(data_path))
+        buckets = split_records(loaded, seed=int(cfg.get("split_seed", 17)))
         train_recs = buckets["train"]
         if not train_recs:
             raise ValueError("training split is empty")
-        write_data_inventory(run, buckets, data_path, source="file")
+        write_data_inventory(run, buckets, data_path, source="file", load_report=last_load_report())
+        report = last_load_report()
+        if report and int(report.get("n_conflict_groups") or 0) > 0:
+            print(
+                f"dropped {report['n_conflict_groups']} conflicting prompt groups; "
+                "see data_conflicts.json"
+            )
 
     seed_all(int(cfg.get("seed", 17)))
     from grace_gc.data.reward import require_math_verify
 
     require_math_verify()
+    if ledger is None:
+        ledger = ComputeLedger(n_gpu=max(n_gpu, 1), hardware=str(cfg.get("hardware", {}).get("name", "gpu")))
     actor = load_lora_actor(str(model_path), cfg.get("lora", {}))
     actor = maybe_wrap_fsdp(actor, n_gpu)
+    if format_warmup_steps(cfg) and not cfg.get("resume") and train_recs:
+        info = run_format_warmup_hf(actor, tokenizer, train_recs, cfg, ledger)
+        run.write_json("format_warmup.json", info)
+        print(f"format warmup steps={info.get('steps')} last_loss={info.get('last_loss')}")
     llm = build_vllm_engine(str(model_path), cfg.get("vllm", {}), int(cfg.get("lora", {}).get("rank", 16)))
     if getattr(build_vllm_engine, "last", None):
         run.write_json("vllm_engine.json", build_vllm_engine.last)
     engines, extra = make_gpu_engines(actor, llm, tokenizer, cfg, Path(run.root) / "lora")
     extra["sync"]()
+    print(
+        "phase=post_sync implementation=gpu_vllm_hf "
+        f"adapter={extra.get('adapter_path')} lora_id={extra.get('lora_id')} "
+        "(lora/step-N is the vLLM adapter id, not state.step; first sync is step-2)",
+        flush=True,
+    )
 
     import torch
 
@@ -184,6 +205,7 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
     in_dim = 1
     predictor = None
     if spec.use_predictor:
+        print("phase=predictor_probe", flush=True)
         probe_ids, _pp, _gg, _mm = _batch_ids(rng)
         prefixes, _fin = engines.generate_prefix(probe_ids[:1], 2, rng, "token")
         feat = engines.prefix_features(prefixes, np.array([len(probe_ids[0])]), [0.5])["features"]
@@ -219,16 +241,45 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         check_snapshot_identity(load_checkpoint(cfg["resume"]), cfg)
         state = restore_train_state(cfg["resume"], actor, opt, in_dim, k, spec.name)
         extra["sync"]()
+        print(
+            f"phase=resume_sync adapter={extra.get('adapter_path')} lora_id={extra.get('lora_id')}",
+            flush=True,
+        )
         n_prompts, starts_per, n_start = resume_start_counts(cfg, spec, state)
 
-    if ledger is None:
-        ledger = ComputeLedger(n_gpu=max(n_gpu, 1), hardware=str(cfg.get("hardware", {}).get("name", "gpu")))
+    run.write_json(
+        "startup.json",
+        {
+            "implementation": "gpu_vllm_hf",
+            "backend_alias": "gpu_verl",
+            "note": "HF actor + vLLM two-phase generation; config backend gpu_verl is not verl PPO",
+            "method": spec.name,
+            "n_start": n_start,
+            "n_prompts": n_prompts,
+            "starts_per": starts_per,
+            "adapter_path": None if extra.get("adapter_path") is None else str(extra.get("adapter_path")),
+            "lora_id": extra.get("lora_id"),
+            "format_warmup_steps": 0 if cfg.get("resume") else format_warmup_steps(cfg),
+            "has_predictor": predictor is not None,
+        },
+    )
+    print(
+        f"phase=train_loop_begin method={spec.name} n_steps={cfg.get('num_steps')} "
+        f"n_start={n_start} n_prompts={n_prompts}",
+        flush=True,
+    )
+
     last = {}
     for _step in range(int(cfg.get("num_steps", 1))):
         if last.get("next_n"):
             n_prompts, starts_per, n_start = resolve_start_counts(cfg, spec, n_start=max(1, int(last["next_n"])))
         prompts, pids, golds, prompt_meta = _batch_ids(state.rng)
         step_timer = Timer()
+        print(
+            f"phase=train_step_begin next_step={int(state.step) + 1} "
+            f"n_prompts={n_prompts} starts_per={starts_per}",
+            flush=True,
+        )
         last = run_algorithm1_step(engines, state, prompts, pids, golds, cfg, opt, prompt_meta=prompt_meta)
         extra["sync"]()
         from grace_gc.backends.logprob_probe import probe_first_completed
@@ -259,7 +310,9 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         )
         print(
             f"step {state.step} n={last['n']} completed={last['n_completed']} "
-            f"audited={last['n_audited']} loss={last['loss']}"
+            f"audited={last['n_audited']} loss={last['loss']} "
+            f"n_prescan={last.get('n_prescan')} timings={last.get('timings')}",
+            flush=True,
         )
     return {
         "versions": versions,

@@ -9,9 +9,10 @@ import numpy as np
 
 from grace_gc.audit.prefix_audit import PrefixBundle, audit_bundles, jl_project
 from grace_gc.core.layout import collect_lora_layout, pack_grads
+from grace_gc.data.format_prompt import apply_solve_instruction
 from grace_gc.data.math_data import MathRecord
 from grace_gc.data.reward import extract_answer, rule_reward
-from grace_gc.logging_util.forensics import write_failed
+from grace_gc.logging_util.forensics import persist_load_report, write_failed
 from grace_gc.logging_util.ledger import ComputeLedger, Timer
 from grace_gc.logging_util.run_dir import RunDirectory, resolve_run_dir, utc_now
 from grace_gc.logging_util.run_log import RunLog
@@ -499,16 +500,30 @@ def generate_bundles_gpu(
     )
 
 
+def _audit_max_new(cfg: dict[str, Any]) -> int:
+    """Audit continuation length. GRPO-short's train 1024 must not bind this."""
+    audit = cfg.get("audit") or {}
+    if audit.get("max_new_tokens") is not None:
+        return int(audit["max_new_tokens"])
+    ev = cfg.get("eval") or {}
+    if ev.get("max_new_tokens") is not None:
+        return int(ev["max_new_tokens"])
+    if cfg.get("audit_max_new_tokens") is not None:
+        return int(cfg["audit_max_new_tokens"])
+    if str(cfg.get("backend", "cpu_tiny")) == "gpu_verl":
+        return 4096
+    return int(cfg.get("max_new_tokens", 8))
+
+
 def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path) -> dict:
     spec = _audit_method_spec(cfg)
-    if spec.max_new_tokens is not None:
-        cfg = dict(cfg)
-        cfg["max_new_tokens"] = int(spec.max_new_tokens)
-        cfg["method"] = spec.name
+    cfg = dict(cfg)
+    cfg["method"] = spec.name
     n_pref = int(cfg.get("audit", {}).get("n_prefixes", cfg.get("n_prefixes", 2)))
     n_cont = int(cfg.get("audit", {}).get("n_continuations", cfg.get("n_cont", 16)))
     decision = int(cfg.get("decision_tokens", 4))
-    max_new = int(cfg.get("max_new_tokens", 8))
+    max_new = _audit_max_new(cfg)
+    records = apply_solve_instruction(list(records))
     seed = int(cfg.get("seed", 17))
     raw_grid = list(cfg.get("audit", {}).get("decision_grid") or [decision])
     grid = [int(t) for t in raw_grid]
@@ -530,6 +545,7 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
     run.write_run_meta(kind="audit", started=started, requested=requested)
     run.write_yaml("config.yaml", cfg)
     run.write_json("environment.json", versions)
+    persist_load_report(run, data_path=cfg.get("data_path"))
     backend = cfg.get("backend", "cpu_tiny")
     n_gpu = int((cfg.get("hardware") or {}).get("n_gpu", 1 if backend == "gpu_verl" else 0))
     hardware = str((cfg.get("hardware") or {}).get("name", "gpu" if backend == "gpu_verl" else "cpu"))

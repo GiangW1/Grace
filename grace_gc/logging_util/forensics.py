@@ -164,23 +164,52 @@ def trajectory_row(
     }
 
 
-def write_data_inventory(run: RunDirectory, records_or_buckets, data_path=None, source: str = "file") -> None:
+def persist_load_report(run: RunDirectory, report=None, data_path=None) -> dict | None:
+    explicit = report is not None
+    if report is None:
+        from grace_gc.data.math_data import last_load_report
+
+        report = last_load_report()
+    if not report:
+        return None
+    if not explicit:
+        if data_path is None:
+            return None
+        if str(Path(str(report.get("path") or ""))) != str(Path(str(data_path))):
+            return None
+    if int(report.get("n_conflict_groups") or 0) > 0:
+        run.write_json("data_conflicts.json", report)
+    return report
+
+
+def write_data_inventory(run: RunDirectory, records_or_buckets, data_path=None, source: str = "file", load_report=None) -> None:
     if isinstance(records_or_buckets, dict):
         buckets = records_or_buckets
     else:
         buckets = {"train": list(records_or_buckets or [])}
-    run.write_json(
-        "data_splits.json",
-        {
-            "data_path": None if data_path is None else str(data_path),
-            "source": source,
-            "counts": {name: len(rows) for name, rows in buckets.items()},
-            "n_unique": {
-                name: len({getattr(row, "problem_id", str(i)) for i, row in enumerate(rows)})
-                for name, rows in buckets.items()
-            },
+    if load_report is not None:
+        report = persist_load_report(run, load_report)
+    elif source == "file":
+        report = persist_load_report(run, data_path=data_path)
+    else:
+        report = None
+    payload = {
+        "data_path": None if data_path is None else str(data_path),
+        "source": source,
+        "counts": {name: len(rows) for name, rows in buckets.items()},
+        "n_unique": {
+            name: len({getattr(row, "problem_id", str(i)) for i, row in enumerate(rows)})
+            for name, rows in buckets.items()
         },
-    )
+    }
+    if report:
+        payload["load"] = {
+            "n_raw": report.get("n_raw"),
+            "n_kept": report.get("n_kept"),
+            "n_same_answer_dedup": report.get("n_same_answer_dedup"),
+            "n_conflict_groups": report.get("n_conflict_groups"),
+        }
+    run.write_json("data_splits.json", payload)
 
 
 def lora_param_health(named) -> dict[str, Any]:
@@ -190,20 +219,30 @@ def lora_param_health(named) -> dict[str, Any]:
     b_g = 0.0
     n_a = 0
     n_b = 0
+    n_a_missing = 0
+    n_b_missing = 0
+    n_a_zero = 0
+    n_b_zero = 0
     for name, param in named or []:
         arr = param.detach().float().cpu().numpy() if hasattr(param, "detach") else np.asarray(param)
         nrm = float(np.square(arr).sum())
         g = getattr(param, "grad", None)
-        g_n = 0.0 if g is None else float(np.square(g.detach().float().cpu().numpy()).sum())
+        missing = g is None
+        g_n = 0.0 if missing else float(np.square(g.detach().float().cpu().numpy()).sum())
         key = str(name)
         if "lora_A" in key or "lora_a" in key:
             a_sq += nrm
             a_g += g_n
             n_a += 1
+            n_a_missing += int(missing)
+            n_a_zero += int(not missing and g_n < 1e-12)
         elif "lora_B" in key or "lora_b" in key:
             b_sq += nrm
             b_g += g_n
             n_b += 1
+            n_b_missing += int(missing)
+            n_b_zero += int(not missing and g_n < 1e-12)
+    b_near_zero = n_b > 0 and b_sq < 1e-12
     return {
         "lora_A_norm_sq": a_sq,
         "lora_B_norm_sq": b_sq,
@@ -211,8 +250,14 @@ def lora_param_health(named) -> dict[str, Any]:
         "lora_B_grad_norm_sq": b_g,
         "n_lora_A": n_a,
         "n_lora_B": n_b,
+        "n_lora_A_grad_missing": n_a_missing,
+        "n_lora_B_grad_missing": n_b_missing,
+        "n_lora_A_grad_zero": n_a_zero,
+        "n_lora_B_grad_zero": n_b_zero,
         "lora_A_near_zero": n_a > 0 and a_sq < 1e-12,
-        "lora_B_near_zero": n_b > 0 and b_sq < 1e-12,
+        "lora_B_near_zero": b_near_zero,
+        # PEFT ΔW=B·A: B≈0 ⇒ ∂L/∂A=0. First-step A grad can be zero without a bug.
+        "lora_A_grad_zero_expected": b_near_zero,
     }
 
 
@@ -225,6 +270,8 @@ def step_health(state, last: dict[str, Any], cfg: dict[str, Any] | None = None) 
     warmup_steps = int((cfg or {}).get("predictor", {}).get("warmup_steps", 0) or 0)
     step = int(getattr(state, "step", 0) or 0)
     named = last.get("actor_named")
+    baseline_vals = list((getattr(getattr(state, "baseline", None), "values", None) or {}).values())
+    n_baseline_zero = sum(1 for v in baseline_vals if abs(float(v)) < 1e-12)
     out = {
         "basis_id": getattr(state, "basis_id", None),
         "reservoir_n": len(getattr(getattr(state, "reservoir", None), "items", []) or []),
@@ -251,6 +298,12 @@ def step_health(state, last: dict[str, Any], cfg: dict[str, Any] | None = None) 
             and not last.get("warmup")
             and (warmup_steps <= 0 or len(getattr(getattr(state, "reservoir", None), "items", []) or []) < 2)
         ),
+        "mean_baseline_b": _mean(baseline_vals),
+        "n_baseline": len(baseline_vals),
+        "n_baseline_zero": n_baseline_zero,
+        "baseline_collapsed_with_zero_reward": bool(completed)
+        and all(r == 0.0 for r in rewards)
+        and n_baseline_zero > 0,
     }
     if named is not None:
         out.update(lora_param_health(named))
