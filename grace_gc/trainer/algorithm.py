@@ -12,6 +12,8 @@ from grace_gc.core.rng import IsolatedRNG
 from grace_gc.predictor.heads import PredictorHeads
 from grace_gc.predictor.reservoir import GradientReservoir, ReservoirItem
 from grace_gc.predictor.risk import full_space_residual
+from grace_gc.data.reward import extract_answer
+from grace_gc.logging_util.ledger import Timer
 from grace_gc.predictor.update import update_predictor_from_reservoir
 from grace_gc.trainer.actor_update import (
     apply_correction_clip_step,
@@ -22,7 +24,14 @@ from grace_gc.trainer.actor_update import (
 )
 from grace_gc.trainer.advantages import advantages_for_method
 from grace_gc.trainer.baseline import HistoricalBaseline
-from grace_gc.trainer.grace_step import StartRecord, batch_token_costs, decide_continuation, next_start_count
+from grace_gc.trainer.grace_step import (
+    StartRecord,
+    answer_first_token,
+    batch_token_costs,
+    decide_continuation,
+    finish_reason,
+    next_start_count,
+)
 from grace_gc.trainer.methods import MethodSpec
 
 
@@ -38,6 +47,7 @@ class StepEngines:
     reward_fn: Callable
     decode: Callable | None = None
     eos_id: int | list[int] | None = None
+    last_rollout: dict | None = None
 
 
 @dataclass
@@ -101,6 +111,34 @@ def _traj_natural_finish(
     if generated is not None and requested is not None and generated < int(requested):
         return True
     return False
+
+
+def _meta_at(prompt_meta, i: int, key: str, default=None):
+    if not prompt_meta or i >= len(prompt_meta) or not isinstance(prompt_meta[i], dict):
+        return default
+    return prompt_meta[i].get(key, default)
+
+
+def _rollout_finish(engines: StepEngines, i: int, z: float):
+    roll = getattr(engines, "last_rollout", None) or {}
+    cont = roll.get("continue_finish_reasons") or {}
+    if float(z) >= 1.0 and i in cont:
+        return cont[i]
+    prefix = roll.get("prefix_finish_reasons") or []
+    if i < len(prefix):
+        return prefix[i]
+    return None
+
+
+def _rollout_stop(engines: StepEngines, i: int, z: float):
+    roll = getattr(engines, "last_rollout", None) or {}
+    cont = roll.get("continue_stop_reasons") or {}
+    if float(z) >= 1.0 and i in cont:
+        return cont[i]
+    prefix = roll.get("prefix_stop_reasons") or []
+    if i < len(prefix):
+        return prefix[i]
+    return None
 
 
 def _pad_features(feats: np.ndarray, k: int) -> np.ndarray:
@@ -170,6 +208,7 @@ def run_algorithm1_step(
     golds: list[str],
     cfg: dict[str, Any],
     optimizer,
+    prompt_meta: list | None = None,
 ) -> dict[str, Any]:
     torch = __import__("torch")
     n = len(prompt_ids)
@@ -186,9 +225,11 @@ def run_algorithm1_step(
     warmup = state.step < int(pred_cfg.get("warmup_steps", 0))
     audit_s = float(pred_cfg.get("audit_s", 0.125))
     n_prescan = int((cfg.get("baseline") or {}).get("prescan", 0) or 0)
+    timer = Timer()
     n_prescanned = prescan_unseen_baselines(
         engines, state, prompt_ids, problem_ids, golds, max_new, n_prescan
     )
+    timings = {"prescan": timer.lap()}
 
     prefixes, finished = engines.generate_prefix(prompt_ids, decision, state.rng, "token")
     finished = np.asarray(finished, dtype=bool).reshape(-1)
@@ -219,8 +260,10 @@ def run_algorithm1_step(
         r_hat = np.ones(n, dtype=np.float64)
         c_hat = np.ones(n, dtype=np.float64)
     lengths = [float(max(len(prefixes[i]) - int(prompt_lens[i]), 1)) for i in range(n)]
+    q_hat_out = None
     if state.spec.risk_mode == "reward" and state.predictor is not None and not warmup:
         q_hat = state.predictor.forward_success(feat)
+        q_hat_out = q_hat
         reward_feats = np.stack(
             [
                 _reward_features(float(q_hat[i]), lengths[i], state.baseline.get(problem_ids[i]))
@@ -232,6 +275,7 @@ def run_algorithm1_step(
         reward_feats = np.stack(
             [_reward_features(state.baseline.get(problem_ids[i]), lengths[i]) for i in range(n)]
         )
+    timings["prefix"] = timer.lap()
 
     p, deviation = decide_continuation(
         state.spec,
@@ -251,6 +295,7 @@ def run_algorithm1_step(
     p[finished] = 1.0
     f = np.asarray(f, dtype=np.float64)
     f[finished] = 0.0
+    timings["allocate"] = timer.lap()
 
     remainings = continuation_remainings(prefixes, prompt_lens, finished, max_new)
     selected = (z >= 1.0) & (~finished) & (remainings > 0)
@@ -269,11 +314,24 @@ def run_algorithm1_step(
     rewards: list[float | None] = []
     texts: list[str | None] = []
     traj_finished: list[bool] = []
+    truncated_flags: list[bool] = []
+    prefix_texts: list[str | None] = []
+    extracted_list: list[str | None] = []
+    first_tokens: list[int | None] = []
+    reasons: list[str] = []
     for i in range(n):
+        prefix_resp = prefixes[i][len(prompt_ids[i]) :]
+        prefix_text = engines.decode(prefix_resp) if engines.decode else ""
+        prefix_texts.append(prefix_text)
         if z[i] < 1.0 or full_ids[i] is None:
             rewards.append(None)
             texts.append(None)
             traj_finished.append(False)
+            truncated_flags.append(False)
+            extracted = extract_answer(prefix_text)
+            extracted_list.append(extracted)
+            first_tokens.append(None if extracted is None else answer_first_token(engines.decode, prefix_resp))
+            reasons.append("stopped")
             continue
         resp = full_ids[i][len(prompt_ids[i]) :]
         text = engines.decode(resp) if engines.decode else ""
@@ -290,10 +348,16 @@ def run_algorithm1_step(
         truncated = _length_truncated(
             full_ids[i], int(prompt_lens[i]), max_new, traj_fin, engines.eos_id
         )
+        truncated_flags.append(truncated)
+        extracted = extract_answer(text)
+        extracted_list.append(extracted)
+        first_tokens.append(None if extracted is None else answer_first_token(engines.decode, resp))
+        reasons.append(finish_reason(float(z[i]), traj_fin, truncated))
         reward = engines.reward_fn(full_ids[i], golds[i], truncated=truncated, text=text)
         if reward is None:
             reward = 0.0
         rewards.append(reward)
+    timings["continue"] = timer.lap()
 
     adv = advantages_for_method(state.spec.objective, rewards, problem_ids, state.baseline)
     named = engines.named_lora()
@@ -309,6 +373,7 @@ def run_algorithm1_step(
         chosen,
     )
     saved = snapshot_grads(params)
+    timings["backward"] = timer.lap()
 
     audited = 0
     audit_draw = (
@@ -330,11 +395,38 @@ def run_algorithm1_step(
             advantage=float(adv[i]) if rewards[i] is not None else None,
             g=None,
             audited=False,
+            prompt_len=int(prompt_lens[i]),
+            prefix_tokens=int(max(len(prefixes[i]) - int(prompt_lens[i]), 0)),
+            response_tokens=0
+            if full_ids[i] is None
+            else int(max(len(full_ids[i]) - int(prompt_lens[i]), 0)),
+            suffix_tokens=0
+            if full_ids[i] is None
+            else int(max(len(full_ids[i]) - len(prefixes[i]), 0)),
+            finish_reason=reasons[i],
+            truncated=truncated_flags[i],
+            text=texts[i],
+            prefix_text=prefix_texts[i],
+            gold=golds[i],
+            extracted=extracted_list[i],
+            answer_first_token=first_tokens[i],
+            baseline_b=state.baseline.get(problem_ids[i]),
+            q_hat=None if q_hat_out is None else float(q_hat_out[i]),
+            prompt_token_ids=[int(x) for x in prompt_ids[i]],
+            prefix_token_ids=[int(x) for x in prefixes[i]],
+            full_token_ids=None if full_ids[i] is None else [int(x) for x in full_ids[i]],
+            prompt_truncated=bool(_meta_at(prompt_meta, i, "prompt_truncated", False)),
+            untruncated_prompt_len=_meta_at(prompt_meta, i, "untruncated_len"),
+            used_chat_template=_meta_at(prompt_meta, i, "used_chat_template"),
+            thinking_closed=_meta_at(prompt_meta, i, "thinking_closed"),
+            vllm_finish_reason=_rollout_finish(engines, i, float(z[i])),
+            vllm_stop_reason=_rollout_stop(engines, i, float(z[i])),
         )
         if state.spec.use_predictor and rec.z >= 1.0 and rec.reward is not None and audit_draw[i] >= 1.0:
             scalar = adv[i] * engines.logprob_one(full_ids[i], int(prompt_lens[i]))
             rec.g = audit_one(scalar, params, [nm for nm, _p in named], state.layout)
             rec.audited = True
+            rec.g_norm_sq = float(np.dot(rec.g, rec.g))
             audited += 1
             realized = None if full_ids[i] is None else float(max(len(full_ids[i]) - len(prefixes[i]), 1))
             cf = None if cost_feat is None else np.asarray(cost_feat[i], dtype=np.float64)
@@ -354,7 +446,9 @@ def run_algorithm1_step(
             )
         records.append(rec)
     restore_grads(params, saved)
+    timings["audit"] = timer.lap()
 
+    update_stats: dict[str, Any] = {}
     packed, clipped = apply_correction_clip_step(
         named,
         state.layout,
@@ -366,9 +460,11 @@ def run_algorithm1_step(
         optimizer,
         clip=float(cfg.get("optim", {}).get("grad_clip", 1.0)),
         use_correction=state.spec.use_ht_correction and state.spec.use_predictor and not warmup,
+        stats=update_stats,
     )
     _ = packed
     _ = torch
+    timings["update"] = timer.lap()
 
     batch_rewards: dict[str, list[float]] = {}
     for rec in records:
@@ -403,6 +499,7 @@ def run_algorithm1_step(
             epochs=int(pred_cfg.get("epochs", 2)),
         )
 
+    timings["predictor"] = timer.lap()
     used, full = batch_token_costs(prompt_lens, prefixes, finished, z, max_new)
     ratio = 1.0 if full <= 0.0 else used / full
     state.history_costs.append(ratio)
@@ -415,6 +512,7 @@ def run_algorithm1_step(
         "records": records,
         "n": n,
         "n_completed": int(z.sum()),
+        "n_stopped": int((z < 1.0).sum()),
         "p": p,
         "z": z,
         "deviation": deviation,
@@ -426,6 +524,13 @@ def run_algorithm1_step(
         "predictor": pred_metrics,
         "warmup": warmup,
         "n_prescan": n_prescanned,
+        "token_cost_used": float(used),
+        "token_cost_full": float(full),
+        "timings": timings,
+        "u_frozen": u_frozen,
+        "grad_norm": update_stats.get("grad_norm"),
+        "grad_norm_preclip": update_stats.get("grad_norm_preclip"),
+        "sampling": (getattr(engines, "last_rollout", None) or {}).get("sampling"),
         "residual_mean": None
         if not any(r.g is not None for r in records)
         else float(

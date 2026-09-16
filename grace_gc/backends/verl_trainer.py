@@ -14,7 +14,9 @@ from grace_gc.backends.hf_actor import named_lora_params
 from grace_gc.core.layout import collect_lora_layout
 from grace_gc.core.rng import IsolatedRNG, seed_all
 from grace_gc.data.math_data import load_math_records, split_records
-from grace_gc.data.tokenize import encode_records_hf, load_hf_tokenizer
+from grace_gc.data.tokenize import encode_records_hf, load_hf_tokenizer, tokenizer_inventory
+from grace_gc.logging_util.forensics import persist_training_step, write_data_inventory
+from grace_gc.logging_util.ledger import ComputeLedger, Timer
 from grace_gc.logging_util.run_dir import RunDirectory
 from grace_gc.predictor.heads import PredictorHeads
 from grace_gc.predictor.reservoir import GradientReservoir
@@ -22,7 +24,7 @@ from grace_gc.trainer.algorithm import TrainState, run_algorithm1_step
 from grace_gc.trainer.baseline import HistoricalBaseline
 from grace_gc.trainer.loop import resolve_start_counts, resume_start_counts, sample_prompt_indices, sample_starts
 from grace_gc.trainer.methods import apply_method_defaults, method_spec
-from grace_gc.trainer.state_io import dump_train_state, restore_train_state
+from grace_gc.trainer.state_io import restore_train_state
 
 
 def load_lora_actor(model_path: str, lora_cfg: dict[str, Any]):
@@ -75,24 +77,29 @@ def build_vllm_engine(model_path: str, cfg: dict[str, Any], lora_rank: int):
         # would silently cap eval.
         "max_model_len": int(cfg.get("max_model_len", 5120)),
     }
+    dropped: list[str] = []
     try:
-        return LLM(**kwargs)
+        llm = LLM(**kwargs)
     except TypeError:
         kwargs.pop("max_loras", None)
+        dropped.append("max_loras")
         try:
-            return LLM(**kwargs)
+            llm = LLM(**kwargs)
         except TypeError:
             kwargs.pop("trust_remote_code", None)
+            dropped.append("trust_remote_code")
             try:
-                return LLM(**kwargs)
+                llm = LLM(**kwargs)
             except TypeError as exc:
                 raise ValueError(
                     'vLLM LLM rejected generation_config="vllm"; '
                     "Qwen3-Base max_new_tokens=2048 would silently cap eval 4096"
                 ) from exc
+    build_vllm_engine.last = {"accepted": dict(kwargs), "dropped": dropped}
+    return llm
 
 
-def train(cfg: dict[str, Any], run: RunDirectory) -> dict[str, Any]:
+def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None = None) -> dict[str, Any]:
     n_gpu = int(cfg.get("hardware", {}).get("n_gpu", 1))
     if n_gpu > 1:
         raise RuntimeError(
@@ -112,6 +119,7 @@ def train(cfg: dict[str, Any], run: RunDirectory) -> dict[str, Any]:
 
     data_path = cfg.get("data_path")
     tokenizer = load_hf_tokenizer(str(model_path))
+    run.write_json("tokenizer.json", tokenizer_inventory(tokenizer))
     if cfg.get("prompt_token_ids"):
         prompt_pool = list(cfg["prompt_token_ids"])
         problem_pool = [str(i) for i in range(len(prompt_pool))]
@@ -133,6 +141,7 @@ def train(cfg: dict[str, Any], run: RunDirectory) -> dict[str, Any]:
         train_recs = buckets["train"]
         if not train_recs:
             raise ValueError("training split is empty")
+        write_data_inventory(run, buckets, data_path, source="file")
 
     seed_all(int(cfg.get("seed", 17)))
     from grace_gc.data.reward import require_math_verify
@@ -141,6 +150,8 @@ def train(cfg: dict[str, Any], run: RunDirectory) -> dict[str, Any]:
     actor = load_lora_actor(str(model_path), cfg.get("lora", {}))
     actor = maybe_wrap_fsdp(actor, n_gpu)
     llm = build_vllm_engine(str(model_path), cfg.get("vllm", {}), int(cfg.get("lora", {}).get("rank", 16)))
+    if getattr(build_vllm_engine, "last", None):
+        run.write_json("vllm_engine.json", build_vllm_engine.last)
     engines, extra = make_gpu_engines(actor, llm, tokenizer, cfg, Path(run.root) / "lora")
     extra["sync"]()
 
@@ -152,6 +163,7 @@ def train(cfg: dict[str, Any], run: RunDirectory) -> dict[str, Any]:
     n_prompts, starts_per, n_start = resolve_start_counts(cfg, spec)
 
     def _batch_ids(draw_rng):
+        meta: list = []
         if packed is not None:
             pr, pi, go = [], [], []
             for i in sample_prompt_indices(len(packed), n_prompts, draw_rng):
@@ -160,16 +172,19 @@ def train(cfg: dict[str, Any], run: RunDirectory) -> dict[str, Any]:
                     pr.append(packed[i][0])
                     pi.append(packed[i][1])
                     go.append(packed[i][2])
-            return pr, pi, go
+            return pr, pi, go, meta
         batch = sample_starts(train_recs, n_prompts, starts_per, draw_rng)
-        return encode_records_hf(batch, tokenizer, int(cfg.get("prompt_max_tokens", 1024)))
+        pr, pi, go = encode_records_hf(
+            batch, tokenizer, int(cfg.get("prompt_max_tokens", 1024)), prompt_meta=meta
+        )
+        return pr, pi, go, meta
 
     pcfg = cfg.get("predictor") or {}
     k = min(int(pcfg.get("k", 8)), layout.dim)
     in_dim = 1
     predictor = None
     if spec.use_predictor:
-        probe_ids, _pp, _gg = _batch_ids(rng)
+        probe_ids, _pp, _gg, _mm = _batch_ids(rng)
         prefixes, _fin = engines.generate_prefix(probe_ids[:1], 2, rng, "token")
         feat = engines.prefix_features(prefixes, np.array([len(probe_ids[0])]), [0.5])["features"]
         in_dim = int(feat.shape[1])
@@ -206,36 +221,46 @@ def train(cfg: dict[str, Any], run: RunDirectory) -> dict[str, Any]:
         extra["sync"]()
         n_prompts, starts_per, n_start = resume_start_counts(cfg, spec, state)
 
-    rows = []
+    if ledger is None:
+        ledger = ComputeLedger(n_gpu=max(n_gpu, 1), hardware=str(cfg.get("hardware", {}).get("name", "gpu")))
     last = {}
     for _step in range(int(cfg.get("num_steps", 1))):
         if last.get("next_n"):
             n_prompts, starts_per, n_start = resolve_start_counts(cfg, spec, n_start=max(1, int(last["next_n"])))
-        prompts, pids, golds = _batch_ids(state.rng)
-        last = run_algorithm1_step(engines, state, prompts, pids, golds, cfg, opt)
+        prompts, pids, golds, prompt_meta = _batch_ids(state.rng)
+        step_timer = Timer()
+        last = run_algorithm1_step(engines, state, prompts, pids, golds, cfg, opt, prompt_meta=prompt_meta)
         extra["sync"]()
-        for rec, text in zip(last["records"], last["texts"]):
-            rows.append(
-                {
-                    "step": state.step,
-                    "problem_id": rec.problem_id,
-                    "p_continue": rec.p,
-                    "z_continue": rec.z,
-                    "reward": rec.reward,
-                    "natural_finish": rec.finished,
-                    "audit_selected": rec.audited,
-                    "global_starts_denominator": last["n"],
-                    "text": text,
-                }
-            )
-    run.write_jsonl("trajectories.jsonl", rows, append=bool(cfg.get("resume")))
-    dump_train_state(
-        Path(run.root) / "checkpoint.npz",
-        state,
-        named,
-        opt,
-        extra={"model_path": str(model_path), "lora": dict(cfg.get("lora") or {})},
-    )
+        from grace_gc.backends.logprob_probe import probe_first_completed
+
+        last["logprob_probe"] = probe_first_completed(
+            actor,
+            llm,
+            last.get("records"),
+            int(extra.get("pad_id") or 0),
+            eos_id=extra.get("eos_id"),
+            lora_request=extra.get("lora_request"),
+        )
+        persist_training_step(
+            run,
+            cfg,
+            state,
+            last,
+            ledger,
+            actor_named=named,
+            optimizer=opt,
+            extra={
+                "model_path": str(model_path),
+                "lora": dict(cfg.get("lora") or {}),
+                "adapter_path": None if extra.get("adapter_path") is None else str(extra.get("adapter_path")),
+                "lora_id": extra.get("lora_id"),
+            },
+            wall_s=step_timer.elapsed(),
+        )
+        print(
+            f"step {state.step} n={last['n']} completed={last['n_completed']} "
+            f"audited={last['n_audited']} loss={last['loss']}"
+        )
     return {
         "versions": versions,
         "method": spec.name,

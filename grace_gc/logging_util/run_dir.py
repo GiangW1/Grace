@@ -10,10 +10,60 @@ from typing import Any
 import yaml
 
 
+def utc_stamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+
+
+def default_run_dir(kind: str) -> Path:
+    return Path("runs") / f"{kind}-{utc_stamp()}"
+
+
+def has_run_artifacts(root: str | Path) -> bool:
+    root = Path(root)
+    if not root.is_dir():
+        return False
+    names = (
+        "summary.json",
+        "config.yaml",
+        "eval_summary.json",
+        "audit_summary.json",
+        "trajectories.jsonl",
+        "run_meta.json",
+    )
+    return any((root / name).is_file() for name in names)
+
+
+def resolve_run_dir(path: str | Path, *, resume: bool = False) -> Path:
+    """Keep a new or resumed directory. A second write to the same name gets a UTC suffix."""
+    requested = Path(path)
+    if resume or not has_run_artifacts(requested):
+        return requested
+    stamp = utc_stamp()
+    stamped = requested.parent / f"{requested.name}-{stamp}"
+    extra = 2
+    while has_run_artifacts(stamped):
+        stamped = requested.parent / f"{requested.name}-{stamp}-{extra}"
+        extra += 1
+    return stamped
+
+
 class RunDirectory:
     def __init__(self, root: str | Path):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
+
+    def write_run_meta(self, *, kind: str, started: str, requested: str | Path | None = None) -> Path:
+        requested_s = None if requested is None else str(Path(requested))
+        return self.write_json(
+            "run_meta.json",
+            {
+                "kind": kind,
+                "started": started,
+                "run_dir": str(self.root.resolve()),
+                "requested_run_dir": requested_s,
+                "redirected": requested_s is not None and Path(requested).resolve() != self.root.resolve(),
+            },
+        )
 
     def write_json(self, name: str, payload: Any) -> Path:
         path = self.root / name

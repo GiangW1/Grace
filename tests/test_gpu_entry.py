@@ -573,6 +573,8 @@ def test_build_vllm_engine_keeps_generation_config(monkeypatch):
     llm = vt.build_vllm_engine("org/model", {}, 16)
     assert llm.kwargs["generation_config"] == "vllm"
     assert "max_loras" not in llm.kwargs
+    assert vt.build_vllm_engine.last["accepted"]["generation_config"] == "vllm"
+    assert "max_loras" in vt.build_vllm_engine.last["dropped"]
 
 
 def test_build_vllm_engine_rejects_missing_generation_config(monkeypatch):
@@ -630,7 +632,7 @@ def test_eval_vllm_rejects_collapsed_avg_at_4(monkeypatch):
     monkeypatch.setattr(
         tok,
         "encode_records_hf",
-        lambda recs, tokenizer, max_prompt: ([[1, 2]] * len(recs), ["p"] * len(recs), ["2"] * len(recs)),
+        lambda recs, tokenizer, max_prompt, **kwargs: ([[1, 2]] * len(recs), ["p"] * len(recs), ["2"] * len(recs)),
     )
     monkeypatch.setattr(tok, "decode_hf", lambda tokenizer, gen: "same")
     monkeypatch.setattr(tok, "collect_stop_token_ids", lambda tokenizer: [2])
@@ -668,7 +670,7 @@ def test_eval_vllm_accepts_distinct_avg_at_4(monkeypatch):
     monkeypatch.setattr(
         tok,
         "encode_records_hf",
-        lambda recs, tokenizer, max_prompt: ([[1, 2]] * len(recs), ["p"] * len(recs), ["2"] * len(recs)),
+        lambda recs, tokenizer, max_prompt, **kwargs: ([[1, 2]] * len(recs), ["p"] * len(recs), ["2"] * len(recs)),
     )
     monkeypatch.setattr(tok, "decode_hf", lambda tokenizer, gen: f"ans{gen[0]}")
     monkeypatch.setattr(tok, "collect_stop_token_ids", lambda tokenizer: [2])
@@ -683,7 +685,7 @@ def test_eval_writes_lora_before_starting_vllm():
 
     from grace_gc.evaluation import generate
 
-    src = inspect.getsource(generate.run_eval)
+    src = inspect.getsource(generate._generate_eval_items)
     assert src.index("save_lora_adapter") < src.index("llm = build_vllm_engine")
     assert src.index("del actor") < src.index("llm = build_vllm_engine")
     assert src.index("apply_lora_request") < src.index("generate_answers_vllm")

@@ -37,6 +37,9 @@ class PrefixBundle:
     finished: bool = False
     prefix_tokens: int | None = None
     answer_emitted: bool = False
+    prefix_text: str | None = None
+    suffix_texts: list[str] | None = None
+    prompt_truncated: bool | None = None
 
 
 _SKETCH_CACHE: dict[tuple[int, int, int], tuple[np.ndarray, np.ndarray]] = {}

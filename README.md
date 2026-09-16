@@ -188,7 +188,7 @@ python scripts/audit.py --generate \
   --run-dir runs/smoke-audit
 ```
 
-训练、评测、审计都过了，再放大。短跑数字只用来确认链路。
+训练、评测、审计都过了，再放大。短跑评测只跑 8 题（`eval.n_problems`）；不设这个字段时评测仍是 MATH-500 整份。短跑数字只用来确认链路。不写 `--run-dir` 时目录是 `runs/train-YYYYMMDD-HHMMSS`（评测/审计同理）。同一个 `--run-dir` 再跑一次（非续训）会改写成 `原名-时间`，不会盖掉上一次。
 
 ## 5. 最小证伪（Pilot 规模、单卡）
 
@@ -268,12 +268,17 @@ python scripts/train.py \
 
 | 目录里的文件 | 内容 |
 |---|---|
-| `config.yaml` / `environment.json` | 实际配置和版本 |
-| `summary.json` / `compute_ledger.json` | 训练是否跑完、墙钟 |
-| `trajectories.jsonl` | 每条起步的 p/Z/奖励 |
-| `checkpoint.npz` | 给评测和审计用 |
-| `eval_summary.json` | MATH-500 的 avg@k、可解析率、截断率 |
-| `audit_summary.json` | ρ、ELF、方差×成本 |
+| `run_meta.json` / `summary.json` | 开始/结束 UTC 时间、实际目录。同名目录再跑会写成 `原名-YYYYMMDD-HHMMSS` |
+| `run.log` | 标准输出和异常 |
+| `summary.json` | `complete` 或 `failed` |
+| `steps.jsonl` / `health.json` | 每步汇总；全零奖励/优势、全 p=1、LoRA A/B、未训预测器分配、nvidia-smi、logprob 对照 |
+| `data_splits.json` / `tokenizer.json` / `vllm_engine.json` / `sampling.json` | 切分、tokenizer stop、实际引擎参数 |
+| `logprob_probe.jsonl` | 同序列 HF vs vLLM logprob（不可用则记原因） |
+| `trajectories.jsonl` | 每条起步：p/Z/f/r̂/ĉ/优势/长度/结束原因/答案/token |
+| `compute_ledger.json` / `compute_ledger.jsonl` | 按步、按阶段的墙钟 |
+| `checkpoint.npz` / `checkpoints/step_k.npz` | 最新与逐步快照 |
+| `eval_summary.json` / `eval_per_problem.jsonl` | MATH-500 的 avg@k、答案、截断、token |
+| `audit_summary.json` / `audit_bundles.jsonl` | ρ、ELF、方差×成本、前缀/后缀文本 |
 
 ```bash
 python scripts/plot.py --summary runs/eval-grace-seed17/eval_summary.json --out runs/plot-eval

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 
 from grace_gc.core.allocation import allocate_continuation
 from grace_gc.core.estimator import dual_stream_mean, optimizer_grad_from_ghat
 from grace_gc.core.losses import prediction_grad_correction, real_stream_loss_scale
+from grace_gc.data.reward import first_parseable_index
 from grace_gc.trainer.methods import MethodSpec, uniform_p
 
 
@@ -26,6 +28,45 @@ class StartRecord:
     g: np.ndarray | None
     audited: bool
     leak_flag: bool = False
+    prompt_len: int = 0
+    prefix_tokens: int = 0
+    response_tokens: int = 0
+    suffix_tokens: int = 0
+    finish_reason: str = "unknown"
+    truncated: bool = False
+    text: str | None = None
+    prefix_text: str | None = None
+    gold: str | None = None
+    extracted: str | None = None
+    answer_first_token: int | None = None
+    baseline_b: float | None = None
+    q_hat: float | None = None
+    g_norm_sq: float | None = None
+    prompt_token_ids: list[int] | None = None
+    prefix_token_ids: list[int] | None = None
+    full_token_ids: list[int] | None = None
+    prompt_truncated: bool = False
+    untruncated_prompt_len: int | None = None
+    used_chat_template: bool | None = None
+    thinking_closed: bool | None = None
+    vllm_finish_reason: str | None = None
+    vllm_stop_reason: Any = None
+
+
+def finish_reason(z: float, natural_finish: bool, truncated: bool) -> str:
+    if float(z) < 1.0:
+        return "stopped"
+    if natural_finish:
+        return "eos"
+    if truncated:
+        return "length"
+    return "completed"
+
+
+def answer_first_token(decode, token_ids) -> int | None:
+    if decode is None or not token_ids:
+        return None
+    return first_parseable_index([decode([int(tok)]) for tok in token_ids])
 
 
 @dataclass

@@ -132,6 +132,28 @@ def test_hf_encode_uses_chat_template_when_present():
     assert fitted[2:-2] == [ord(ch) % 10 for ch in "abcd"]
 
 
+def test_encode_records_prompt_truncated_flag():
+    from grace_gc.data.math_data import MathRecord
+    from grace_gc.data.tokenize import encode_prompt_hf_detail, encode_records_hf
+
+    class LongChat:
+        chat_template = "dummy"
+
+        def apply_chat_template(self, messages, enable_thinking=None, **kwargs):
+            return list(range(20))
+
+        def decode(self, ids):
+            return "ok"
+
+    ids, meta = encode_prompt_hf_detail(LongChat(), "1+1", 8)
+    assert meta["prompt_truncated"] is True
+    assert meta["untruncated_len"] == 20
+    assert len(ids) <= 8
+    flags = []
+    encode_records_hf([MathRecord("p", "1+1", "2")], LongChat(), 8, prompt_meta=flags)
+    assert flags[0]["prompt_truncated"] is True
+
+
 def test_dapo_chat_prompt_and_ground_truth(tmp_path: Path):
     path = tmp_path / "dapo.jsonl"
     row = {

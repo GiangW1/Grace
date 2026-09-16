@@ -1,4 +1,6 @@
 # First GPU chain check. Finish this before Pilot scale.
+# warmup_steps=0 means the untrained predictor allocates from step 1.
+# health.json records allocating_with_untrained_predictor; this is plumbing, not formal GRACE.
 method: grace
 backend: gpu_verl
 n_start: 16
@@ -12,6 +14,7 @@ predictor:
   audit_s: 0.125
   constant_cost: true
 eval:
+  n_problems: 8
   k: 2
   n: 2
   max_new_tokens: 512

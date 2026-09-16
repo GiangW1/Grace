@@ -25,4 +25,4 @@ audit:
   jl_dim: 4096
 hardware:
   name: a100
-  n_gpu: 4
+  # n_gpu comes from hardware/*.yaml. This file must not set 4; single-card is the only wired path.

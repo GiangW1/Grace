@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 
 @dataclass
@@ -18,18 +19,20 @@ class ComputeLedger:
         wall_s: float,
         cpu_s: float = 0.0,
         overlap_excluded: bool = True,
+        **extra,
     ) -> None:
         gpu_reserved = float(wall_s) * max(int(self.n_gpu), 0)
-        self.rows.append(
-            {
-                "name": name,
-                "hardware": self.hardware,
-                "wall_seconds": float(wall_s),
-                "gpu_reserved_seconds": gpu_reserved,
-                "cpu_seconds": float(cpu_s),
-                "overlap_excluded": overlap_excluded,
-            }
-        )
+        row = {
+            "name": name,
+            "hardware": self.hardware,
+            "wall_seconds": float(wall_s),
+            "gpu_reserved_seconds": gpu_reserved,
+            "cpu_seconds": float(cpu_s),
+            "overlap_excluded": overlap_excluded,
+            "at": datetime.now(timezone.utc).isoformat(),
+        }
+        row.update(extra)
+        self.rows.append(row)
 
     def summary(self) -> dict:
         return {
@@ -45,6 +48,13 @@ class ComputeLedger:
 class Timer:
     def __init__(self):
         self.t0 = time.perf_counter()
+        self.mark = self.t0
 
     def elapsed(self) -> float:
         return time.perf_counter() - self.t0
+
+    def lap(self) -> float:
+        now = time.perf_counter()
+        dt = now - self.mark
+        self.mark = now
+        return dt

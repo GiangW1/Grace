@@ -14,6 +14,13 @@ class EvalItem:
     gold: str
     answers: list[str]
     truncated: list[bool]
+    extracted: list[str | None] | None = None
+    response_tokens: list[int] | None = None
+    finish_reasons: list[str] | None = None
+    token_ids: list[list[int]] | None = None
+    sample_seeds: list[int] | None = None
+    prompt_truncated: list[bool] | None = None
+    vllm_finish_reasons: list[str | None] | None = None
 
 
 def evaluate_items(items: list[EvalItem], k: int = 1) -> dict:

@@ -11,8 +11,11 @@ from grace_gc.audit.prefix_audit import PrefixBundle, audit_bundles, jl_project
 from grace_gc.core.layout import collect_lora_layout, pack_grads
 from grace_gc.data.math_data import MathRecord
 from grace_gc.data.reward import extract_answer, rule_reward
-from grace_gc.logging_util.run_dir import RunDirectory
-from grace_gc.versions import collect_versions
+from grace_gc.logging_util.forensics import write_failed
+from grace_gc.logging_util.ledger import ComputeLedger, Timer
+from grace_gc.logging_util.run_dir import RunDirectory, resolve_run_dir, utc_now
+from grace_gc.logging_util.run_log import RunLog
+from grace_gc.versions import collect_environment
 from grace_gc.trainer.algorithm import _length_truncated, _traj_natural_finish
 from grace_gc.trainer.checkpoint import load_checkpoint
 from grace_gc.trainer.state_io import load_numpy_module_state
@@ -138,6 +141,12 @@ def _bundles_from_engines(
         explicit = None if baseline_fn is None else baseline_fn(rec.problem_id)
         b_feat = b_grad if explicit is None else float(explicit)
         prompts, _pids, _golds = encode_fn(rec, n_prefixes)
+        encode_meta = getattr(encode_fn, "last_meta", None) or []
+        prompt_truncated = (
+            None
+            if not encode_meta
+            else any(bool(m.get("prompt_truncated")) for m in encode_meta if isinstance(m, dict))
+        )
         longs, finished_long = engines.generate_prefix(prompts, tmax, rng, "token")
         finished_long = np.asarray(finished_long, dtype=bool).reshape(-1)
         if len(longs) != len(prompts) or finished_long.shape[0] != len(prompts):
@@ -209,6 +218,7 @@ def _bundles_from_engines(
                 rewards = []
                 grads = []
                 costs = []
+                suffix_texts = []
                 for full in fulls:
                     if full is None:
                         raise ValueError("audit continuation produced an empty sequence")
@@ -228,6 +238,7 @@ def _bundles_from_engines(
                     r = rule_reward(text, rec.answer, truncated=truncated)
                     reward = 0.0 if r is None else float(r)
                     rewards.append(reward)
+                    suffix_texts.append(text)
                     grads.append(
                         _policy_grad_vec(engines, layout, full, prompt_len, reward, b_grad)
                     )
@@ -254,6 +265,9 @@ def _bundles_from_engines(
                         finished=bool(finished[loc]),
                         prefix_tokens=max(len(prefix) - prompt_len, 0),
                         answer_emitted=extract_answer(prefix_text) is not None,
+                        prefix_text=prefix_text,
+                        suffix_texts=suffix_texts,
+                        prompt_truncated=prompt_truncated,
                     )
                 )
     return bundles
@@ -355,7 +369,10 @@ def generate_bundles_tiny(
     prompt_max = 1024 if cfg is None else int(cfg.get("prompt_max_tokens", 1024))
 
     def encode(rec: MathRecord, n: int):
-        return encode_records_tiny([rec] * n, actor.vocab, prompt_max)
+        meta: list = []
+        out = encode_records_tiny([rec] * n, actor.vocab, prompt_max, prompt_meta=meta)
+        encode.last_meta = meta
+        return out
 
     predictor, u = _frozen_predictor(cfg)
     spec = _audit_method_spec(cfg)
@@ -409,7 +426,7 @@ def generate_bundles_gpu(
         from grace_gc.backends.hf_actor import named_lora_params
         from grace_gc.backends.verl_trainer import build_vllm_engine, load_lora_actor
         from grace_gc.data.reward import require_math_verify
-        from grace_gc.data.tokenize import encode_records_hf, load_hf_tokenizer
+        from grace_gc.data.tokenize import encode_records_hf, load_hf_tokenizer, tokenizer_inventory
         from grace_gc.trainer.state_io import check_snapshot_identity
 
         ckpt = cfg.get("checkpoint") or cfg.get("resume")
@@ -417,11 +434,19 @@ def generate_bundles_gpu(
             raise ValueError("GPU prefix audit needs a training checkpoint")
         require_math_verify()
         tokenizer = load_hf_tokenizer(str(model_path))
+        if work_dir is not None:
+            from grace_gc.logging_util.run_dir import RunDirectory
+
+            RunDirectory(Path(work_dir).parent).write_json("tokenizer.json", tokenizer_inventory(tokenizer))
         actor = load_lora_actor(str(model_path), cfg.get("lora", {}))
         payload = load_checkpoint(ckpt)
         check_snapshot_identity(payload, cfg)
         load_numpy_module_state(named_lora_params(actor), payload.get("actor") or {})
         llm = build_vllm_engine(str(model_path), cfg.get("vllm", {}), int(cfg.get("lora", {}).get("rank", 16)))
+        if work_dir is not None and getattr(build_vllm_engine, "last", None):
+            from grace_gc.logging_util.run_dir import RunDirectory
+
+            RunDirectory(Path(work_dir).parent).write_json("vllm_engine.json", build_vllm_engine.last)
         adapter = Path(work_dir or "runs/audit-lora")
         engines, extra = make_gpu_engines(actor, llm, tokenizer, cfg, adapter)
         extra["sync"]()
@@ -429,7 +454,10 @@ def generate_bundles_gpu(
         max_prompt = int(cfg.get("prompt_max_tokens", 1024))
 
         def encode(rec: MathRecord, n: int):
-            return encode_records_hf([rec] * n, tokenizer, max_prompt)
+            meta: list = []
+            out = encode_records_hf([rec] * n, tokenizer, max_prompt, prompt_meta=meta)
+            encode.last_meta = meta
+            return out
 
         encode_fn = encode
         if cache is not None:
@@ -442,7 +470,10 @@ def generate_bundles_gpu(
         max_prompt = int(cfg.get("prompt_max_tokens", 1024))
 
         def encode_fn(rec: MathRecord, n: int):
-            return encode_records_hf([rec] * n, tokenizer, max_prompt)
+            meta: list = []
+            out = encode_records_hf([rec] * n, tokenizer, max_prompt, prompt_meta=meta)
+            encode_fn.last_meta = meta
+            return out
 
     predictor, u = _frozen_predictor(cfg)
     spec = _audit_method_spec(cfg)
@@ -490,63 +521,106 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
     grid = kept
     n_problems = int(cfg.get("audit", {}).get("n_problems", 0) or 0)
     recs = records[:n_problems] if n_problems > 0 else records
+    requested = Path(run_dir)
+    run_dir = resolve_run_dir(run_dir)
     run = RunDirectory(run_dir)
-    if cfg.get("backend") == "gpu_verl":
-        bundles = generate_bundles_gpu(
-            recs,
-            n_pref,
-            n_cont,
-            grid,
-            max_new,
-            seed,
-            cfg,
-            work_dir=Path(run_dir) / "audit_lora",
-        )
-    else:
-        bundles = generate_bundles_tiny(recs, n_pref, n_cont, grid, max_new, seed, cfg=cfg)
-    if not bundles:
-        result = {"n_bundles": 0, "note": "no prefixes"}
-        run.write_json("audit_summary.json", result)
-        return result
-    u = _audit_u(bundles, cfg)
-    rng = np.random.default_rng(seed)
-    analysis = dict(cfg.get("analysis", {}))
-    alloc = cfg.get("allocation", {})
-    analysis.setdefault("beta", alloc.get("beta", 0.5))
-    analysis.setdefault("p_min", alloc.get("p_min", 0.2))
-    analysis["method"] = spec.name
-    analysis["max_new_tokens"] = max_new
-    if cfg.get("audit", {}).get("jl_dim"):
-        analysis["jl_dim"] = int(cfg["audit"]["jl_dim"])
-    result = audit_bundles(bundles, u, analysis, rng)
-    result["seed"] = seed
-    result["checkpoint"] = cfg.get("checkpoint") or cfg.get("resume")
-    result["max_new_tokens"] = max_new
-    result["decision_grid"] = grid
-    if dropped:
-        result["decision_grid_dropped"] = dropped
+    started = utc_now()
+    versions = collect_environment(cfg)
+    versions["started"] = started
+    run.write_run_meta(kind="audit", started=started, requested=requested)
     run.write_yaml("config.yaml", cfg)
-    run.write_json("environment.json", collect_versions())
-    run.write_json("audit_summary.json", result)
-    run.write_jsonl(
-        "audit_bundles.jsonl",
-        [
-            {
-                "problem_id": b.problem_id,
-                "t": b.t,
-                "path_id": b.path_id,
-                "rewards": b.rewards.tolist(),
-                "grads": b.grads.tolist(),
-                "suffix_cost": None if b.suffix_cost is None else b.suffix_cost.tolist(),
-                "m_pred": None if b.m_pred is None else np.asarray(b.m_pred).tolist(),
-                "r_hat": b.r_hat,
-                "c_hat": b.c_hat,
-                "finished": bool(b.finished),
-                "prefix_tokens": b.prefix_tokens,
-                "answer_emitted": bool(b.answer_emitted),
-                "coords": None if b.coords is None else np.asarray(b.coords).tolist(),
-            }
-            for b in bundles
-        ],
-    )
-    return result
+    run.write_json("environment.json", versions)
+    backend = cfg.get("backend", "cpu_tiny")
+    n_gpu = int((cfg.get("hardware") or {}).get("n_gpu", 1 if backend == "gpu_verl" else 0))
+    hardware = str((cfg.get("hardware") or {}).get("name", "gpu" if backend == "gpu_verl" else "cpu"))
+    ledger = ComputeLedger(n_gpu=n_gpu, hardware=hardware)
+    timer = Timer()
+    try:
+        with RunLog(run.root / "run.log"):
+            print(f"audit start {started} backend={backend} n_problems={len(recs)} grid={grid} dir={run.root}")
+            if Path(run.root).resolve() != requested.resolve():
+                print(f"run-dir {requested} already had artifacts; writing to {run.root}")
+            if backend == "gpu_verl":
+                bundles = generate_bundles_gpu(
+                    recs,
+                    n_pref,
+                    n_cont,
+                    grid,
+                    max_new,
+                    seed,
+                    cfg,
+                    work_dir=Path(run.root) / "audit_lora",
+                )
+            else:
+                bundles = generate_bundles_tiny(recs, n_pref, n_cont, grid, max_new, seed, cfg=cfg)
+            if not bundles:
+                result = {
+                    "n_bundles": 0,
+                    "note": "no prefixes",
+                    "started": started,
+                    "run_dir": str(run.root),
+                }
+                ledger.add("audit", timer.elapsed())
+                result["finished"] = utc_now()
+                run.write_json("audit_summary.json", result)
+                run.write_json("compute_ledger.json", ledger.summary())
+                return result
+            u = _audit_u(bundles, cfg)
+            rng = np.random.default_rng(seed)
+            analysis = dict(cfg.get("analysis", {}))
+            alloc = cfg.get("allocation", {})
+            analysis.setdefault("beta", alloc.get("beta", 0.5))
+            analysis.setdefault("p_min", alloc.get("p_min", 0.2))
+            analysis["method"] = spec.name
+            analysis["max_new_tokens"] = max_new
+            if cfg.get("audit", {}).get("jl_dim"):
+                analysis["jl_dim"] = int(cfg["audit"]["jl_dim"])
+            result = audit_bundles(bundles, u, analysis, rng)
+            result["seed"] = seed
+            result["checkpoint"] = cfg.get("checkpoint") or cfg.get("resume")
+            result["max_new_tokens"] = max_new
+            result["decision_grid"] = grid
+            if dropped:
+                result["decision_grid_dropped"] = dropped
+            result["started"] = started
+            result["run_dir"] = str(run.root)
+            run.write_json("audit_summary.json", result)
+            run.write_jsonl(
+                "audit_bundles.jsonl",
+                [
+                    {
+                        "problem_id": b.problem_id,
+                        "t": b.t,
+                        "path_id": b.path_id,
+                        "rewards": b.rewards.tolist(),
+                        "grads": b.grads.tolist(),
+                        "suffix_cost": None if b.suffix_cost is None else b.suffix_cost.tolist(),
+                        "m_pred": None if b.m_pred is None else np.asarray(b.m_pred).tolist(),
+                        "r_hat": b.r_hat,
+                        "c_hat": b.c_hat,
+                        "finished": bool(b.finished),
+                        "prefix_tokens": b.prefix_tokens,
+                        "answer_emitted": bool(b.answer_emitted),
+                        "coords": None if b.coords is None else np.asarray(b.coords).tolist(),
+                        "prefix_text": b.prefix_text,
+                        "suffix_texts": b.suffix_texts,
+                        "prompt_truncated": b.prompt_truncated,
+                    }
+                    for b in bundles
+                ],
+            )
+            from grace_gc.backends.vllm_two_phase import build_sampling_params
+
+            if getattr(build_sampling_params, "last", None):
+                run.write_json("sampling.json", build_sampling_params.last)
+            print(f"audit done n_bundles={result.get('n_bundles')}")
+        ledger.add("audit", timer.elapsed())
+        result["finished"] = utc_now()
+        run.write_json("audit_summary.json", result)
+        run.write_json("compute_ledger.json", ledger.summary())
+        run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])
+        return result
+    except Exception as exc:
+        write_failed(run, exc, versions, started)
+        run.write_json("compute_ledger.json", ledger.summary())
+        raise

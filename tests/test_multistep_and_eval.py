@@ -43,6 +43,12 @@ def test_multistep_train_and_resume(tmp_path: Path):
     assert first["run_status"] == "complete"
     assert first["summary"]["steps"] == 2
     assert first["summary"]["step"] == 2
+    steps = [
+        json.loads(line)
+        for line in (tmp_path / "run1" / "steps.jsonl").read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+    assert [row["step"] for row in steps] == [1, 2]
     ckpt = load_checkpoint(first["summary"]["checkpoint"])
     assert ckpt["actor"]
     assert ckpt["optimizer"]
@@ -72,13 +78,33 @@ def test_eval_and_audit_generate(tmp_path: Path):
     recs = load_math_records(data)
     ev = run_eval(recs, {"backend": "cpu_tiny", "eval_k": 1, "eval_n": 2, "max_new_tokens": 3, "seed": 1}, tmp_path / "eval")
     assert ev["n_problems"] == 3
-    assert (tmp_path / "eval" / "eval_per_problem.jsonl").is_file()
+    capped = run_eval(
+        recs,
+        {"backend": "cpu_tiny", "eval": {"n_problems": 1, "k": 1, "n": 1}, "max_new_tokens": 3, "seed": 1},
+        tmp_path / "eval-cap",
+    )
+    assert capped["n_problems"] == 1
+    eval_rows = [
+        json.loads(line)
+        for line in (tmp_path / "eval" / "eval_per_problem.jsonl").read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+    assert eval_rows
+    assert "extracted" in eval_rows[0]
+    assert "response_tokens" in eval_rows[0]
+    assert (tmp_path / "eval" / "run.log").is_file()
     au = run_audit(recs[:1], {"backend": "cpu_tiny", "n_prefixes": 1, "n_cont": 3, "decision_tokens": 2, "max_new_tokens": 2, "seed": 2}, tmp_path / "audit")
+    assert (tmp_path / "audit" / "run.log").is_file()
     if au["n_bundles"] == 0:
         assert au.get("note") == "no prefixes"
     else:
         assert au["n_bundles"] == 1
         assert "variance_cost" in au
+        bundle_path = tmp_path / "audit" / "audit_bundles.jsonl"
+        assert bundle_path.is_file()
+        first = json.loads(bundle_path.read_text(encoding="utf-8").splitlines()[0])
+        assert "prefix_text" in first
+        assert "suffix_texts" in first
 
 
 def test_prompt_cv_uses_prompt_features():

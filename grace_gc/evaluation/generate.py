@@ -6,10 +6,14 @@ from pathlib import Path
 from typing import Any
 
 from grace_gc.data.math_data import MathRecord
-from grace_gc.data.reward import rule_reward
+from grace_gc.data.reward import extract_answer
 from grace_gc.evaluation.eval_full import EvalItem, evaluate_items
-from grace_gc.logging_util.run_dir import RunDirectory
-from grace_gc.versions import collect_versions
+from grace_gc.logging_util.forensics import persist_eval_items, write_failed
+from grace_gc.logging_util.ledger import ComputeLedger, Timer
+from grace_gc.logging_util.run_dir import RunDirectory, resolve_run_dir, utc_now
+from grace_gc.logging_util.run_log import RunLog
+from grace_gc.trainer.grace_step import finish_reason
+from grace_gc.versions import collect_environment
 
 
 def _load_tiny_actor(cfg: dict[str, Any] | None = None):
@@ -44,24 +48,50 @@ def generate_answers_tiny(
     engines = make_tiny_engines(actor, actor.vocab)
     rng = IsolatedRNG.create(seed)
     prompt_max = int((cfg or {}).get("prompt_max_tokens", 1024))
-    from grace_gc.trainer.algorithm import _length_truncated
+    from grace_gc.trainer.algorithm import _length_truncated, _traj_natural_finish
 
     items = []
+    eos_id = getattr(engines, "eos_id", None)
     for rec in records:
+        prompt_meta: list = []
+        prompts, _pids, _golds = encode_records_tiny([rec], actor.vocab, prompt_max, prompt_meta=prompt_meta)
         answers = []
         truncated = []
-        for _ in range(n):
-            prompts, _pids, _golds = encode_records_tiny([rec], actor.vocab, prompt_max)
+        extracted = []
+        response_tokens = []
+        finish_reasons = []
+        token_ids = []
+        sample_seeds = []
+        for sample_i in range(n):
             full = engines.continue_selected(prompts, [True], max_new, rng)
             if not full or full[0] is None:
                 raise ValueError("eval generate returned no sequence")
             seq = full[0]
             resp = seq[len(prompts[0]) :]
-            answers.append(engines.decode(resp) if engines.decode else "")
-            truncated.append(
-                _length_truncated(seq, len(prompts[0]), max_new, False, getattr(engines, "eos_id", None))
+            text = engines.decode(resp) if engines.decode else ""
+            answers.append(text)
+            ended = _traj_natural_finish(False, seq, eos_id, generated=len(resp), requested=max_new)
+            trunc = _length_truncated(seq, len(prompts[0]), max_new, ended, eos_id)
+            truncated.append(trunc)
+            extracted.append(extract_answer(text))
+            response_tokens.append(len(resp))
+            finish_reasons.append(finish_reason(1.0, ended, trunc))
+            token_ids.append([int(x) for x in resp])
+            sample_seeds.append(int(seed) + sample_i)
+        items.append(
+            EvalItem(
+                rec.problem_id,
+                rec.answer,
+                answers,
+                truncated,
+                extracted=extracted,
+                response_tokens=response_tokens,
+                finish_reasons=finish_reasons,
+                token_ids=token_ids,
+                sample_seeds=sample_seeds,
+                prompt_truncated=[bool((prompt_meta or [{}])[0].get("prompt_truncated"))] * n,
             )
-        items.append(EvalItem(rec.problem_id, rec.answer, answers, truncated))
+        )
     return items
 
 
@@ -93,9 +123,16 @@ def generate_answers_vllm(
     sample_i = 0
     eos_id = collect_stop_token_ids(tokenizer)
     for rec in records:
-        prompts, _pids, _golds = encode_records_hf([rec] * n, tokenizer, int(max_prompt))
+        prompt_meta: list = []
+        prompts, _pids, _golds = encode_records_hf([rec] * n, tokenizer, int(max_prompt), prompt_meta=prompt_meta)
         answers = []
         truncated = []
+        extracted = []
+        response_tokens = []
+        finish_reasons = []
+        token_ids = []
+        sample_seeds = []
+        vllm_finish_reasons = []
         fulls = []
         for prompt in prompts:
             params = build_sampling_params(
@@ -130,12 +167,34 @@ def generate_answers_vllm(
                 getattr(completion, "stop_reason", None),
             )
             fulls.append(list(prompt) + list(gen))
-            answers.append(decode_hf(tokenizer, gen))
-            truncated.append(generated_was_truncated(len(gen), max_new, ended, finish_reason))
+            text = decode_hf(tokenizer, gen)
+            answers.append(text)
+            trunc = generated_was_truncated(len(gen), max_new, ended, finish_reason)
+            truncated.append(trunc)
+            extracted.append(extract_answer(text))
+            response_tokens.append(len(gen))
+            finish_reasons.append("length" if trunc else ("eos" if ended else "completed"))
+            vllm_finish_reasons.append(None if finish_reason is None else str(finish_reason))
+            token_ids.append([int(x) for x in gen])
+            sample_seeds.append(int(seed) + sample_i - 1)
         # Paper headline is avg@4. The same ignored-seed collapse that
         # zeros GRPO advantages would silently report avg@1 as avg@4.
         _require_distinct_rollouts(prompts, fulls, temperature)
-        items.append(EvalItem(rec.problem_id, rec.answer, answers, truncated))
+        items.append(
+            EvalItem(
+                rec.problem_id,
+                rec.answer,
+                answers,
+                truncated,
+                extracted=extracted,
+                response_tokens=response_tokens,
+                finish_reasons=finish_reasons,
+                token_ids=token_ids,
+                sample_seeds=sample_seeds,
+                prompt_truncated=[bool(m.get("prompt_truncated")) for m in prompt_meta] or None,
+                vllm_finish_reasons=vllm_finish_reasons,
+            )
+        )
     return items
 
 
@@ -169,9 +228,18 @@ def _eval_hparams(cfg: dict[str, Any]) -> tuple[int, int, int, float, float]:
     return k, n, max_new, temperature, top_p
 
 
-def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path) -> dict:
-    backend = cfg.get("backend", "cpu_tiny")
-    k, n, max_new, temperature, top_p = _eval_hparams(cfg)
+def limit_eval_records(records: list[MathRecord], cfg: dict[str, Any]) -> list[MathRecord]:
+    """0 or missing means the full split. Smoke sets eval.n_problems."""
+    ev = cfg.get("eval") or {}
+    n_problems = int(cfg.get("eval_n_problems", ev.get("n_problems", 0)) or 0)
+    if n_problems < 0:
+        raise ValueError(f"eval.n_problems must be >= 0, got {n_problems}")
+    if n_problems == 0:
+        return list(records)
+    return list(records[:n_problems])
+
+
+def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, run_dir):
     if backend == "gpu_verl":
         if not cfg.get("model_path"):
             raise ValueError("model_path is required for GPU evaluation")
@@ -181,13 +249,14 @@ def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path
         from grace_gc.backends.hf_actor import named_lora_params
         from grace_gc.backends.verl_trainer import build_vllm_engine, load_lora_actor
         from grace_gc.backends.weight_sync import apply_lora_request, make_lora_request, reset_vllm_prefix_cache, save_lora_adapter
-        from grace_gc.data.tokenize import load_hf_tokenizer
+        from grace_gc.data.tokenize import load_hf_tokenizer, tokenizer_inventory
         from grace_gc.data.reward import require_math_verify
         from grace_gc.trainer.checkpoint import load_checkpoint
         from grace_gc.trainer.state_io import check_snapshot_identity, load_numpy_module_state
 
         require_math_verify()
         tok = load_hf_tokenizer(str(cfg["model_path"]))
+        RunDirectory(run_dir).write_json("tokenizer.json", tokenizer_inventory(tok))
         actor = load_lora_actor(str(cfg["model_path"]), cfg.get("lora", {}))
         payload = load_checkpoint(ckpt)
         check_snapshot_identity(payload, cfg)
@@ -204,6 +273,8 @@ def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path
         have = int(vllm_cfg.get("max_model_len", 0) or 0)
         vllm_cfg["max_model_len"] = max(have, 5120, need)
         llm = build_vllm_engine(str(cfg["model_path"]), vllm_cfg, int(cfg.get("lora", {}).get("rank", 16)))
+        if getattr(build_vllm_engine, "last", None):
+            RunDirectory(run_dir).write_json("vllm_engine.json", build_vllm_engine.last)
         lora_request = make_lora_request(adapter, 1)
         apply_lora_request(llm, lora_request)
         reset_vllm_prefix_cache(llm)
@@ -221,25 +292,62 @@ def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path
         )
     else:
         items = generate_answers_tiny(records, n, max_new, int(cfg.get("seed", 17)), cfg=cfg)
-    result = evaluate_items(items, k=k)
-    result["seed"] = int(cfg.get("seed", 17))
-    result["checkpoint"] = cfg.get("checkpoint") or cfg.get("resume")
-    result["actor_source"] = "checkpoint" if result["checkpoint"] else "base_or_random"
+    return items
+
+
+def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path) -> dict:
+    backend = cfg.get("backend", "cpu_tiny")
+    records = limit_eval_records(records, cfg)
+    k, n, max_new, temperature, top_p = _eval_hparams(cfg)
+    requested = Path(run_dir)
+    run_dir = resolve_run_dir(run_dir)
     run = RunDirectory(run_dir)
+    started = utc_now()
+    versions = collect_environment(cfg)
+    versions["started"] = started
+    run.write_run_meta(kind="eval", started=started, requested=requested)
     run.write_yaml("config.yaml", cfg)
-    run.write_json("environment.json", collect_versions())
-    run.write_json("eval_summary.json", result)
-    run.write_jsonl(
-        "eval_per_problem.jsonl",
-        [
-            {
-                "problem_id": item.problem_id,
-                "gold": item.gold,
-                "answers": item.answers,
-                "truncated": item.truncated,
-                "rewards": [rule_reward(a, item.gold, t) for a, t in zip(item.answers, item.truncated)],
-            }
-            for item in items
-        ],
-    )
-    return result
+    run.write_json("environment.json", versions)
+    n_gpu = int((cfg.get("hardware") or {}).get("n_gpu", 1 if backend == "gpu_verl" else 0))
+    hardware = str((cfg.get("hardware") or {}).get("name", "gpu" if backend == "gpu_verl" else "cpu"))
+    ledger = ComputeLedger(n_gpu=n_gpu, hardware=hardware)
+    timer = Timer()
+    try:
+        with RunLog(run.root / "run.log"):
+            print(f"eval start {started} backend={backend} n_problems={len(records)} n={n} k={k} dir={run.root}")
+            if Path(run.root).resolve() != requested.resolve():
+                print(f"run-dir {requested} already had artifacts; writing to {run.root}")
+            items = _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, run.root)
+            result = evaluate_items(items, k=k)
+            result["seed"] = int(cfg.get("seed", 17))
+            result["checkpoint"] = cfg.get("checkpoint") or cfg.get("resume")
+            result["actor_source"] = "checkpoint" if result["checkpoint"] else "base_or_random"
+            result["n_problems_requested"] = len(records)
+            result["started"] = started
+            result["run_dir"] = str(run.root)
+            persist_eval_items(run, items, cfg, result)
+            from grace_gc.backends.vllm_two_phase import build_sampling_params
+
+            if getattr(build_sampling_params, "last", None):
+                run.write_json("sampling.json", build_sampling_params.last)
+            run.write_json(
+                "data_splits.json",
+                {
+                    "data_path": cfg.get("data_path"),
+                    "eval_split": cfg.get("eval_split", "eval"),
+                    "n_loaded": len(records),
+                    "n_problems": result.get("n_problems"),
+                    "looks_like_math500": len(records) == 500 or result.get("n_problems") == 500,
+                },
+            )
+            print(f"eval done avg={result.get('avg')} pass_at_k={result.get('pass_at_k')}")
+        ledger.add("eval", timer.elapsed())
+        result["finished"] = utc_now()
+        run.write_json("eval_summary.json", result)
+        run.write_json("compute_ledger.json", ledger.summary())
+        run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])
+        return result
+    except Exception as exc:
+        write_failed(run, exc, versions, started)
+        run.write_json("compute_ledger.json", ledger.summary())
+        raise

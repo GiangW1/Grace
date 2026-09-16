@@ -97,6 +97,7 @@ def apply_correction_clip_step(
     optimizer,
     clip: float = 1.0,
     use_correction: bool = True,
+    stats: dict | None = None,
 ) -> tuple[np.ndarray, bool]:
     torch = _torch()
     packed = pack_grads(
@@ -128,4 +129,8 @@ def apply_correction_clip_step(
     if written != len(layout.entries):
         raise ValueError("correction writeback missed layout entries")
     optimizer.step()
+    if stats is not None:
+        stats["grad_norm_preclip"] = float(norm)
+        stats["grad_norm"] = float(np.linalg.norm(packed))
+        stats["clip_triggered"] = bool(triggered)
     return packed, triggered

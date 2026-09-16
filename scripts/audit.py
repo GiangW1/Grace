@@ -15,7 +15,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from grace_gc.audit.prefix_audit import PrefixBundle, audit_bundles
-from grace_gc.logging_util.run_dir import RunDirectory
+from grace_gc.logging_util.run_dir import RunDirectory, default_run_dir, resolve_run_dir, utc_now
 from grace_gc.trainer.loop import build_run_config
 
 
@@ -30,7 +30,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model-path", dest="model_path", default=None)
     parser.add_argument("--backend", default=None, help="cpu_tiny or gpu_verl; default keeps YAML")
     parser.add_argument("--split", default="audit", help="split_records bucket used with --generate")
-    parser.add_argument("--run-dir", dest="run_dir", default="runs/audit")
+    parser.add_argument("--run-dir", dest="run_dir", default=None, help="default: runs/audit-UTC")
     args = parser.parse_args(argv)
     overrides = {}
     if args.seed is not None:
@@ -53,8 +53,10 @@ def main(argv: list[str] | None = None) -> int:
         recs = records_for_split(load_math_records(args.data_path), args.split, seed=int(cfg.get("split_seed", 17)))
         if not recs:
             raise ValueError(f"split {args.split!r} is empty")
-        result = run_audit(recs, cfg, args.run_dir)
+        run_dir = args.run_dir or str(default_run_dir("audit"))
+        result = run_audit(recs, cfg, run_dir)
         print(result)
+        print("run_dir", result.get("run_dir"))
         return 0
     if not args.bundles:
         raise ValueError("provide --bundles or --generate --data-path")
@@ -87,10 +89,21 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
     if not bundles:
-        run = RunDirectory(args.run_dir)
-        result = {"n_bundles": 0, "note": "no prefixes"}
+        requested = args.run_dir or str(default_run_dir("audit"))
+        run_dir = resolve_run_dir(requested)
+        started = utc_now()
+        run = RunDirectory(run_dir)
+        run.write_run_meta(kind="audit", started=started, requested=requested)
+        result = {
+            "n_bundles": 0,
+            "note": "no prefixes",
+            "started": started,
+            "finished": utc_now(),
+            "run_dir": str(run.root),
+        }
         run.write_json("audit_summary.json", result)
         print(result)
+        print("run_dir", result["run_dir"])
         return 0
     from grace_gc.audit.run import _audit_u
 
@@ -104,9 +117,17 @@ def main(argv: list[str] | None = None) -> int:
     if cfg.get("max_new_tokens") is not None:
         analysis.setdefault("max_new_tokens", int(cfg["max_new_tokens"]))
     result = audit_bundles(bundles, u, analysis, rng)
-    run = RunDirectory(args.run_dir)
+    requested = args.run_dir or str(default_run_dir("audit"))
+    run_dir = resolve_run_dir(requested)
+    started = utc_now()
+    run = RunDirectory(run_dir)
+    run.write_run_meta(kind="audit", started=started, requested=requested)
+    result["started"] = started
+    result["finished"] = utc_now()
+    result["run_dir"] = str(run.root)
     run.write_json("audit_summary.json", result)
     print(result)
+    print("run_dir", result["run_dir"])
     return 0
 
 

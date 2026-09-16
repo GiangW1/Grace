@@ -33,6 +33,27 @@ def _snapshot(repo_id: str, repo_type: str, dest: Path) -> Path:
         raise ImportError("pip install huggingface_hub") from exc
     dest.mkdir(parents=True, exist_ok=True)
     snapshot_download(repo_id=repo_id, repo_type=repo_type, local_dir=str(dest))
+    meta = {
+        "repo_id": repo_id,
+        "repo_type": repo_type,
+        "endpoint": os.environ.get("HF_ENDPOINT"),
+        "local_dir": str(dest),
+    }
+    refs = dest / "refs" / "main"
+    if refs.is_file():
+        meta["hf_ref_main"] = refs.read_text(encoding="utf-8").strip()
+    try:
+        from huggingface_hub import HfApi
+
+        info = HfApi().repo_info(repo_id, repo_type=repo_type)
+        meta["sha"] = getattr(info, "sha", None)
+        last = getattr(info, "lastModified", None) or getattr(info, "last_modified", None)
+        meta["last_modified"] = None if last is None else str(last)
+    except Exception as exc:
+        meta["sha_error"] = f"{type(exc).__name__}: {exc}"
+    import json
+
+    (dest / "download_meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     return dest
 
 

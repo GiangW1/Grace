@@ -14,6 +14,9 @@ class PhaseResult:
     token_ids: list[list[int]]
     natural_finish: np.ndarray
     prompt_lens: np.ndarray
+    finish_reasons: list[str | None] | None = None
+    stop_reasons: list | None = None
+    sampling: dict | None = None
 
 
 def _require_vllm():
@@ -56,34 +59,46 @@ def build_sampling_params(
     stop_ids = as_stop_ids(eos_id)
     if stop_ids:
         kwargs["stop_token_ids"] = stop_ids
+    used, dropped = _fit_sampling_params(SamplingParams, kwargs, seed is not None)
+    build_sampling_params.last = {"used": dict(used), "dropped": list(dropped)}
+    return SamplingParams(**used)
+
+
+def _fit_sampling_params(SamplingParams, kwargs: dict, need_seed: bool) -> tuple[dict, list[str]]:
+    """Keep required fields. Only min_p / repetition_penalty may be dropped."""
     try:
-        return SamplingParams(**kwargs)
+        SamplingParams(**kwargs)
+        return dict(kwargs), []
     except TypeError:
-        # min_p / repetition_penalty are only there to block Instruct defaults.
-        # stop, stop_token_ids, top_k, top_p, and seed must stay or sampling
-        # would not match the actor log-prob.
-        optional = ("min_p", "repetition_penalty")
-        for drop in optional:
-            trial = dict(kwargs)
-            trial.pop(drop, None)
-            try:
-                return SamplingParams(**trial)
-            except TypeError:
-                continue
-        for drop in optional:
-            kwargs.pop(drop, None)
+        pass
+    optional = ("min_p", "repetition_penalty")
+    for drop in optional:
+        trial = dict(kwargs)
+        if drop not in trial:
+            continue
+        trial.pop(drop, None)
         try:
-            return SamplingParams(**kwargs)
-        except TypeError as exc:
-            msg = str(exc).lower()
-            if seed is not None and "seed" in msg:
-                raise ValueError(
-                    "vLLM SamplingParams rejected seed; rollout RNG would not be isolated"
-                ) from exc
+            SamplingParams(**trial)
+            return trial, [drop]
+        except TypeError:
+            continue
+    dropped = [name for name in optional if name in kwargs]
+    trial = dict(kwargs)
+    for name in dropped:
+        trial.pop(name, None)
+    try:
+        SamplingParams(**trial)
+        return trial, dropped
+    except TypeError as exc:
+        msg = str(exc).lower()
+        if need_seed and "seed" in msg:
             raise ValueError(
-                "vLLM SamplingParams rejected a required sampling field; "
-                "generation would not match the actor log-prob"
+                "vLLM SamplingParams rejected seed; rollout RNG would not be isolated"
             ) from exc
+        raise ValueError(
+            "vLLM SamplingParams rejected a required sampling field; "
+            "generation would not match the actor log-prob"
+        ) from exc
 
 
 def _usable_stop_reason(stop_reason, stop_set: set[int]) -> int | None:
@@ -231,6 +246,8 @@ def generate_phase(
     token_ids = []
     finished = []
     prompt_lens = []
+    finish_reasons = []
+    stop_reasons = []
     for prompt, out in zip(prompt_token_ids, outputs):
         out_prompt = getattr(out, "prompt_token_ids", None)
         if out_prompt is None:
@@ -241,22 +258,30 @@ def generate_phase(
         if not completions:
             raise ValueError("vLLM returned a request with no completions")
         completion = completions[0]
-        _require_known_finish(getattr(completion, "finish_reason", None))
+        raw_finish = getattr(completion, "finish_reason", None)
+        raw_stop = getattr(completion, "stop_reason", None)
+        _require_known_finish(raw_finish)
         gen, ended = trim_generated_tokens(
             completion.token_ids,
             eos_id,
-            getattr(completion, "finish_reason", None),
-            getattr(completion, "stop_reason", None),
+            raw_finish,
+            raw_stop,
         )
         full = list(prompt) + gen
         token_ids.append(full)
         prompt_lens.append(len(prompt))
         finished.append(ended)
+        finish_reasons.append(None if raw_finish is None else str(raw_finish))
+        stop_reasons.append(None if raw_stop is None else raw_stop)
     _require_distinct_rollouts(prompt_token_ids, token_ids, temperature)
+    sampling = getattr(build_sampling_params, "last", None)
     return PhaseResult(
         token_ids=token_ids,
         natural_finish=np.asarray(finished, dtype=bool),
         prompt_lens=np.asarray(prompt_lens, dtype=np.int64),
+        finish_reasons=finish_reasons,
+        stop_reasons=stop_reasons,
+        sampling=None if sampling is None else dict(sampling),
     )
 
 
@@ -289,8 +314,12 @@ def continue_selected(
     for i, seq in already.items():
         out[i] = seq
     if not chosen:
+        continue_selected.last_phase = None
+        continue_selected.last_idx = []
         return out
     phase = generate_phase(llm, chosen, max_tokens, temperature, eos_id, rng, "continuation", lora_request=lora_request)
+    continue_selected.last_phase = phase
+    continue_selected.last_idx = list(chosen_idx)
     for j, i in enumerate(chosen_idx):
         out[i] = phase.token_ids[j]
     return out

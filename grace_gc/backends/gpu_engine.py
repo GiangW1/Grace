@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any  # noqa: F401
 
 import numpy as np
 
@@ -30,6 +30,7 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
             "training temperature must be 1 so vLLM sampling matches the HF score"
         )
     extra = {"lora_request": None, "lora_id": 1, "llm": llm}
+    box: dict[str, Any] = {}
 
     def generate_prefix(prompt_ids, max_new, rng, stream: str):
         phase = generate_phase(
@@ -42,10 +43,17 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
             stream,
             lora_request=extra.get("lora_request"),
         )
+        engines = box.get("engines")
+        if engines is not None:
+            engines.last_rollout = {
+                "prefix_finish_reasons": list(phase.finish_reasons or []),
+                "prefix_stop_reasons": list(phase.stop_reasons or []),
+                "sampling": phase.sampling,
+            }
         return phase.token_ids, phase.natural_finish
 
     def continue_fn(prefixes, selected, max_new, rng):
-        return continue_selected(
+        out = continue_selected(
             llm,
             prefixes,
             selected,
@@ -55,6 +63,25 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
             rng,
             lora_request=extra.get("lora_request"),
         )
+        phase = getattr(continue_selected, "last_phase", None)
+        idx = getattr(continue_selected, "last_idx", None) or []
+        engines = box.get("engines")
+        if engines is not None:
+            roll = dict(engines.last_rollout or {})
+            finish_map = {}
+            stop_map = {}
+            if phase is not None:
+                for j, i in enumerate(idx):
+                    if phase.finish_reasons:
+                        finish_map[i] = phase.finish_reasons[j]
+                    if phase.stop_reasons:
+                        stop_map[i] = phase.stop_reasons[j]
+                if phase.sampling is not None:
+                    roll["sampling"] = phase.sampling
+            roll["continue_finish_reasons"] = finish_map
+            roll["continue_stop_reasons"] = stop_map
+            engines.last_rollout = roll
+        return out
 
     def features(prefixes, prompt_lens, baselines):
         return prefix_feature_bundle(actor, prefixes, prompt_lens, baselines, pad_id, eos_id=eos_id)
@@ -84,6 +111,9 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
         decode=decode,
         eos_id=eos_id,
     )
+    box["engines"] = engines
+    extra["pad_id"] = pad_id
+    extra["eos_id"] = eos_id
     extra["sync"] = lambda: _sync(actor, adapter_dir, extra)
     return engines, extra
 

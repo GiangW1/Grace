@@ -12,7 +12,7 @@
 - `tests/test_methods.py`：八个方法入口、assemble_ghat 数值、Reward-CV 不同 q 不同 p、成功头随前缀特征变化、GRPO-short 为每题 16 起步
 - `tests/test_layout_and_reduce.py`：LoRA 布局、缺名报错、全局 N、非零 f 校正
 - `tests/test_data_eval_audit.py`：去重分割互斥、标记 split、嵌套 boxed、parse_rate=2/3、ρ_L≠1、DAPO 对话列表与 ground_truth、JSON 字符串字段还原、GPU chat_template 编码、保留 role/content 消息、未闭合 thinking 硬失败、超长对话先缩短 user 文本以保住 assistant 头，模板本身超长才退回截尾、未标记 DAPO 规模语料预留校准 256/审计 240 且评测拒绝整库 DAPO、审计 PLC 用 t_L 后 token 代理、verl 风格 `extra_info.index=0` 保留为题号以免 256/240 划分被静默打乱
-- `tests/test_config_loop.py`：配置、checkpoint、CPU 训练写日志
+- `tests/test_config_loop.py`：配置、checkpoint、CPU 训练逐步写轨迹/`steps.jsonl`/`run.log`/账本/逐步快照
 - `tests/test_grpo.py`：组均值优势、GRPO 必续写、抽题在池够大时无放回以免同题两组合成一组
 - `tests/test_multistep_and_eval.py`：多步训练、续训、评测/审计自行生成、Prompt-CV 用题目特征
 - `tests/test_gpu_entry.py::test_u7_amp_reduce_clip_order_cpu_reference`：clip/N 的 CPU 参考
@@ -30,10 +30,10 @@
 ## 本机最近一次结果（2026-09-16）
 
 ```text
-186 passed, 1 skipped
+190 passed, 1 skipped
 ```
 
-本次覆盖审查报告的代码修复，以及主曲线的 Wilson / 答案出现前筛选、按决策点 t 求解 λ。跳过项：`test_u6_gpu_fp64_entry_is_defined`（无 CUDA/verl）。
+本次覆盖：prompt 截断标记、实际 SamplingParams/引擎参数、HF vs vLLM logprob 对照（无引擎记 unavailable）、LoRA A/B 范数、nvidia-smi/磁盘/revision、未训预测器分配、逐步资源快照。跳过项：`test_u6_gpu_fp64_entry_is_defined`（无 CUDA/verl）。
 
 跳过项：`test_u6_gpu_fp64_entry_is_defined`（无 CUDA/verl；stack 存在时会跑 FP64 对照，不再无条件 skip）。
 

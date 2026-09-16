@@ -21,8 +21,25 @@ def tiny_decode(token_ids: list[int], eos_id: int) -> str:
     return "".join(chars)
 
 
-def encode_records_tiny(records: list[MathRecord], vocab: int, max_len: int) -> tuple[list[list[int]], list[str], list[str]]:
-    prompts = [tiny_encode(rec.prompt, vocab, max_len) for rec in records]
+def encode_records_tiny(
+    records: list[MathRecord],
+    vocab: int,
+    max_len: int,
+    prompt_meta: list | None = None,
+) -> tuple[list[list[int]], list[str], list[str]]:
+    prompts = []
+    for rec in records:
+        text = rec.prompt
+        prompts.append(tiny_encode(text, vocab, max_len))
+        if prompt_meta is not None:
+            prompt_meta.append(
+                {
+                    "used_chat_template": False,
+                    "prompt_truncated": len(text) > int(max_len),
+                    "untruncated_len": len(text),
+                    "thinking_closed": None,
+                }
+            )
     return prompts, [rec.problem_id for rec in records], [rec.answer for rec in records]
 
 
@@ -140,9 +157,15 @@ def _fit_chat_to_max(apply, chat, kwargs, max_len: int, rendered: list[int]) -> 
     return best if best is not None else rendered[-max_len:]
 
 
-def encode_prompt_hf(tokenizer, text: str, max_len: int, messages=None) -> list[int]:
-    """verl/DAPO: chat template + generation prompt when the tokenizer has one."""
+def encode_prompt_hf_detail(tokenizer, text: str, max_len: int, messages=None) -> tuple[list[int], dict]:
+    """Same encoding as encode_prompt_hf, plus whether the prompt was shortened."""
     apply = getattr(tokenizer, "apply_chat_template", None)
+    meta = {
+        "used_chat_template": False,
+        "prompt_truncated": False,
+        "untruncated_len": None,
+        "thinking_closed": None,
+    }
     if apply is not None and getattr(tokenizer, "chat_template", None):
         chat = list(messages) if messages else [{"role": "user", "content": text}]
         kwargs = {
@@ -150,25 +173,65 @@ def encode_prompt_hf(tokenizer, text: str, max_len: int, messages=None) -> list[
             "add_generation_prompt": True,
         }
         ids = _render_chat(apply, chat, kwargs)
+        meta["used_chat_template"] = True
+        meta["untruncated_len"] = len(ids)
         if len(ids) > int(max_len):
+            meta["prompt_truncated"] = True
             ids = _fit_chat_to_max(apply, chat, kwargs, int(max_len), ids)
         decode = getattr(tokenizer, "decode", None)
         if decode is not None:
-            text = str(decode(ids))
-            # Qwen3 off-switch writes an empty <think></think>. An open
-            # <think> with no close means the template is still in thinking mode.
-            if "<think>" in text and "</think>" not in text:
+            rendered = str(decode(ids))
+            if "<think>" in rendered and "</think>" not in rendered:
                 raise ValueError(
                     "chat template left thinking open; Qwen3 needs enable_thinking=False"
                 )
-        return ids
-    ids = tokenizer(text, add_special_tokens=True, truncation=True, max_length=int(max_len))["input_ids"]
-    return _as_id_list(ids)
+            meta["thinking_closed"] = "<think>" not in rendered or "</think>" in rendered
+        return ids, meta
+    raw = tokenizer(text, add_special_tokens=True, truncation=False)
+    full = _as_id_list(raw["input_ids"] if isinstance(raw, dict) else raw)
+    meta["untruncated_len"] = len(full)
+    if len(full) > int(max_len):
+        meta["prompt_truncated"] = True
+        return full[: int(max_len)], meta
+    return full, meta
 
 
-def encode_records_hf(records: list[MathRecord], tokenizer, max_len: int) -> tuple[list[list[int]], list[str], list[str]]:
-    prompts = [encode_prompt_hf(tokenizer, rec.prompt, max_len, rec.messages) for rec in records]
+def encode_prompt_hf(tokenizer, text: str, max_len: int, messages=None) -> list[int]:
+    """verl/DAPO: chat template + generation prompt when the tokenizer has one."""
+    ids, _meta = encode_prompt_hf_detail(tokenizer, text, max_len, messages)
+    return ids
+
+
+def encode_records_hf(
+    records: list[MathRecord],
+    tokenizer,
+    max_len: int,
+    prompt_meta: list | None = None,
+) -> tuple[list[list[int]], list[str], list[str]]:
+    prompts = []
+    for rec in records:
+        ids, meta = encode_prompt_hf_detail(tokenizer, rec.prompt, max_len, rec.messages)
+        prompts.append(ids)
+        if prompt_meta is not None:
+            prompt_meta.append(meta)
     return prompts, [rec.problem_id for rec in records], [rec.answer for rec in records]
+
+
+def tokenizer_inventory(tokenizer) -> dict:
+    stop_ids = None
+    try:
+        stop_ids = collect_stop_token_ids(tokenizer)
+    except Exception as exc:
+        stop_ids = {"error": str(exc)}
+    return {
+        "name_or_path": getattr(tokenizer, "name_or_path", None),
+        "vocab_size": getattr(tokenizer, "vocab_size", None),
+        "has_chat_template": bool(getattr(tokenizer, "chat_template", None)),
+        "eos_token_id": getattr(tokenizer, "eos_token_id", None),
+        "pad_token_id": getattr(tokenizer, "pad_token_id", None),
+        "unk_token_id": getattr(tokenizer, "unk_token_id", None),
+        "stop_token_ids": stop_ids,
+    }
 
 
 def decode_hf(tokenizer, token_ids: list[int]) -> str:
