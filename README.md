@@ -46,7 +46,7 @@ python scripts/fetch_assets.py --root data
 test -d "$MODEL" && test -f "$TRAIN_DATA" && test -f "$EVAL_DATA" && echo ok
 ```
 
-官方 DAPO parquet 可直接加载。同一题面金标冲突的整组丢掉，写入 `data_conflicts.json`（大约 12 组），不会硬失败。MATH-500 套与 DAPO 相同的 `Answer:` 指令。`format_warmup` 是共享格式 SFT（LoRA 上教 `Answer:`），不是 `predictor.warmup_steps`。
+官方 DAPO parquet 可直接加载。同一题面金标冲突的整组丢掉，写入 `data_conflicts.json`（大约 12 组），不会硬失败。MATH-500 套与 DAPO 相同的 `Answer:` 指令。`format_warmup` 是共享格式 SFT：训练推理开头和 `Answer:`，不训金标、不追加 EOS。它不是 `predictor.warmup_steps`。
 
 ### D. 绑卡和会话
 
@@ -186,7 +186,7 @@ python scripts/audit.py --bundles runs/audit-fullpg-seed17/audit_bundles.jsonl -
 | `lora/step-2` 在第 1 步前就出现 | adapter id，首次 sync；不是 `state.step` |
 | `phase=prescan` 很久没新日志 | 未见过的题各抽 4 条满长样本写 baseline；现在会打心跳 |
 | `data_conflicts.json` | 官方 DAPO 冲突题面已丢掉 |
-| `format_warmup.json` | 共享格式 SFT，默认 Pilot 256 步、smoke 32 步 |
+| `format_warmup.json` | 共享格式 SFT：训推理开头和 `Answer:`，不训金标/EOS。`mean_response_tokens<16` 是交卷 |
 | `baseline_collapsed_with_zero_reward` | 全零奖励且 b=0，优势为 0 |
 | `lora_A_grad_zero_expected` | B≈0 时 A 梯度应为 0 |
 | 审计 ρ 为 NaN | 该子集 `Var(R)=0`，按公式就是 NaN |
@@ -301,7 +301,7 @@ export EVAL_DATA=$(find "$PWD/data/math500" \( -name '*.parquet' -o -name '*.jso
 - 训练文件是官方 DAPO 的 JSONL 或 parquet。`prompt` 可以是对话列表，答案读 `reward_model.ground_truth`。官方 parquet 可直接加载；同一题面金标冲突的整组会丢掉，并写入 `data_conflicts.json`（大约 12 组）。
 - 评测必须是单独的 MATH-500，字段用 `problem`/`prompt` 和 `answer`。不要把 DAPO 再切 10% 当考卷。MATH-500 会套上与 DAPO 相同的 `Answer:` 格式指令。
 - 未标记且够大的 DAPO 会按 seed 17 切出校准 256、审计 240，其余训练。缺金标会报错。
-- `format_warmup` 是论文要求的共享格式 SFT（LoRA 上教 `Answer:`），不是预测器的 `predictor.warmup_steps`。默认 256 步；续训会跳过。
+- `format_warmup` 是论文要求的共享格式 SFT：训练推理开头和 `Answer:`，不训金标、不追加 EOS。默认 256 步；续训会跳过。看 `mean_response_tokens`：经常小于 16 是交卷，不是学会了。
 
 检查路径存在再往下：
 

@@ -57,12 +57,15 @@ def evaluate_items(items: list[EvalItem], k: int = 1) -> dict:
     rate, lo, hi = wilson_interval(successes, max(len(per), 1))
     avgs = [row["avg"] for row in per]
     passes = [row["pass_at_k"] for row in per if row["pass_at_k"] is not None]
+    resp_lens = [int(n) for item in items for n in (item.response_tokens or [])]
     return {
         "n_problems": len(items),
         "n_samples": total,
         "requested_k": k,
         "parse_rate": None if total == 0 else parse_ok / total,
         "truncate_rate": None if total == 0 else trunc / total,
+        "mean_response_tokens": None if not resp_lens else float(sum(resp_lens) / len(resp_lens)),
+        "n_short_response": sum(1 for n in resp_lens if n < 16),
         "avg": None if not avgs else float(sum(avgs) / len(avgs)),
         "pass_at_k": None if not passes else float(sum(passes) / len(passes)),
         "pass_at_k_note": None if passes else (f"n<k={k}" if items else "no items"),

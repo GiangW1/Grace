@@ -115,12 +115,10 @@ def load_hf_tokenizer(model_path: str):
 
 
 def _as_id_list(ids) -> list[int]:
-    if hasattr(ids, "tolist"):
-        ids = ids.tolist()
     if isinstance(ids, Mapping) and "input_ids" in ids:
         ids = ids["input_ids"]
-        if hasattr(ids, "tolist"):
-            ids = ids.tolist()
+    if hasattr(ids, "tolist"):
+        ids = ids.tolist()
     if ids and isinstance(ids[0], (list, tuple)):
         ids = ids[0]
     return [int(x) for x in ids]

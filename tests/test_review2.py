@@ -306,6 +306,10 @@ def test_natural_eos_at_budget_is_not_truncated():
     assert _traj_natural_finish(False, [1, 2, 3, 4], 9, generated=2, requested=8) is True
     assert _traj_natural_finish(False, [1, 2, 3, 4], 9, generated=8, requested=8) is False
     assert _traj_natural_finish(False, [1, 2], 9, generated=0, requested=8) is True
+    assert _traj_natural_finish(False, [1, 2, 3, 4], 9, generated=2, requested=8, finish_reason="length") is False
+    assert _traj_natural_finish(False, [1, 2, 3, 4], 9, generated=2, requested=8, finish_reason="stop") is True
+    assert _length_truncated([1, 2, 3, 4], 2, 8, False, 9, finish_reason="length") is True
+    assert _length_truncated([1, 2, 3, 9], 2, 8, True, 9, finish_reason="stop") is False
 
 
 def test_unknown_split_raises(tmp_path: Path):

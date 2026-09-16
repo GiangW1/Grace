@@ -30,7 +30,7 @@ def vllm_prompt_logprobs(llm, token_ids: list[int], lora_request=None, max_n: in
     params = build_sampling_params(1, 0.0, seed=0)
     extra = {}
     for key in ("prompt_logprobs",):
-        extra[key] = 0
+        extra[key] = 1
     try:
         params = type(params)(**{**getattr(build_sampling_params, "last", {}).get("used", {}), **extra, "max_tokens": 1, "temperature": 0.0, "seed": 0})
     except TypeError as exc:
@@ -88,7 +88,11 @@ def compare_hf_vllm_logprob(
         # vLLM prompt_logprobs[i] is p(token i | prefix). HF slice starts at prompt_len-1
         # which is p(token[prompt_len] | prompt). Align on the response tokens.
         start = max(int(prompt_len) - 1, 0)
-        vllm_resp = vllm[start : start + len(hf)] if len(vllm) > start else vllm[-len(hf) :]
+        if len(vllm) <= start:
+            payload["status"] = "misaligned"
+            payload["n_vllm"] = len(vllm)
+            return payload
+        vllm_resp = vllm[start : start + len(hf)]
         n = min(len(hf), len(vllm_resp))
         if n <= 0:
             payload["status"] = "empty"

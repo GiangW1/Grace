@@ -58,5 +58,23 @@ def apply_solve_instruction(records: list[MathRecord]) -> list[MathRecord]:
     return out
 
 
+# First tokens of the SFT target. CE trains these so generation does not start at Answer:.
+FORMAT_SFT_LEAD = "I will solve this step by step.\n\n"
+FORMAT_SFT_ANSWER_PREFIX = "Answer: "
+
+
+def format_sft_lead() -> str:
+    return FORMAT_SFT_LEAD
+
+
+def format_sft_answer_prefix() -> str:
+    return FORMAT_SFT_ANSWER_PREFIX
+
+
 def format_sft_response(gold: str) -> str:
-    return f"Answer: {gold}"
+    """Last line. Matches the DAPO 'Answer: $Answer' instruction."""
+    return f"{FORMAT_SFT_ANSWER_PREFIX}{str(gold).strip()}"
+
+
+def format_sft_text(gold: str) -> str:
+    return f"{FORMAT_SFT_LEAD}{format_sft_response(gold)}"

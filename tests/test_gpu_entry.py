@@ -744,6 +744,29 @@ def test_eval_writes_lora_before_starting_vllm():
     assert src.index("prompt_max_tokens") < src.index("llm = build_vllm_engine")
 
 
+def test_ensure_bf16_casts_ignored_dtype():
+    torch = pytest.importorskip("torch")
+    from torch import nn
+
+    from grace_gc.backends.verl_trainer import _ensure_bf16
+
+    lin = nn.Linear(2, 2).to(dtype=torch.float32)
+    out = _ensure_bf16(lin)
+    assert next(out.parameters()).dtype == torch.bfloat16
+
+
+def test_logprob_probe_does_not_tail_align():
+    import inspect
+
+    from grace_gc.backends import logprob_probe
+
+    src = inspect.getsource(logprob_probe.vllm_prompt_logprobs)
+    assert "extra[key] = 1" in src
+    cmp = inspect.getsource(logprob_probe.compare_hf_vllm_logprob)
+    assert "vllm[-len(hf)" not in cmp
+    assert "misaligned" in cmp
+
+
 def test_logprob_forward_skips_hidden_states():
     import inspect
 

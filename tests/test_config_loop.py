@@ -123,6 +123,12 @@ def test_cpu_train_script_path(tmp_path: Path):
         assert key in row
     assert "lora_A_norm_sq" in health
     assert "mean_baseline_b" in health
+    assert "mean_response_tokens" in health
+    assert "mean_suffix_tokens" in health
+    assert "n_prefix_finished" in health
+    assert "n_eligible" in health
+    assert "n_continued" in health
+    assert "n_short_response" in health
     assert "n_baseline_zero" in health
     assert "baseline_collapsed_with_zero_reward" in health
     assert "lora_A_grad_zero_expected" in health

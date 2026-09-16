@@ -315,12 +315,12 @@ def test_rule_reward_verifies_extracted_pred(monkeypatch):
 
     def verify(gold, pred):
         calls.append(pred)
-        return pred == r"\boxed{1/2}"
+        return pred == r"\boxed{0.5}"
 
     monkeypatch.setattr("grace_gc.data.reward.math_verify_fns", lambda: (parse, verify))
-    looping = r"\boxed{1/2} " + ("x" * 80)
+    looping = r"\boxed{0.5} " + ("x" * 80)
     assert rule_reward(looping, r"\frac{1}{2}") == 1.0
-    assert calls[0] == r"\boxed{1/2}"
+    assert calls[0] == r"\boxed{0.5}"
 
 
 @pytest.mark.parametrize(
@@ -341,7 +341,7 @@ def test_reward_checks_complete_final_expression(text, gold, expected):
     assert rule_reward(text, gold) == expected
 
 
-def test_rule_reward_none_pred_still_tries_verify(monkeypatch):
+def test_rule_reward_none_pred_does_not_scan_prose(monkeypatch):
     def parse(value):
         return str(value)
 
@@ -349,7 +349,43 @@ def test_rule_reward_none_pred_still_tries_verify(monkeypatch):
         return "42" in pred and "42" in gold
 
     monkeypatch.setattr("grace_gc.data.reward.math_verify_fns", lambda: (parse, verify))
-    assert rule_reward("the value is 42.", "42") == 1.0
+    assert rule_reward("the value is 42.", "42") == 0.0
+    assert rule_reward("The girl is Evelyn.", r"\text{Evelyn}") == 1.0
+
+
+def test_format_sft_trains_last_line_not_immediate_answer():
+    from grace_gc.data.format_prompt import format_sft_answer_prefix, format_sft_lead, format_sft_response, format_sft_text
+
+    lead = format_sft_lead()
+    tail = format_sft_response("61")
+    text = format_sft_text("61")
+    assert lead.strip()
+    assert not lead.lstrip().startswith("Answer:")
+    assert tail == "Answer: 61"
+    assert text.startswith(lead)
+    assert text.endswith(tail)
+    assert "Answer:" not in lead
+    assert (lead + format_sft_answer_prefix()).startswith(lead)
+
+
+def test_extract_prefers_later_answer_line():
+    from grace_gc.data.reward import extract_answer
+
+    assert extract_answer("work \\boxed{27} more\nAnswer: 343/27") == "343/27"
+    assert extract_answer("Answer: 3\n\\boxed{(3,\\pi/2)}") == r"(3,\pi/2)"
+    assert extract_answer("the answer is 90") == "90"
+    assert extract_answer("Final Answer:\n90") == "90"
+
+
+def test_normalize_degree_unit_and_frac():
+    from grace_gc.data.reward import normalize_answer
+
+    assert normalize_answer(r"90^\circ") == "90"
+    assert normalize_answer(r"90^{\circ}") == "90"
+    assert normalize_answer(r"\frac{14}{3}") == "14/3"
+    assert rule_reward("Answer: 90", r"90^\circ") == 1.0
+    assert rule_reward(r"Answer: 5", r"5\text{ cm}") == 1.0
+    assert rule_reward(r"Answer: 3\text{ cm}", r"5\text{ cm}") == 0.0
 
 
 def test_solve_instruction_and_math500_flag():
@@ -486,6 +522,7 @@ def test_lora_and_baseline_health_fields():
         advantage=0.0,
         g=None,
         audited=False,
+        baseline_b=0.0,
     )
     state = type(
         "S",
@@ -503,3 +540,7 @@ def test_lora_and_baseline_health_fields():
     assert out["n_baseline"] == 2
     assert out["n_baseline_zero"] == 1
     assert out["baseline_collapsed_with_zero_reward"] is True
+    rec.baseline_b = 0.5
+    later = step_health(state, {"records": [rec]})
+    assert later["n_baseline_zero"] == 1
+    assert later["baseline_collapsed_with_zero_reward"] is False

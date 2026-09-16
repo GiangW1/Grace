@@ -16,3 +16,10 @@ def test_first_file_returns_none_for_metadata_only(tmp_path):
     (tmp_path / "download_meta.json").write_text("{}")
 
     assert _first_file(tmp_path, (".parquet", ".jsonl", ".json")) is None
+
+
+def test_first_file_prefers_parquet_over_root_json(tmp_path):
+    (tmp_path / "aaa.json").write_text("{}")
+    parquet = tmp_path / "data.parquet"
+    parquet.write_bytes(b"PAR1")
+    assert _first_file(tmp_path, (".parquet", ".jsonl", ".json")) == parquet

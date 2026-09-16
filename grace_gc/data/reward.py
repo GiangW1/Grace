@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 
-FINAL = re.compile(r"(?:final answer|answer)\s*[:=]\s*([^\n]+)", re.I)
+FINAL = re.compile(r"(?:final\s+answer|answer)\s*(?:is\s+|[:=]\s*)(?:\n\s*)?([^\n]+)", re.I)
 
 
 def extract_boxed(text: str) -> str | None:
@@ -37,12 +37,14 @@ def extract_answer(text: str) -> str | None:
     if text is None:
         return None
     boxed = extract_boxed(text)
-    if boxed:
-        return boxed
-    final = FINAL.findall(text)
-    if final:
-        return final[-1].strip()
-    return None
+    finals = list(FINAL.finditer(text))
+    last_final = finals[-1].group(1).strip() if finals else ""
+    if not last_final:
+        last_final = None
+    if boxed and last_final:
+        boxed_pos = text.rfind("\\boxed{")
+        return boxed if boxed_pos > finals[-1].start() else last_final
+    return boxed or last_final
 
 
 _LEFT_RIGHT = re.compile(r"\\(?:left|right|bigl|bigr|Bigl|Bigr|biggl|biggr|Biggl|Biggr)\s*")
@@ -54,8 +56,21 @@ def normalize_answer(text: str) -> str:
     text = text.replace("\\dfrac", "\\frac").replace("\\tfrac", "\\frac")
     text = text.replace("\\,", "").replace("\\;", "").replace("\\!", "").replace("\\:", "")
     text = text.replace("$", "")
+    text = re.sub(r"\^?(?:\{\\circ\}|\\circ|°)", "", text)
+    text = re.sub(r"degrees?", "", text, flags=re.I)
+    text = re.sub(r"\\text\s*\{([^{}]*)\}", r"\1", text)
+    text = re.sub(r"\\frac\{(-?[0-9]+)\}\{(-?[0-9]+)\}", r"\1/\2", text)
     text = re.sub(r"\\frac\{(\\pi)\}\{([0-9]+)\}", r"\1/\2", text)
     return re.sub(r"\s+", "", text.strip().lower())
+
+
+def _compat_number_unit(pred: str, gold: str) -> bool:
+    """5 vs 5cm. Does not equate 5cm with 5mm."""
+    if not pred or not gold or pred == gold:
+        return pred == gold
+    short, long = (pred, gold) if len(pred) <= len(gold) else (gold, pred)
+    extra = long[len(short) :]
+    return long.startswith(short) and extra.isalpha()
 
 
 _TEXT_GOLD = re.compile(r"\\text\s*\{([^{}]+)\}")
@@ -103,8 +118,11 @@ def rule_reward(text: str | None, gold: str, truncated: bool = False) -> float |
     _ = truncated
     pred = extract_answer(text)
     gold_s = str(gold)
-    if pred is not None and normalize_answer(pred) == normalize_answer(gold_s):
-        return 1.0
+    if pred is not None:
+        pred_n = normalize_answer(pred)
+        gold_n = normalize_answer(gold_s)
+        if pred_n == gold_n or _compat_number_unit(pred_n, gold_n):
+            return 1.0
     if text_gold_in_response(pred if pred is not None else text, gold_s):
         return 1.0
     fns = math_verify_fns()
@@ -113,14 +131,9 @@ def rule_reward(text: str | None, gold: str, truncated: bool = False) -> float |
     parse, verify = fns
     # Golds and extracted answers are expressions, not prose to scan for numbers.
     gold_expr = r"\boxed{" + gold_s + "}"
-    if pred is not None:
-        try:
-            return float(verify(parse(gold_expr), parse(r"\boxed{" + str(pred) + "}")))
-        except Exception as exc:
-            raise ValueError("math-verify failed; this is not a scored miss") from exc
-    try:
-        if verify(parse(gold_expr), parse(str(text))):
-            return 1.0
-    except Exception:
+    if pred is None:
         return 0.0
-    return 0.0
+    try:
+        return float(verify(parse(gold_expr), parse(r"\boxed{" + str(pred) + "}")))
+    except Exception as exc:
+        raise ValueError("math-verify failed; this is not a scored miss") from exc

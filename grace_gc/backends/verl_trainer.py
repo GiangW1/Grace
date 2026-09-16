@@ -30,14 +30,32 @@ from grace_gc.trainer.methods import apply_method_defaults, method_spec
 from grace_gc.trainer.state_io import restore_train_state
 
 
+def _ensure_bf16(model):
+    import torch
+
+    try:
+        current = next(model.parameters()).dtype
+    except StopIteration:
+        return model
+    if current != torch.bfloat16:
+        model = model.to(dtype=torch.bfloat16)
+    return model
+
+
 def load_lora_actor(model_path: str, lora_cfg: dict[str, Any]):
     require_gpu_stack()
     import torch
     from transformers import AutoModelForCausalLM
 
-    model = AutoModelForCausalLM.from_pretrained(
-        model_path, dtype=torch.bfloat16, trust_remote_code=True
-    )
+    try:
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path, dtype=torch.bfloat16, trust_remote_code=True
+        )
+    except TypeError:
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path, torch_dtype=torch.bfloat16, trust_remote_code=True
+        )
+    model = _ensure_bf16(model)
     try:
         from peft import LoraConfig, get_peft_model
     except Exception as exc:
@@ -105,20 +123,25 @@ def build_vllm_engine(model_path: str, cfg: dict[str, Any], lora_rank: int):
     try:
         llm = LLM(**kwargs)
     except TypeError:
-        kwargs.pop("max_loras", None)
-        dropped.append("max_loras")
+        kwargs.pop("worker_extension_cls", None)
+        dropped.append("worker_extension_cls")
         try:
             llm = LLM(**kwargs)
         except TypeError:
-            kwargs.pop("trust_remote_code", None)
-            dropped.append("trust_remote_code")
+            kwargs.pop("max_loras", None)
+            dropped.append("max_loras")
             try:
                 llm = LLM(**kwargs)
-            except TypeError as exc:
-                raise ValueError(
-                    'vLLM LLM rejected generation_config="vllm"; '
-                    "Qwen3-Base max_new_tokens=2048 would silently cap eval 4096"
-                ) from exc
+            except TypeError:
+                kwargs.pop("trust_remote_code", None)
+                dropped.append("trust_remote_code")
+                try:
+                    llm = LLM(**kwargs)
+                except TypeError as exc:
+                    raise ValueError(
+                        'vLLM LLM rejected generation_config="vllm"; '
+                        "Qwen3-Base max_new_tokens=2048 would silently cap eval 4096"
+                    ) from exc
     build_vllm_engine.last = {"accepted": dict(kwargs), "dropped": dropped}
     # Stop the worker before Python's multiprocessing finalizers terminate it.
     core = getattr(getattr(llm, "llm_engine", None), "engine_core", None)

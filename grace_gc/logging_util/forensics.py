@@ -272,13 +272,31 @@ def step_health(state, last: dict[str, Any], cfg: dict[str, Any] | None = None) 
     named = last.get("actor_named")
     baseline_vals = list((getattr(getattr(state, "baseline", None), "values", None) or {}).values())
     n_baseline_zero = sum(1 for v in baseline_vals if abs(float(v)) < 1e-12)
+    batch_b = [float(r.baseline_b) for r in completed if getattr(r, "baseline_b", None) is not None]
+    n_batch_b_zero = sum(1 for v in batch_b if abs(v) < 1e-12)
+    reservoir_n = len(getattr(getattr(state, "reservoir", None), "items", []) or [])
     out = {
         "basis_id": getattr(state, "basis_id", None),
-        "reservoir_n": len(getattr(getattr(state, "reservoir", None), "items", []) or []),
+        "reservoir_n": reservoir_n,
         "n_parsed": sum(1 for r in records if r.extracted),
         "n_truncated": sum(1 for r in records if r.truncated),
         "n_prompt_truncated": sum(1 for r in records if r.prompt_truncated),
         "n_reward_pos": sum(1 for r in rewards if r >= 1.0),
+        "mean_response_tokens": _mean(getattr(r, "response_tokens", None) for r in records),
+        "mean_suffix_tokens": last.get(
+            "mean_suffix_tokens",
+            _mean(getattr(r, "suffix_tokens", None) for r in records),
+        ),
+        "n_short_response": sum(1 for r in records if int(getattr(r, "response_tokens", 0) or 0) < 16),
+        "n_prefix_finished": last.get(
+            "n_prefix_finished",
+            sum(1 for r in records if r.z >= 1.0 and r.finished and int(getattr(r, "suffix_tokens", 0) or 0) == 0),
+        ),
+        "n_eligible": last.get("n_eligible"),
+        "n_continued": last.get(
+            "n_continued",
+            sum(1 for r in records if int(getattr(r, "suffix_tokens", 0) or 0) > 0),
+        ),
         "n_zero_adv": sum(1 for a in advs if abs(a) < 1e-12),
         "all_reward_zero": bool(completed) and all(r == 0.0 for r in rewards),
         "all_completed_adv_zero": bool(advs) and all(abs(a) < 1e-12 for a in advs),
@@ -286,7 +304,7 @@ def step_health(state, last: dict[str, Any], cfg: dict[str, Any] | None = None) 
         "predictor_loss_null": pred.get("coord_loss") is None,
         "warmup_steps": warmup_steps,
         "steps_after_warmup": max(0, step - warmup_steps),
-        "predictor_untrained": last.get("warmup") or (len(getattr(getattr(state, "reservoir", None), "items", []) or []) < 2),
+        "predictor_untrained": last.get("warmup") or reservoir_n < 2,
         "grad_norm": last.get("grad_norm"),
         "grad_norm_preclip": last.get("grad_norm_preclip"),
         "logprob_probe": last.get("logprob_probe"),
@@ -296,14 +314,14 @@ def step_health(state, last: dict[str, Any], cfg: dict[str, Any] | None = None) 
         "allocating_with_untrained_predictor": bool(
             getattr(getattr(state, "spec", None), "use_predictor", False)
             and not last.get("warmup")
-            and (warmup_steps <= 0 or len(getattr(getattr(state, "reservoir", None), "items", []) or []) < 2)
+            and reservoir_n < 2
         ),
         "mean_baseline_b": _mean(baseline_vals),
         "n_baseline": len(baseline_vals),
         "n_baseline_zero": n_baseline_zero,
         "baseline_collapsed_with_zero_reward": bool(completed)
         and all(r == 0.0 for r in rewards)
-        and n_baseline_zero > 0,
+        and n_batch_b_zero > 0,
     }
     if named is not None:
         out.update(lora_param_health(named))

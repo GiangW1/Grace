@@ -226,15 +226,23 @@ def _bundles_from_engines(
                     resp = full[prompt_len:]
                     text = engines.decode(resp) if engines.decode else ""
                     gen_cont = max(len(full) - len(prefix), 0)
+                    roll = getattr(engines, "last_rollout", None) or {}
+                    cont_fr = (roll.get("continue_finish_reasons") or {}).get(0)
                     traj_fin = _traj_natural_finish(
                         bool(finished[loc]),
                         full,
                         eos_id,
                         generated=None if finished[loc] else gen_cont,
                         requested=None if finished[loc] else rem,
+                        finish_reason=cont_fr,
                     )
                     truncated = _length_truncated(
-                        full, prompt_len, int(max_new), traj_fin, eos_id
+                        full,
+                        prompt_len,
+                        int(max_new),
+                        traj_fin,
+                        eos_id,
+                        finish_reason=cont_fr,
                     )
                     r = rule_reward(text, rec.answer, truncated=truncated)
                     reward = 0.0 if r is None else float(r)
@@ -598,6 +606,10 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
             result["decision_grid"] = grid
             if dropped:
                 result["decision_grid_dropped"] = dropped
+            observed = {int(b.t) for b in bundles}
+            unobserved = [t for t in grid if t not in observed]
+            if unobserved:
+                result["decision_grid_unobserved"] = unobserved
             result["started"] = started
             result["run_dir"] = str(run.root)
             run.write_json("audit_summary.json", result)

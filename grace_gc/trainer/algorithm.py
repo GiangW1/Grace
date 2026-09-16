@@ -79,11 +79,15 @@ def _length_truncated(
     max_new: int,
     finished: bool,
     eos_id: int | list[int] | None,
+    finish_reason=None,
 ) -> bool:
     """True only for length hits; natural EOS at the budget is not truncation."""
+    from grace_gc.backends.vllm_two_phase import _is_length_finish, _is_stop_finish
     from grace_gc.data.tokenize import is_stop_token
 
-    if finished:
+    if _is_length_finish(finish_reason):
+        return True
+    if _is_stop_finish(finish_reason) or finished:
         return False
     if len(full_ids) < int(prompt_len) + int(max_new):
         return False
@@ -98,10 +102,16 @@ def _traj_natural_finish(
     eos_id,
     generated: int | None = None,
     requested: int | None = None,
+    finish_reason=None,
 ) -> bool:
-    """EOS on the prefix, on the continuation, or a short continue after vLLM omitted the stop id."""
+    """EOS on the prefix or continuation. vLLM length is not a natural stop."""
+    from grace_gc.backends.vllm_two_phase import _is_length_finish, _is_stop_finish
     from grace_gc.data.tokenize import is_stop_token
 
+    if _is_length_finish(finish_reason):
+        return False
+    if _is_stop_finish(finish_reason):
+        return True
     if prefix_finished:
         return True
     if not full_ids:
@@ -351,16 +361,23 @@ def run_algorithm1_step(
         text = engines.decode(resp) if engines.decode else ""
         texts.append(text)
         gen_cont = max(len(full_ids[i]) - len(prefixes[i]), 0)
+        vllm_fr = _rollout_finish(engines, i, float(z[i]))
         traj_fin = _traj_natural_finish(
             bool(finished[i]),
             full_ids[i],
             engines.eos_id,
             generated=None if finished[i] else gen_cont,
             requested=None if finished[i] else int(remainings[i]),
+            finish_reason=vllm_fr,
         )
         traj_finished.append(traj_fin)
         truncated = _length_truncated(
-            full_ids[i], int(prompt_lens[i]), max_new, traj_fin, engines.eos_id
+            full_ids[i],
+            int(prompt_lens[i]),
+            max_new,
+            traj_fin,
+            engines.eos_id,
+            finish_reason=vllm_fr,
         )
         truncated_flags.append(truncated)
         extracted = extract_answer(text)
@@ -523,11 +540,30 @@ def run_algorithm1_step(
     if group <= 0:
         group = max(1, n // max(1, len(set(problem_ids))))
     next_n = next_start_count(state.history_costs, state.n_ref or n, c_full=1.0, group=group)
+    prefix_done = np.asarray(finished, dtype=bool).reshape(-1)
+    n_continued = int(
+        sum(
+            1
+            for i in range(n)
+            if full_ids[i] is not None and len(full_ids[i]) > len(prefixes[i])
+        )
+    )
     return {
         "records": records,
         "n": n,
         "n_completed": int(z.sum()),
         "n_stopped": int((z < 1.0).sum()),
+        "n_prefix_finished": int(prefix_done.sum()),
+        "n_eligible": int(((~prefix_done) & (remainings > 0)).sum()),
+        "n_continued": n_continued,
+        "mean_suffix_tokens": float(
+            np.mean(
+                [
+                    0 if full_ids[i] is None else max(len(full_ids[i]) - len(prefixes[i]), 0)
+                    for i in range(n)
+                ]
+            )
+        ),
         "p": p,
         "z": z,
         "deviation": deviation,
