@@ -26,3 +26,18 @@ def test_partial_report_preserves_missing_and_undefined_results(tmp_path):
     assert payload["methods"][0]["final_avg4"] is None
     assert payload["methods"][0]["variance_cost_ratio"] is None
     assert all(row["target_met_observed"] is None for row in payload["paper_targets"])
+
+
+def test_report_uses_completed_audit_retry(tmp_path):
+    failed = tmp_path / "full_pg/audit"
+    failed.mkdir(parents=True)
+    (failed / "summary.json").write_text(json.dumps({"run_status": "failed"}))
+    retry = tmp_path / "full_pg/audit-retry-memory"
+    retry.mkdir()
+    (retry / "audit_summary.json").write_text(json.dumps({
+        "n_bundles": 4, "finished": "2026-09-16T14:00:00+00:00",
+    }))
+    summarize(tmp_path)
+    row = json.loads((tmp_path / "comparison.json").read_text())["methods"][0]
+    assert row["audit_bundles"] == 4
+    assert row["audit_run_dir"] == str(retry)

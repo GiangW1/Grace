@@ -1,0 +1,3 @@
+# Leave room for HF backward at the full 4096-token audit budget on one A100.
+vllm:
+  gpu_memory_utilization: 0.3

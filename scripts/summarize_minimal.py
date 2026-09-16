@@ -56,7 +56,15 @@ def summarize(root):
         initial = read_json(folder / "eval-0/eval_summary.json")
         midpoint = read_json(folder / "eval-20/eval_summary.json")
         final = read_json(folder / "eval-40/eval_summary.json")
-        audit = read_json(folder / "audit/audit_summary.json")
+        audit_path = folder / "audit/audit_summary.json"
+        audit = read_json(audit_path)
+        completed_audits = []
+        for candidate in folder.glob("audit*/audit_summary.json"):
+            result = read_json(candidate)
+            if result.get("finished") and "n_bundles" in result:
+                completed_audits.append((result, candidate))
+        if completed_audits:
+            audit, audit_path = max(completed_audits, key=lambda item: item[0]["finished"])
         evaluations[method], audits[method] = final, audit
         hours = None
         if summary.get("started") and summary.get("finished"):
@@ -74,6 +82,7 @@ def summarize(root):
             "post_warmup_starts": sum(s["n"] for s in active),
             "post_warmup_stopped": sum(s.get("n_stopped", 0) for s in active),
             "reservoir_n": health.get("reservoir_n"), "audit_bundles": audit.get("n_bundles"),
+            "audit_run_dir": str(audit_path.parent) if audit else None,
             "audit_selected": audit.get("n_gated"), "variance_cost_ratio": ratio if finite(ratio) else None,
         })
     comparison = paired_delta(evaluations.get("grace", {}), evaluations.get("grpo", {}))

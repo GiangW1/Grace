@@ -29,6 +29,7 @@ for method in "${methods[@]}"; do
       | tee "$experiment_root/logs/$method-eval-$step.stdout"
   done
   python scripts/audit.py --generate "${common[@]}" --data-path "$TRAIN_DATA" \
+    --config configs/experiments/minimal_gpu_audit.yaml \
     --checkpoint "$train_run/checkpoint.npz" --run-dir "$experiment_root/$method/audit" \
     | tee "$experiment_root/logs/$method-audit.stdout"
   python scripts/summarize_minimal.py "$experiment_root"
