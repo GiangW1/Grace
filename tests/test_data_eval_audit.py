@@ -328,6 +328,11 @@ def test_rule_reward_verifies_extracted_pred(monkeypatch):
     [
         ("Answer: 3", r"\left(3,\frac{\pi}{2}\right)", 0.0),
         (r"Answer: (3,\pi/2)", r"\left(3,\frac{\pi}{2}\right)", 1.0),
+        ("Answer: (3, pi/2)", r"\left(3,\frac{\pi}{2}\right)", 1.0),
+        ("Answer: (3, pi/3)", r"\left(3,\frac{\pi}{2}\right)", 0.0),
+        ("Answer: (3, \u03c0/2)", r"\left(3,\frac{\pi}{2}\right)", 1.0),
+        (r"Answer: p*i", r"\pi", 0.0),
+        (r"Answer: pi", r"p i", 1.0),
         ("Answer: q-p", "p-q", 0.0),
         ("Answer: -q+p", "p-q", 1.0),
         ("Answer: 0.5", r"\frac{1}{2}", 1.0),

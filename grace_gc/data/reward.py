@@ -160,10 +160,15 @@ def rule_reward(text: str | None, gold: str, truncated: bool = False) -> float |
         return 0.0
     parse, verify = fns
     # Golds and extracted answers are expressions, not prose to scan for numbers.
-    gold_expr = r"\boxed{" + gold_s + "}"
+    gold_expr = r"\boxed{" + gold_s.replace("\u03c0", r"\pi") + "}"
     if pred is None:
         return 0.0
+    pred_expr = str(pred).replace("\u03c0", r"\pi")
+    # Plain-text pi denotes the constant when the gold explicitly contains it.
+    # Otherwise leave variable products such as p*i to the symbolic parser.
+    if re.search(r"\\pi\b", gold_expr):
+        pred_expr = re.sub(r"(?<![\\\w])pi(?!\w)", lambda _m: r"\pi", pred_expr)
     try:
-        return float(verify(parse(gold_expr), parse(r"\boxed{" + str(pred) + "}")))
+        return float(verify(parse(gold_expr), parse(r"\boxed{" + pred_expr + "}")))
     except Exception as exc:
         raise ValueError("math-verify failed; this is not a scored miss") from exc

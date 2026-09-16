@@ -155,7 +155,12 @@ def _bundles_from_engines(
         baseline_fn = lambda _pid: None
     eos_id = getattr(engines, "eos_id", None)
     bundles = []
-    for rec in records:
+    for record_index, rec in enumerate(records, start=1):
+        print(
+            f"phase=audit_problem_begin problem={record_index}/{len(records)} "
+            f"problem_id={rec.problem_id} n_bundles={len(bundles)}",
+            flush=True,
+        )
         b_grad = _independent_pass_rate(engines, rec, encode_fn, n_cont, max_new, rng, eos_id)
         explicit = None if baseline_fn is None else baseline_fn(rec.problem_id)
         b_feat = b_grad if explicit is None else float(explicit)
@@ -298,6 +303,11 @@ def _bundles_from_engines(
                         suffix_texts=suffix_texts,
                         prompt_truncated=prompt_truncated,
                     )
+                )
+                print(
+                    f"phase=audit_prefix_done problem={record_index}/{len(records)} "
+                    f"t={t} path={idx} n_bundles={len(bundles)}",
+                    flush=True,
                 )
     return bundles
 
