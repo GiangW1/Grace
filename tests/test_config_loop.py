@@ -62,6 +62,24 @@ def test_checkpoint_roundtrip(tmp_path: Path):
     assert set(loaded) >= set(required_keys())
 
 
+def test_predictor_probe_keeps_first_training_draws_aligned(tmp_path):
+    from grace_gc.logging_util.run_dir import RunDirectory
+    from grace_gc.trainer.loop import run_tiny_training
+
+    first = {}
+    for method in ("full_pg", "grace"):
+        cfg = merge_configs(default_config(), {
+            "method": method, "num_steps": 1, "n_start": 4, "n_prompts": 2,
+            "decision_tokens": 3, "max_new_tokens": 6,
+            "predictor": {"warmup_steps": 20},
+        })
+        root = tmp_path / method
+        run_tiny_training(cfg, RunDirectory(root), ComputeLedger(0, "cpu"))
+        rows = [json.loads(line) for line in (root / "trajectories.jsonl").read_text().splitlines()]
+        first[method] = [(row["problem_id"], row["full_token_ids"]) for row in rows]
+    assert first["full_pg"] == first["grace"]
+
+
 def test_cpu_train_script_path(tmp_path: Path):
     cfg = build_run_config(
         ["configs/experiments/minimal.yaml"],

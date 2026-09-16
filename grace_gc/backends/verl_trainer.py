@@ -27,7 +27,7 @@ from grace_gc.trainer.algorithm import TrainState, run_algorithm1_step
 from grace_gc.trainer.baseline import HistoricalBaseline
 from grace_gc.trainer.loop import resolve_start_counts, resume_start_counts, sample_prompt_indices, sample_starts
 from grace_gc.trainer.methods import apply_method_defaults, method_spec
-from grace_gc.trainer.state_io import restore_train_state
+from grace_gc.trainer.state_io import dump_train_state, restore_train_state
 
 
 def _ensure_bf16(model):
@@ -267,8 +267,9 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
     predictor = None
     if spec.use_predictor:
         print("phase=predictor_probe", flush=True)
-        probe_ids, _pp, _gg, _mm = _batch_ids(rng)
-        prefixes, _fin = engines.generate_prefix(probe_ids[:1], 2, rng, "token")
+        probe_rng = IsolatedRNG.create(rng.seed)
+        probe_ids, _pp, _gg, _mm = _batch_ids(probe_rng)
+        prefixes, _fin = engines.generate_prefix(probe_ids[:1], 2, probe_rng, "token")
         feat = engines.prefix_features(prefixes, np.array([len(probe_ids[0])]), [0.5])["features"]
         in_dim = int(feat.shape[1])
         predictor = PredictorHeads(
@@ -330,6 +331,14 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         flush=True,
     )
 
+    if cfg.get("save_initial_checkpoint") and not cfg.get("resume"):
+        dump_train_state(
+            Path(run.root) / "checkpoints" / "step_0.npz",
+            state,
+            named,
+            opt,
+            extra={"model_path": str(model_path), "lora": dict(cfg.get("lora") or {})},
+        )
     last = {}
     for _step in range(int(cfg.get("num_steps", 1))):
         if last.get("next_n"):

@@ -142,9 +142,10 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
     engines = make_tiny_engines(actor, actor.vocab)
     in_dim = 1
     if spec.use_predictor:
-        probe = sample_starts(train_recs, 1, 1, rng)
+        probe_rng = IsolatedRNG.create(rng.seed)
+        probe = sample_starts(train_recs, 1, 1, probe_rng)
         prompt_ids, _pids, _golds = encode_records_tiny(probe, actor.vocab, 8)
-        prefixes, _ = engines.generate_prefix(prompt_ids, 2, rng, "token")
+        prefixes, _ = engines.generate_prefix(prompt_ids, 2, probe_rng, "token")
         feat = engines.prefix_features(prefixes, np.array([len(prompt_ids[0])]), [0.5])["features"]
         in_dim = int(feat.shape[1])
     k = min(int(cfg.get("predictor", {}).get("k", 2)), layout.dim)
