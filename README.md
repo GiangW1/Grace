@@ -89,22 +89,17 @@ python -m pytest tests
 
 另外预留 Hugging Face 缓存和 `runs/`。短跑几个 GB 就够；完整 Pilot 审计的 `audit_bundles.jsonl` 可能到十几 GB 以上，训练盘建议空出 **50 GB+**。
 
-国内打不开 huggingface.co 时，先设镜像再下：
-
-```bash
-export HF_ENDPOINT=https://hf-mirror.com
-```
-
-一键下载并打印路径（会装到 `data/`）：
+下载默认走 [HF Mirror](https://hf-mirror.com)。`fetch_assets.py` 会自己设置 `HF_ENDPOINT`；能直连官网时加 `--official`。
 
 ```bash
 pip install huggingface_hub pyarrow
 python scripts/fetch_assets.py --root data
 ```
 
-脚本结束会打印三行 `export`，复制进当前 shell。也可以自己下：
+脚本结束会打印三行 `export`，复制进当前 shell。手动下也先开镜像：
 
 ```bash
+export HF_ENDPOINT=https://hf-mirror.com
 pip install -U "huggingface_hub[cli]"
 huggingface-cli download Qwen/Qwen3-4B-Base --local-dir data/Qwen3-4B-Base
 huggingface-cli download BytedTsinghua-SIA/DAPO-Math-17k --repo-type dataset --local-dir data/dapo

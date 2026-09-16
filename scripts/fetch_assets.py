@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import sys
 
@@ -13,6 +14,16 @@ ASSETS = {
     "train": ("BytedTsinghua-SIA/DAPO-Math-17k", "dataset", "dapo"),
     "eval": ("HuggingFaceH4/MATH-500", "dataset", "math500"),
 }
+DEFAULT_MIRROR = "https://hf-mirror.com"
+
+
+def _apply_endpoint(official: bool) -> str:
+    """Prefer hf-mirror unless the user already set HF_ENDPOINT or asked for official."""
+    if official:
+        os.environ["HF_ENDPOINT"] = "https://huggingface.co"
+    elif not os.environ.get("HF_ENDPOINT"):
+        os.environ["HF_ENDPOINT"] = DEFAULT_MIRROR
+    return os.environ["HF_ENDPOINT"]
 
 
 def _snapshot(repo_id: str, repo_type: str, dest: Path) -> Path:
@@ -34,7 +45,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Download Qwen3-4B-Base, DAPO, MATH-500")
     parser.add_argument("--root", default="data", help="local download root")
     parser.add_argument("--only", choices=list(ASSETS), nargs="*", default=list(ASSETS))
+    parser.add_argument(
+        "--official",
+        action="store_true",
+        help="download from huggingface.co instead of hf-mirror.com",
+    )
     args = parser.parse_args(argv)
+    endpoint = _apply_endpoint(args.official)
+    print(f"using HF_ENDPOINT={endpoint}", file=sys.stderr)
     root = Path(args.root).resolve()
     paths = {}
     for key in args.only:
