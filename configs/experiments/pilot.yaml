@@ -1,0 +1,28 @@
+# Paper Pilot defaults. Actual GPU run is Phase 2.
+method: grace
+backend: gpu_verl
+n_start: 512
+n_prompts: 64
+decision_tokens: 512
+max_new_tokens: 2048
+predictor:
+  k: 8
+  warmup_steps: 20
+  reservoir_size: 512
+  audit_s: 0.125
+  constant_cost: true
+eval:
+  k: 4
+  n: 4
+  max_new_tokens: 4096
+  temperature: 0.6
+  top_p: 0.95
+audit:
+  n_problems: 240
+  n_prefixes: 16
+  decision_grid: [64, 128, 256, 384, 512, 768, 1024, 1536]
+  n_continuations: 16
+  jl_dim: 4096
+hardware:
+  name: a100
+  n_gpu: 4

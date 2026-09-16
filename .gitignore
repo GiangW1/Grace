@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.eggs/
+dist/
+build/
+runs/
+.venv/
+venv/
+*.npz
+.idea/
+.vscode/
+.planning/phases/

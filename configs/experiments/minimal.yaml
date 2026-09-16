@@ -1,0 +1,14 @@
+# Smallest runnable experiment config. Scale down freely.
+method: grace
+backend: cpu_tiny
+n_start: 8
+n_prompts: 4
+decision_tokens: 16
+max_new_tokens: 32
+predictor:
+  warmup_steps: 0
+  k: 4
+  reservoir_size: 32
+hardware:
+  name: cpu
+  n_gpu: 0

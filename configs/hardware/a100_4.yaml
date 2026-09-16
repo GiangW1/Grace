@@ -1,0 +1,8 @@
+hardware:
+  name: a100
+  n_gpu: 4
+  gpu_memory_gb: 80
+vllm:
+  tensor_parallel: 1
+  dtype: bfloat16
+backend: gpu_verl

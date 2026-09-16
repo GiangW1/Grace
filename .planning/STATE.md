@@ -1,54 +1,45 @@
 ---
 gsd_state_version: '1.0'
-status: planning
+status: phase-complete
 progress:
   total_phases: 2
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 4
+  completed_plans: 4
+  percent: 50
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-15)
+See: .planning/PROJECT.md
 
 **Core value:** 用简单、正确、可运行的代码实现 GRACE，随后做最小证伪。
-**Current focus:** Phase 1 — 完整实现代码。
+**Current focus:** Phase 2 — 服务器最小证伪（尚未开始）。
 
 ## Current Position
 
-Phase: 1 of 2 (完整实现 GRACE 与实验代码)
-Plan: 0 of TBD
-Status: Ready to plan
-Last activity: 2026-09-15 — 按用户纠正简化为代码优先；移除额外审批和实验准入要求。
+Phase: 1 of 2 complete（完整实现 GRACE 与实验代码）
+Plan: 4 of 4
+Status: Phase 1 code complete
+Last activity: 2026-09-15 — 补上多步 Algorithm 1、GRPO、评测/审计生成、GPU 双流更新接线；本机 pytest 48 passed / 1 skipped。
 
-Progress: 0% — 规划调整完成，尚无算法实现或真实实验。
+Progress: 50% — 代码阶段完成；真实 GPU 实验未跑。
 
 ## Accumulated Context
 
 ### Decisions
 
-- 用户最新要求：先把代码搞完，再最小证伪；采用奥卡姆剃刀，尽量不加门槛影响实验。
-- 完整主方法、核心对照、训练/审计/评测脚本都属于 Phase 1；实际 GPU 实验属于 Phase 2。
-- 取消研究合同前置阶段、路线图审批、元数据齐全才能启动、额外样本/区间门槛和自动 Go/No-Go。
-- 保留算法必要测试、数据隔离与真实结果记录，边写边验证。
-- 当前本机 CPU；服务器4×A100，未来两组各8×RTX5090。
+- GSD 只记录 4 个短计划，不加审批或研究合同。
+- CPU 与 GPU 共用 `grace_gc.core` 数学函数。
+- GPU 缺失时明确 ImportError，不提供假后端。
 
 ### Next Work
 
-直接实现核心数学函数和 tiny LoRA 测试，再接预测器、GPU 训练与实验脚本。可按需要拆成短执行计划，无需先补讨论、调研或审批文件。
+把仓库放到 4×A100，按 README 安装同一 verl/vLLM 版本，跑最小证伪（RUN-01 到 RUN-03）。
 
 ### Notes
 
-- research/PITFALLS.md 是实现参考，不是阻塞清单。
-- GPU 条件稍后实际运行时处理；本机无法测的内容简单列入运行说明。
-- 已有论文未改动；本次没有执行算法或真实实验。
-
-## Session Continuity
-
-Last session: 2026-09-15
-Stopped at: 完成代码优先与精简工作流调整。
-Resume file: None
+- U6/真实两阶段 token 分布待 GPU。
+- 不要把本机 tiny LoRA 数字当成实测。

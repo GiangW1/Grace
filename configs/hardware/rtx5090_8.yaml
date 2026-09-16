@@ -1,0 +1,9 @@
+hardware:
+  name: rtx5090
+  n_gpu: 8
+  gpu_memory_gb: null
+vllm:
+  tensor_parallel: 1
+  dtype: bfloat16
+backend: gpu_verl
+note: Record 5090 hours separately. Do not convert them to A100-hours.

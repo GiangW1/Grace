@@ -1,0 +1,52 @@
+method: grace
+backend: cpu_tiny
+seed: 17
+n_start: 8
+n_prompts: 4
+decision_tokens: 512
+max_new_tokens: 2048
+temperature: 1.0
+eval_temperature: 0.6
+eval_top_p: 0.95
+eval:
+  k: 4
+  n: 4
+  max_new_tokens: 4096
+  temperature: 0.6
+  top_p: 0.95
+allocation:
+  p_min: 0.2
+  beta: 0.5
+  bisection_iters: 20
+predictor:
+  k: 8
+  hidden_coord: 256
+  hidden_risk: 64
+  lr: 0.001
+  epochs: 2
+  warmup_steps: 20
+  audit_s: 0.125
+  reservoir_size: 512
+  refresh_every: 32
+  constant_cost: true
+lora:
+  rank: 16
+  alpha: 32.0
+  dropout: 0.0
+  targets: [q_proj, v_proj]
+optim:
+  lr: 0.0001
+  betas: [0.9, 0.99]
+  weight_decay: 0.0
+  grad_clip: 1.0
+baseline:
+  ema_alpha: 0.7
+  prescan: 4
+hardware:
+  name: cpu
+  n_gpu: 0
+analysis:
+  answer_undecided: 0.15
+  nonzero_signal_kappa: 0.05
+  delta_answer: 0.05
+  epsilon_learn: 0.2

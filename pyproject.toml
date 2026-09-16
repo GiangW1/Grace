@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "grace-gc"
+version = "0.1.0"
+description = "GRACE-GC: gradient-completion RLVR with adaptive continuation"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.24",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+cpu = [
+  "torch>=2.4",
+]
+gpu = [
+  "torch>=2.4",
+]
+dev = [
+  "pytest>=7.4",
+]
+
+[project.scripts]
+grace-train = "scripts.train:main"
+grace-eval = "scripts.evaluate:main"
+grace-audit = "scripts.audit:main"
+grace-plot = "scripts.plot:main"
+
+[tool.setuptools.packages.find]
+include = ["grace_gc*", "scripts*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
