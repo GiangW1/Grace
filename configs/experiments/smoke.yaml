@@ -1,0 +1,25 @@
+# First GPU chain check. Finish this before Pilot scale.
+method: grace
+backend: gpu_verl
+n_start: 16
+n_prompts: 4
+decision_tokens: 128
+max_new_tokens: 256
+predictor:
+  warmup_steps: 0
+  k: 4
+  reservoir_size: 32
+  audit_s: 0.125
+  constant_cost: true
+eval:
+  k: 2
+  n: 2
+  max_new_tokens: 512
+  temperature: 0.6
+  top_p: 0.95
+audit:
+  n_problems: 8
+  n_prefixes: 2
+  decision_grid: [64, 128]
+  n_continuations: 4
+  jl_dim: 256

@@ -1,0 +1,10 @@
+# First runnable 5090 config. Record 5090 hours separately.
+hardware:
+  name: rtx5090
+  n_gpu: 1
+  gpu_memory_gb: null
+vllm:
+  tensor_parallel: 1
+  dtype: bfloat16
+  gpu_memory_utilization: 0.5
+backend: gpu_verl

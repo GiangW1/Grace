@@ -19,6 +19,9 @@ cpu = [
 ]
 gpu = [
   "torch>=2.4",
+  "transformers",
+  "peft",
+  "math-verify",
 ]
 dev = [
   "pytest>=7.4",
