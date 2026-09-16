@@ -3,6 +3,24 @@ from pathlib import Path
 import pytest
 
 
+def test_format_warmup_accepts_hf_batch_encoding():
+    transformers = pytest.importorskip("transformers")
+    from grace_gc.data.math_data import MathRecord
+    from grace_gc.trainer.format_warmup import _encode_sft_pair
+
+    class Tokenizer:
+        eos_token_id = 9
+        chat_template = None
+
+        def __call__(self, text, **kwargs):
+            ids = [7, 8] if text == "Answer: 2" else [4, 5, 6]
+            return transformers.BatchEncoding({"input_ids": ids, "attention_mask": [1] * len(ids)})
+
+    prompt, response = _encode_sft_pair(Tokenizer(), MathRecord("1", "1+1", "2"), 2)
+    assert prompt == [4, 5]
+    assert response == [7, 8, 9]
+
+
 def test_format_warmup_tiny_moves_lora_b(tmp_path: Path):
     pytest.importorskip("torch")
     import torch

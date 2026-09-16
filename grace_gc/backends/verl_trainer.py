@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import atexit
 from pathlib import Path
 from typing import Any
 
@@ -35,7 +36,7 @@ def load_lora_actor(model_path: str, lora_cfg: dict[str, Any]):
     from transformers import AutoModelForCausalLM
 
     model = AutoModelForCausalLM.from_pretrained(
-        model_path, torch_dtype=torch.bfloat16, trust_remote_code=True
+        model_path, dtype=torch.bfloat16, trust_remote_code=True
     )
     try:
         from peft import LoraConfig, get_peft_model
@@ -55,12 +56,33 @@ def load_lora_actor(model_path: str, lora_cfg: dict[str, Any]):
     return model
 
 
+class VLLMWorkerCleanup:
+    """Expose process-group cleanup through vLLM's named worker RPC API."""
+
+    def grace_destroy_process_groups(self) -> None:
+        from vllm.distributed.parallel_state import destroy_distributed_environment, destroy_model_parallel
+
+        destroy_model_parallel()
+        destroy_distributed_environment()
+
+
+def _shutdown_vllm_engine(llm) -> None:
+    core = llm.llm_engine.engine_core
+    try:
+        rpc = getattr(llm, "collective_rpc", None)
+        if callable(rpc):
+            rpc("grace_destroy_process_groups")
+    finally:
+        core.shutdown()
+
+
 def build_vllm_engine(model_path: str, cfg: dict[str, Any], lora_rank: int):
     from grace_gc.backends.vllm_two_phase import _require_vllm
 
     LLM, _SP = _require_vllm()
     kwargs = {
         "model": model_path,
+        "worker_extension_cls": "grace_gc.backends.verl_trainer.VLLMWorkerCleanup",
         "enable_prefix_caching": True,
         "enable_lora": True,
         "max_lora_rank": int(lora_rank),
@@ -98,6 +120,11 @@ def build_vllm_engine(model_path: str, cfg: dict[str, Any], lora_rank: int):
                     "Qwen3-Base max_new_tokens=2048 would silently cap eval 4096"
                 ) from exc
     build_vllm_engine.last = {"accepted": dict(kwargs), "dropped": dropped}
+    # Stop the worker before Python's multiprocessing finalizers terminate it.
+    core = getattr(getattr(llm, "llm_engine", None), "engine_core", None)
+    shutdown = getattr(core, "shutdown", None)
+    if callable(shutdown):
+        atexit.register(_shutdown_vllm_engine, llm)
     return llm
 
 

@@ -315,12 +315,30 @@ def test_rule_reward_verifies_extracted_pred(monkeypatch):
 
     def verify(gold, pred):
         calls.append(pred)
-        return pred == "1/2"
+        return pred == r"\boxed{1/2}"
 
     monkeypatch.setattr("grace_gc.data.reward.math_verify_fns", lambda: (parse, verify))
     looping = r"\boxed{1/2} " + ("x" * 80)
     assert rule_reward(looping, r"\frac{1}{2}") == 1.0
-    assert calls[0] == "1/2"
+    assert calls[0] == r"\boxed{1/2}"
+
+
+@pytest.mark.parametrize(
+    "text,gold,expected",
+    [
+        ("Answer: 3", r"\left(3,\frac{\pi}{2}\right)", 0.0),
+        (r"Answer: (3,\pi/2)", r"\left(3,\frac{\pi}{2}\right)", 1.0),
+        ("Answer: q-p", "p-q", 0.0),
+        ("Answer: -q+p", "p-q", 1.0),
+        ("Answer: 0.5", r"\frac{1}{2}", 1.0),
+        ("I considered 42.\nAnswer: 41", "42", 0.0),
+        ("I considered Evelyn.\nAnswer: Alice", r"\text{Evelyn}", 0.0),
+        (r"Answer: 3\text{ cm}", r"5\text{ cm}", 0.0),
+    ],
+)
+def test_reward_checks_complete_final_expression(text, gold, expected):
+    pytest.importorskip("math_verify")
+    assert rule_reward(text, gold) == expected
 
 
 def test_rule_reward_none_pred_still_tries_verify(monkeypatch):

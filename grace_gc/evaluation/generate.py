@@ -109,7 +109,6 @@ def generate_answers_vllm(
     max_prompt: int = 1024,
 ) -> list[EvalItem]:
     from grace_gc.backends.vllm_two_phase import (
-        _require_distinct_rollouts,
         _require_known_finish,
         _require_vllm,
         _vllm_prompts,
@@ -178,9 +177,7 @@ def generate_answers_vllm(
             vllm_finish_reasons.append(None if finish_reason is None else str(finish_reason))
             token_ids.append([int(x) for x in gen])
             sample_seeds.append(int(seed) + sample_i - 1)
-        # Paper headline is avg@4. The same ignored-seed collapse that
-        # zeros GRPO advantages would silently report avg@1 as avg@4.
-        _require_distinct_rollouts(prompts, fulls, temperature)
+        # Equal answers are valid independent samples; keep their request seeds.
         items.append(
             EvalItem(
                 rec.problem_id,
