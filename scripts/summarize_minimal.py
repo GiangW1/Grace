@@ -54,6 +54,7 @@ def summarize(root):
         health = read_json(folder / "train/health.json")
         steps = read_rows(folder / "train/steps.jsonl")
         initial = read_json(folder / "eval-0/eval_summary.json")
+        midpoint = read_json(folder / "eval-20/eval_summary.json")
         final = read_json(folder / "eval-40/eval_summary.json")
         audit = read_json(folder / "audit/audit_summary.json")
         evaluations[method], audits[method] = final, audit
@@ -62,10 +63,13 @@ def summarize(root):
             hours = (datetime.fromisoformat(summary["finished"]) - datetime.fromisoformat(summary["started"])).total_seconds() / 3600
         active = [step for step in steps if not step.get("warmup")]
         ratio = (audit.get("variance_cost") or {}).get("ratio")
+        gain = final["avg"] - initial["avg"] if finite(final.get("avg")) and finite(initial.get("avg")) else None
         rows.append({
             "method": method, "train_status": summary.get("run_status", "running_or_not_started"),
             "steps": len(steps), "initial_avg4": initial.get("avg"), "final_avg4": final.get("avg"),
+            "midpoint_avg4": midpoint.get("avg"), "final_minus_initial_avg4": gain,
             "final_pass4": final.get("pass_at_k"), "eval_n_problems": final.get("n_problems"),
+            "final_parse_rate": final.get("parse_rate"), "final_truncate_rate": final.get("truncate_rate"),
             "train_a100_hours": hours, "basis_id": health.get("basis_id"),
             "post_warmup_starts": sum(s["n"] for s in active),
             "post_warmup_stopped": sum(s.get("n_stopped", 0) for s in active),
@@ -97,11 +101,12 @@ def summarize(root):
             writer.writeheader()
             writer.writerows(rows)
     lines = ["# Minimal GPU experiment", "", payload["scope"], "",
-             "| Method | Steps | Initial avg@4 | Final avg@4 | pass@4 | Train A100-hours | Audit bundles |",
-             "|---|---:|---:|---:|---:|---:|---:|"]
+             "| Method | Steps | Initial avg@4 | Step 20 avg@4 | Final avg@4 | Final - initial | pass@4 | Truncate rate | Train A100-hours | Audit bundles |",
+             "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
     for row in rows:
         lines.append("| " + " | ".join([row["method"], str(row["steps"]), number(row["initial_avg4"]),
-                     number(row["final_avg4"]), number(row["final_pass4"]), number(row["train_a100_hours"]),
+                     number(row["midpoint_avg4"]), number(row["final_avg4"]), number(row["final_minus_initial_avg4"]),
+                     number(row["final_pass4"]), number(row["final_truncate_rate"]), number(row["train_a100_hours"]),
                      str(row["audit_bundles"])]) + " |")
     lines += ["", "GRACE minus GRPO (matched steps): " + json.dumps(comparison),
               "", "GRACE minus Uniform-CV: " + json.dumps(mechanism),
