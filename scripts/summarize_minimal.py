@@ -67,8 +67,12 @@ def summarize(root):
             audit, audit_path = max(completed_audits, key=lambda item: item[0]["finished"])
         evaluations[method], audits[method] = final, audit
         hours = None
-        if summary.get("started") and summary.get("finished"):
-            hours = (datetime.fromisoformat(summary["finished"]) - datetime.fromisoformat(summary["started"])).total_seconds() / 3600
+        attempts = [read_json(path) for path in sorted((folder / "train/attempts").glob("*/summary.json"))]
+        attempts.append(summary)
+        completed_intervals = [item for item in attempts if item.get("started") and item.get("finished")]
+        if completed_intervals:
+            hours = sum((datetime.fromisoformat(item["finished"]) - datetime.fromisoformat(item["started"])).total_seconds()
+                        for item in completed_intervals) / 3600
         active = [step for step in steps if not step.get("warmup")]
         ratio = (audit.get("variance_cost") or {}).get("ratio")
         gain = final["avg"] - initial["avg"] if finite(final.get("avg")) and finite(initial.get("avg")) else None
@@ -78,7 +82,7 @@ def summarize(root):
             "midpoint_avg4": midpoint.get("avg"), "final_minus_initial_avg4": gain,
             "final_pass4": final.get("pass_at_k"), "eval_n_problems": final.get("n_problems"),
             "final_parse_rate": final.get("parse_rate"), "final_truncate_rate": final.get("truncate_rate"),
-            "train_a100_hours": hours, "basis_id": health.get("basis_id"),
+            "train_a100_hours": hours, "train_attempts": len(attempts), "basis_id": health.get("basis_id"),
             "post_warmup_starts": sum(s["n"] for s in active),
             "post_warmup_stopped": sum(s.get("n_stopped", 0) for s in active),
             "reservoir_n": health.get("reservoir_n"), "audit_bundles": audit.get("n_bundles"),
@@ -102,7 +106,7 @@ def summarize(root):
                "unmeasured": ["equal-compute multi-benchmark +2 percentage points", "0.65x time-to-target",
                               "hard-problem discoveries +30%", "medium-stratum ELF >=55%", "method overhead <=8%",
                               "multi-seed statistical support", "all attribution controls"],
-               "cost_note": "Training hours use end-to-end start/finish timestamps on one A100. Do not sum overlapping ledger rows."}
+               "cost_note": "Training hours sum start/finish intervals on one A100, including archived failed attempts. Recovery idle time is excluded. Do not sum overlapping ledger rows. See RECOVERY.md for runtime memory changes."}
     (root / "comparison.json").write_text(json.dumps(payload, indent=2, allow_nan=False) + "\n")
     if rows:
         with (root / "comparison.csv").open("w", newline="") as stream:

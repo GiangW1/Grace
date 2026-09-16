@@ -1,0 +1,3 @@
+# Predictor methods need room for per-trajectory HF gradient audits.
+vllm:
+  gpu_memory_utilization: 0.3

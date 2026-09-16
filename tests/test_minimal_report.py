@@ -41,3 +41,21 @@ def test_report_uses_completed_audit_retry(tmp_path):
     row = json.loads((tmp_path / "comparison.json").read_text())["methods"][0]
     assert row["audit_bundles"] == 4
     assert row["audit_run_dir"] == str(retry)
+
+
+def test_report_includes_failed_training_time(tmp_path):
+    train = tmp_path / "grace/train"
+    archived = train / "attempts/first"
+    archived.mkdir(parents=True)
+    (archived / "summary.json").write_text(json.dumps({
+        "started": "2026-09-16T12:00:00+00:00", "finished": "2026-09-16T12:30:00+00:00",
+        "run_status": "failed",
+    }))
+    (train / "summary.json").write_text(json.dumps({
+        "started": "2026-09-16T13:00:00+00:00", "finished": "2026-09-16T14:00:00+00:00",
+        "run_status": "complete",
+    }))
+    summarize(tmp_path)
+    row = json.loads((tmp_path / "comparison.json").read_text())["methods"][0]
+    assert row["train_a100_hours"] == 1.5
+    assert row["train_attempts"] == 2

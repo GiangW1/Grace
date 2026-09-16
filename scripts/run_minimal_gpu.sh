@@ -19,6 +19,7 @@ python -m pytest tests | tee "$experiment_root/logs/tests.log"
 common=(--config configs/default.yaml --config configs/experiments/minimal_gpu.yaml --config configs/hardware/a100_1.yaml --backend gpu_verl --model-path "$MODEL" --seed 17)
 for method in "${methods[@]}"; do
   python scripts/train.py "${common[@]}" --method "$method" --data-path "$TRAIN_DATA" \
+    --config configs/experiments/minimal_gpu_train_memory.yaml \
     --num-steps 40 --run-dir "$experiment_root/$method/train" \
     | tee "$experiment_root/logs/$method-train.stdout"
   train_run=$(awk '$1 == "run_dir" {path=$2} END {print path}' "$experiment_root/logs/$method-train.stdout")
