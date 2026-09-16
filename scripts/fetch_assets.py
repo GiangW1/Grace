@@ -58,7 +58,13 @@ def _snapshot(repo_id: str, repo_type: str, dest: Path) -> Path:
 
 
 def _first_file(root: Path, suffixes: tuple[str, ...]) -> Path | None:
-    hits = sorted(p for p in root.rglob("*") if p.is_file() and p.suffix.lower() in suffixes)
+    hits = sorted(
+        p for p in root.rglob("*")
+        if p.is_file()
+        and p.suffix.lower() in suffixes
+        and p.name != "download_meta.json"
+        and not any(part.startswith(".") for part in p.relative_to(root).parts)
+    )
     return hits[0] if hits else None
 
 

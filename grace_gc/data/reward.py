@@ -63,7 +63,7 @@ _TEXT_GOLD = re.compile(r"\\text\s*\{([^{}]+)\}")
 
 def text_gold_in_response(text: str, gold: str) -> bool:
     """MATH-500 name answers are stored as \\text{Evelyn}, not a boxed expression."""
-    match = _TEXT_GOLD.search(str(gold))
+    match = _TEXT_GOLD.fullmatch(str(gold).strip())
     if not match:
         return False
     name = match.group(1).strip()
@@ -105,20 +105,21 @@ def rule_reward(text: str | None, gold: str, truncated: bool = False) -> float |
     gold_s = str(gold)
     if pred is not None and normalize_answer(pred) == normalize_answer(gold_s):
         return 1.0
-    if text_gold_in_response(text, gold_s):
+    if text_gold_in_response(pred if pred is not None else text, gold_s):
         return 1.0
     fns = math_verify_fns()
     if fns is None:
         return 0.0
     parse, verify = fns
+    # Golds and extracted answers are expressions, not prose to scan for numbers.
+    gold_expr = r"\boxed{" + gold_s + "}"
     if pred is not None:
         try:
-            if verify(parse(gold_s), parse(str(pred))):
-                return 1.0
+            return float(verify(parse(gold_expr), parse(r"\boxed{" + str(pred) + "}")))
         except Exception as exc:
             raise ValueError("math-verify failed; this is not a scored miss") from exc
     try:
-        if verify(parse(gold_s), parse(str(text))):
+        if verify(parse(gold_expr), parse(str(text))):
             return 1.0
     except Exception:
         return 0.0

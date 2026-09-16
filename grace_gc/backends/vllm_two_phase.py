@@ -189,27 +189,6 @@ def _vllm_prompts(prompt_token_ids: list[list[int]]):
         return [{"prompt_token_ids": ids} for ids in prompt_token_ids]
 
 
-def _require_distinct_rollouts(
-    prompt_token_ids: list[list[int]],
-    token_ids: list[list[int]],
-    temperature: float,
-) -> None:
-    """A list SamplingParams API that broadcasts one seed collapses GRPO groups."""
-    if float(temperature) <= 0.0:
-        return
-    groups: dict[tuple[int, ...], list[tuple[int, ...]]] = {}
-    for prompt, full in zip(prompt_token_ids, token_ids):
-        groups.setdefault(tuple(prompt), []).append(tuple(full[len(prompt) :]))
-    for gens in groups.values():
-        if len(gens) < 2:
-            continue
-        if len(set(gens)) == 1:
-            raise ValueError(
-                "vLLM produced identical completions for the same prompt; "
-                "per-request SamplingParams seeds were not applied"
-            )
-
-
 def generate_phase(
     llm,
     prompt_token_ids: list[list[int]],
@@ -223,14 +202,15 @@ def generate_phase(
     """Generate from raw token IDs. Prefix caching reuses KV, not RNG state."""
     _LLM, _SP = _require_vllm()
     prompts = _vllm_prompts(prompt_token_ids)
+    seeds = [int(rng.integers(stream, 0, 2**31 - 1)) for _ in prompt_token_ids]
     param_list = [
         build_sampling_params(
             max_tokens,
             temperature,
-            int(rng.integers(stream, 0, 2**31 - 1)),
+            seed,
             eos_id=eos_id,
         )
-        for _ in prompt_token_ids
+        for seed in seeds
     ]
     kwargs = {"use_tqdm": False}
     if lora_request is not None:
@@ -273,8 +253,10 @@ def generate_phase(
         finished.append(ended)
         finish_reasons.append(None if raw_finish is None else str(raw_finish))
         stop_reasons.append(None if raw_stop is None else raw_stop)
-    _require_distinct_rollouts(prompt_token_ids, token_ids, temperature)
+    # Independent draws can coincide, especially for short format-SFT answers.
     sampling = getattr(build_sampling_params, "last", None)
+    if sampling is not None:
+        sampling = {**sampling, "request_seeds": seeds}
     return PhaseResult(
         token_ids=token_ids,
         natural_finish=np.asarray(finished, dtype=bool),

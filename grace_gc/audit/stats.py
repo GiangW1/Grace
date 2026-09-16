@@ -116,7 +116,10 @@ def lag_index(
     horizon = float(length) if length is not None and float(length) > 0 else float(np.max(t))
     if horizon <= 0.0:
         return float("nan")
-    return float(np.trapz(a - b, t / horizon))
+    integrate = getattr(np, "trapezoid", None)
+    if integrate is None:
+        integrate = np.trapz
+    return float(integrate(a - b, t / horizon))
 
 
 def plc(tokens_after_tl: float, backward_after_tl: float, total_cost: float) -> float:
