@@ -18,10 +18,10 @@ from grace_gc.data.format_prompt import apply_solve_instruction
 from grace_gc.data.math_data import last_load_report, load_math_records, split_records
 from grace_gc.data.tokenize import encode_records_hf, load_hf_tokenizer, tokenizer_inventory
 from grace_gc.trainer.format_warmup import format_warmup_steps, run_format_warmup_hf
-from grace_gc.logging_util.forensics import persist_training_step, write_data_inventory
+from grace_gc.logging_util.forensics import persist_initial_checkpoint, persist_training_step, write_data_inventory
 from grace_gc.logging_util.ledger import ComputeLedger, Timer
 from grace_gc.logging_util.run_dir import RunDirectory
-from grace_gc.predictor.heads import PredictorHeads
+from grace_gc.predictor.heads import predictor_from_spec
 from grace_gc.predictor.reservoir import GradientReservoir
 from grace_gc.trainer.algorithm import TrainState, run_algorithm1_step
 from grace_gc.trainer.baseline import HistoricalBaseline
@@ -267,18 +267,12 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
     predictor = None
     if spec.use_predictor:
         print("phase=predictor_probe", flush=True)
-        probe_ids, _pp, _gg, _mm = _batch_ids(rng)
-        prefixes, _fin = engines.generate_prefix(probe_ids[:1], 2, rng, "token")
+        probe_rng = IsolatedRNG.create(rng.seed)
+        probe_ids, _pp, _gg, _mm = _batch_ids(probe_rng)
+        prefixes, _fin = engines.generate_prefix(probe_ids[:1], 2, probe_rng, "token")
         feat = engines.prefix_features(prefixes, np.array([len(probe_ids[0])]), [0.5])["features"]
         in_dim = int(feat.shape[1])
-        predictor = PredictorHeads(
-            in_dim=in_dim,
-            k=k,
-            hidden_coord=int(pcfg.get("hidden_coord", 256)),
-            hidden_risk=int(pcfg.get("hidden_risk", 64)),
-            constant_cost=bool(pcfg.get("constant_cost", True)),
-            lr=float(pcfg.get("lr", 1e-3)),
-        )
+        predictor = predictor_from_spec(in_dim, k, pcfg)
     opt = torch.optim.AdamW(
         [p for _, p in named],
         lr=float(cfg.get("optim", {}).get("lr", 1e-4)),
@@ -322,6 +316,7 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
             "lora_id": extra.get("lora_id"),
             "format_warmup_steps": 0 if cfg.get("resume") else format_warmup_steps(cfg),
             "has_predictor": predictor is not None,
+            "grpo_advantage": "group_mean_no_std",
         },
     )
     print(
@@ -330,6 +325,14 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         flush=True,
     )
 
+    persist_initial_checkpoint(
+        run,
+        cfg,
+        state,
+        named,
+        opt,
+        extra={"model_path": str(model_path), "lora": dict(cfg.get("lora") or {})},
+    )
     last = {}
     for _step in range(int(cfg.get("num_steps", 1))):
         if last.get("next_n"):

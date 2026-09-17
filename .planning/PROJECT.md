@@ -25,7 +25,7 @@
 
 ### Validated
 
-- [x] GRACE 全空间 HT、续写分配、tiny LoRA 与 CPU 数学测试（本机 pytest 214 passed / 9 deselected，2026-09-16）。
+- [x] GRACE 全空间 HT、续写分配、tiny LoRA 与 CPU 数学测试（本机 pytest 252 passed / 17 deselected，2026-09-17）。
 - [x] reservoir / basis / 预测器 / IPW / 审计梯度。
 - [x] 八个方法入口、checkpoint、分布式归约顺序的 CPU 参考。
 - [x] 数据分割、DAPO 冲突丢掉、格式 SFT、规则奖励、独立评测、前缀审计、账本、单卡配置与 README 全流程。
@@ -54,7 +54,7 @@ GPU 两阶段真实训练与 U6 尚未在服务器验证。没有真实实验结
 - 实际原稿：仓库根目录 GRACE_ICLR论文框架_v3.md；用户最初给出的嵌套路径不存在。
 - 原稿 SHA256：20b111105c42f116dbcc488355744bb72c5a90b08b8fdba333591bd63dc9a3e4。原稿保留不变。
 - 核心实现依据：§4–§6、§8、§13 和附录 B/F/G。
-- 最近一次推送是 GitHub `master`（`bd5f64f`）。现役工作树还有未提交的 SFT/审计/vLLM 修复，不以该 hash 当作工作树。技术笔记供实现查阅，不要求重跑调研。
+- GitHub 默认分支是 `master`。`37fbcb2` 只有格式 SFT 只训推理开头；现役保真/方差接线在其后的 master 提交。技术笔记供实现查阅，不要求重跑调研。
 - 本机 Windows 无 GPU；CPU 测试已跑。服务器按 README 全流程单卡起步。
 - 规划硬件为 4×A100，随后两组各 8×RTX5090；现在 `n_gpu>1` 不能启动。
 - GPU-hours 按硬件分别记录，不把5090时间直接叫作 A100-hours。
@@ -83,4 +83,4 @@ GPU 两阶段真实训练与 U6 尚未在服务器验证。没有真实实验结
 随代码更新勾选功能、记录重要方法偏离与已跑测试。已有论文与技术笔记保持可查，实际结果出来后再扩展实验计划。
 
 ---
-*Last updated: 2026-09-16 after lead-only format SFT, audit finish_reason, and vLLM max_model_len slack were aligned*
+*Last updated: 2026-09-17 after grace-fidelity wiring; CPU 252 passed / 17 deselected; no GPU numbers on this tree*

@@ -260,8 +260,8 @@ def collect_versions(
 
 def collect_environment(cfg: dict[str, Any] | None = None, files_to_hash: dict[str, str] | None = None) -> dict[str, Any]:
     hashes = dict(files_to_hash or {})
-    if Path("GRACE_ICLR论文框架_v3.md").is_file() and "paper" not in hashes:
-        hashes["paper"] = "GRACE_ICLR论文框架_v3.md"
+    if Path("GRACE_ICLR????_v3.md").is_file() and "paper" not in hashes:
+        hashes["paper"] = "GRACE_ICLR????_v3.md"
     info = collect_versions(files_to_hash=hashes or None)
     info["process"] = {
         "pid": os.getpid(),
@@ -302,7 +302,12 @@ def collect_environment(cfg: dict[str, Any] | None = None, files_to_hash: dict[s
         "warmup_steps": pred.get("warmup_steps"),
         "audit_s": pred.get("audit_s"),
         "k": pred.get("k"),
+        "coord_kind": pred.get("coord_kind", "mlp"),
+        "use_affine": pred.get("use_affine", True),
+        "shrink_m": pred.get("shrink_m", True),
+        "align_basis": pred.get("align_basis", True),
         "math_verify": math_verify_fns() is not None,
+        "grpo_advantage": "group_mean_no_std",
     }
     if info["data"] is None and cfg.get("data_path"):
         info["missing"].append("data_path")

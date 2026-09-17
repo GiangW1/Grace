@@ -8,7 +8,9 @@ Qwen3-4B-Base 上的 GRACE 训练、评测和前缀审计。本机先做 CPU 检
 
 ## 全流程
 
-顺序：**环境 → 资源 → 绑卡/tmux → smoke Full-PG → Pilot Full-PG → Pilot GRACE → 其余对照**。先看 Full-PG 会不会学，再跑 GRACE。不要一上来就用 `grace` 做第一份 GPU 作业。
+顺序：**环境 → 资源 → 绑卡/tmux → smoke Full-PG → 最小比较 → Pilot Full-PG → Pilot GRACE → 其余对照**。先看 Full-PG 会不会学，再跑 GRACE。不要一上来就用 `grace` 做第一份 GPU 作业。
+
+GitHub 默认分支是 `master`。clone 后确认 `git log -1` 含保真接线，不要停在只训推理开头的 `37fbcb2`。
 
 5090 把下面所有 `configs/hardware/a100_1.yaml` 换成 `configs/hardware/rtx5090_1.yaml`。两种卡分别记时，不要折成 A100-hours。
 
@@ -98,6 +100,17 @@ python scripts/audit.py --generate \
 ```
 
 看 `run.log` 里有没有 `phase=prescan` / `phase=prefix` / `phase=continue_done` / `step N`。第一份适配器叫 `lora/step-2`，那是 vLLM adapter id（首次 sync），**不是**已经训完 2 步。`health.json` 里 `lora_A_grad_zero_expected` 在 B≈0 时可以为真（PEFT ΔW=B·A）。`all_reward_zero` 且 `n_baseline_zero>0` 时，`baseline_collapsed_with_zero_reward` 为真，优势会是 0。审计里 `Var(R)=0` 时 ρ 是 NaN，这是公式，不是崩了。
+
+### E2. 最小比较（现役工作树）
+
+16 题、40 步、单卡。用来看 GRACE 分配是否压过 Full-PG / Uniform-CV / GRPO，不是 Pilot。不要把 2026-09-16 那次链当这份代码的结果。
+
+```bash
+export CUDA_VISIBLE_DEVICES=0
+bash scripts/run_minimal_gpu.sh
+```
+
+默认方法是 `full_pg grace uniform_cv grpo`。看质量和实际成本，不要看停止者比例。
 
 ### F. Pilot：先 Full-PG 30 步
 
@@ -471,7 +484,7 @@ python scripts/train.py \
 | `data_splits.json` / `data_conflicts.json` / `format_warmup.json` / `tokenizer.json` / `vllm_engine.json` / `sampling.json` | 切分、丢掉的冲突题、格式 SFT、tokenizer stop、实际引擎参数 |
 | `logprob_probe.jsonl` | 同序列 HF vs vLLM logprob（不可用则记原因） |
 | `trajectories.jsonl` | 每条起步：p/Z/f/r̂/ĉ/优势/长度/结束原因/答案/token |
-| `compute_ledger.json` / `compute_ledger.jsonl` | 按步、按阶段的墙钟 |
+| `compute_ledger.json` / `compute_ledger.jsonl` | 按步、按阶段的墙钟；`summary` 总量只计 `train`/`eval`/`audit` 外壳，不把 `phase_*` 和 `train_step` 再加一遍 |
 | `checkpoint.npz` / `checkpoints/step_k.npz` | 最新与逐步快照 |
 | `eval_summary.json` / `eval_per_problem.jsonl` | MATH-500 的 avg@k、答案、截断、token |
 | `audit_summary.json` / `audit_bundles.jsonl` | ρ、ELF、方差×成本、前缀/后缀文本 |
@@ -498,6 +511,7 @@ python scripts/plot.py --summary runs/eval-grace-seed17/eval_summary.json --out 
 | `configs/default.yaml` | 论文默认超参 |
 | `configs/experiments/smoke.yaml` | 服务器短跑 |
 | `configs/experiments/minimal.yaml` | 本机 CPU 冒烟 |
+| `configs/experiments/minimal_gpu.yaml` | 单卡 16 题比较；经 `scripts/run_minimal_gpu.sh` 与 default 合并 |
 | `configs/experiments/pilot.yaml` | Pilot 规模 |
 | `configs/hardware/a100_1.yaml` | 单卡 A100（先用这个） |
 | `configs/hardware/rtx5090_1.yaml` | 单卡 5090 |

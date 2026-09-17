@@ -1,0 +1,41 @@
+# Small real-GPU comparison; not the paper-scale Pilot.
+# 40 steps leave predictor warmup (20) and the periodic basis refresh (32).
+# The first SVD basis is formed as soon as the reservoir has k gradients.
+backend: gpu_verl
+seed: 17
+split_seed: 17
+num_steps: 40
+n_start: 16
+n_prompts: 2
+decision_tokens: 512
+max_new_tokens: 2048
+save_initial_checkpoint: true
+format_warmup:
+  steps: 256
+  batch_size: 4
+predictor:
+  k: 8
+  warmup_steps: 20
+  refresh_every: 32
+  reservoir_size: 64
+  audit_s: 0.125
+  constant_cost: true
+  coord_kind: ridge
+  ridge_l2: 1.0
+  use_affine: true
+  shrink_m: true
+  align_basis: true
+eval:
+  n_problems: 16
+  k: 4
+  n: 4
+  max_new_tokens: 4096
+  temperature: 0.6
+  top_p: 0.95
+audit:
+  n_problems: 4
+  n_prefixes: 2
+  decision_grid: [128, 512, 1024]
+  n_continuations: 8
+  max_new_tokens: 4096
+  jl_dim: 256

@@ -8,7 +8,7 @@ import numpy as np
 
 from grace_gc.core.layout import ParamLayout, collect_lora_layout
 from grace_gc.core.rng import IsolatedRNG
-from grace_gc.predictor.heads import PredictorHeads
+from grace_gc.predictor.heads import predictor_from_spec
 from grace_gc.predictor.reservoir import GradientReservoir
 from grace_gc.trainer.algorithm import TrainState
 from grace_gc.trainer.baseline import HistoricalBaseline
@@ -81,7 +81,12 @@ def dump_train_state(path, state: TrainState, actor_named, optimizer, actor_full
         "optimizer": optimizer_state(optimizer),
         "predictor": None if state.predictor is None else state.predictor.state_dict(),
         "baseline": state.baseline.state_dict(),
-        "basis": {"u": state.u, "basis_id": state.basis_id},
+        "basis": {
+            "u": state.u,
+            "basis_id": state.basis_id,
+            "predictor_synced_basis_id": state.predictor_synced_basis_id,
+        },
+        "prescan_rng": None if state.prescan_rng is None else state.prescan_rng.state_dict(),
         "reservoir": state.reservoir.state_dict(),
         "rng": state.rng.state_dict(),
         "step": state.step,
@@ -130,12 +135,10 @@ def restore_train_state(path, actor, optimizer, in_dim: int, k: int, spec_name: 
             raise ValueError("Reward-CV checkpoint missing reward_risk")
         if spec_name == "reward_cv" and not raw.get("success"):
             raise ValueError("Reward-CV checkpoint missing success")
-        predictor = PredictorHeads(
-            in_dim=int(raw.get("in_dim", in_dim)),
-            k=int(raw.get("k", k)),
-            hidden_coord=int(raw.get("hidden_coord", 256)),
-            hidden_risk=int(raw.get("hidden_risk", 64)),
-            constant_cost=bool(raw.get("constant_cost", True)),
+        predictor = predictor_from_spec(
+            int(raw.get("in_dim", in_dim)),
+            int(raw.get("k", k)),
+            raw,
         )
         predictor.load_state_dict(raw)
     spec = method_spec(spec_name)
@@ -143,6 +146,10 @@ def restore_train_state(path, actor, optimizer, in_dim: int, k: int, spec_name: 
         raise ValueError(f"{spec_name} checkpoint missing predictor")
     rng = IsolatedRNG.create(0)
     rng.load_state_dict(payload["rng"])
+    prescan_rng = None
+    if payload.get("prescan_rng"):
+        prescan_rng = IsolatedRNG.create(0)
+        prescan_rng.load_state_dict(payload["prescan_rng"])
     reservoir = GradientReservoir.from_state_dict(payload["reservoir"])
     baseline = HistoricalBaseline()
     baseline.load_state_dict(payload["baseline"])
@@ -160,6 +167,8 @@ def restore_train_state(path, actor, optimizer, in_dim: int, k: int, spec_name: 
         predictor=predictor,
         reservoir=reservoir,
         basis_id=int(payload["basis"].get("basis_id", 0)),
+        predictor_synced_basis_id=int(payload["basis"].get("predictor_synced_basis_id", -1)),
+        prescan_rng=prescan_rng,
         history_costs=list(payload.get("history_costs", [])),
         step=int(payload.get("step", 0)),
         n_ref=int(payload.get("n_ref", 0)),

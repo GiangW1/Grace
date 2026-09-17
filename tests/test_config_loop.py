@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from grace_gc.config import default_config, merge_configs, require_training_leaves_warmup, validate_config
@@ -60,6 +61,78 @@ def test_checkpoint_roundtrip(tmp_path: Path):
     save_checkpoint(path, payload)
     loaded = load_checkpoint(path)
     assert set(loaded) >= set(required_keys())
+
+
+def test_predictor_probe_keeps_first_training_draws_aligned(tmp_path):
+    from grace_gc.logging_util.run_dir import RunDirectory
+    from grace_gc.trainer.loop import run_tiny_training
+
+    first = {}
+    for method in ("full_pg", "grace"):
+        cfg = merge_configs(default_config(), {
+            "method": method, "num_steps": 1, "n_start": 4, "n_prompts": 2,
+            "decision_tokens": 3, "max_new_tokens": 6,
+            "predictor": {"warmup_steps": 20},
+        })
+        root = tmp_path / method
+        run_tiny_training(cfg, RunDirectory(root), ComputeLedger(0, "cpu"))
+        rows = [json.loads(line) for line in (root / "trajectories.jsonl").read_text().splitlines()]
+        first[method] = [(row["problem_id"], row["full_token_ids"]) for row in rows]
+    assert first["full_pg"] == first["grace"]
+
+
+def test_save_initial_checkpoint_before_rl(tmp_path):
+    from grace_gc.logging_util.run_dir import RunDirectory
+    from grace_gc.trainer.loop import run_tiny_training
+
+    cfg = merge_configs(default_config(), {
+        "method": "full_pg",
+        "num_steps": 1,
+        "n_start": 4,
+        "n_prompts": 2,
+        "decision_tokens": 3,
+        "max_new_tokens": 6,
+        "save_initial_checkpoint": True,
+        "predictor": {"warmup_steps": 0},
+    })
+    run_tiny_training(cfg, RunDirectory(tmp_path), ComputeLedger(0, "cpu"))
+    assert (tmp_path / "checkpoints" / "step_0.npz").is_file()
+    assert (tmp_path / "checkpoints" / "step_1.npz").is_file()
+    index = json.loads((tmp_path / "checkpoints.json").read_text(encoding="utf-8"))
+    assert any(int(row["step"]) == 0 for row in index["steps"])
+
+
+def test_basis_forms_before_periodic_refresh(tmp_path, monkeypatch):
+    from grace_gc.logging_util.run_dir import RunDirectory
+    from grace_gc.predictor.basis import Basis
+    from grace_gc.trainer.loop import run_tiny_training
+
+    def fake_refresh(grads, k, basis_id, **kwargs):
+        d = int(np.asarray(grads).shape[1])
+        kk = int(k)
+        return Basis(u=np.eye(d, kk, dtype=np.float64), basis_id=int(basis_id), k=kk, rank=kk)
+
+    monkeypatch.setattr("grace_gc.trainer.algorithm.refresh_basis", fake_refresh)
+    cfg = merge_configs(default_config(), {
+        "method": "grace",
+        "num_steps": 1,
+        "n_start": 8,
+        "n_prompts": 4,
+        "decision_tokens": 3,
+        "max_new_tokens": 6,
+        "predictor": {
+            "k": 2,
+            "warmup_steps": 20,
+            "refresh_every": 32,
+            "audit_s": 1.0,
+            "reservoir_size": 16,
+            "epochs": 1,
+        },
+    })
+    run_tiny_training(cfg, RunDirectory(tmp_path), ComputeLedger(0, "cpu"))
+    health = json.loads((tmp_path / "health.json").read_text(encoding="utf-8"))
+    assert health["reservoir_n"] >= 2
+    assert health["basis_id"] == 1
 
 
 def test_cpu_train_script_path(tmp_path: Path):

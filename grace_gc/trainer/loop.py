@@ -14,11 +14,11 @@ from grace_gc.data.format_prompt import apply_solve_instruction
 from grace_gc.data.math_data import MathRecord, last_load_report, load_math_records, split_records
 from grace_gc.data.reward import rule_reward
 from grace_gc.data.tokenize import encode_records_tiny
-from grace_gc.logging_util.forensics import persist_training_step, reset_run_artifacts, trajectory_row, write_data_inventory, write_failed
+from grace_gc.logging_util.forensics import persist_initial_checkpoint, persist_training_step, reset_run_artifacts, trajectory_row, write_data_inventory, write_failed
 from grace_gc.logging_util.ledger import ComputeLedger, Timer
 from grace_gc.logging_util.run_dir import RunDirectory, resolve_run_dir, utc_now
 from grace_gc.logging_util.run_log import RunLog
-from grace_gc.predictor.heads import PredictorHeads
+from grace_gc.predictor.heads import predictor_from_spec
 from grace_gc.predictor.reservoir import GradientReservoir
 from grace_gc.trainer.algorithm import TrainState, run_algorithm1_step
 from grace_gc.trainer.grace_step import next_start_count
@@ -142,21 +142,21 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
     engines = make_tiny_engines(actor, actor.vocab)
     in_dim = 1
     if spec.use_predictor:
-        probe = sample_starts(train_recs, 1, 1, rng)
+        probe_rng = IsolatedRNG.create(rng.seed)
+        probe = sample_starts(train_recs, 1, 1, probe_rng)
         prompt_ids, _pids, _golds = encode_records_tiny(probe, actor.vocab, 8)
-        prefixes, _ = engines.generate_prefix(prompt_ids, 2, rng, "token")
+        prefixes, _ = engines.generate_prefix(prompt_ids, 2, probe_rng, "token")
         feat = engines.prefix_features(prefixes, np.array([len(prompt_ids[0])]), [0.5])["features"]
         in_dim = int(feat.shape[1])
     k = min(int(cfg.get("predictor", {}).get("k", 2)), layout.dim)
     predictor = None
     if spec.use_predictor:
-        predictor = PredictorHeads(
-            in_dim=in_dim,
-            k=k,
+        predictor = predictor_from_spec(
+            in_dim,
+            k,
+            cfg.get("predictor") or {},
             hidden_coord=min(32, int(cfg.get("predictor", {}).get("hidden_coord", 256))),
             hidden_risk=min(16, int(cfg.get("predictor", {}).get("hidden_risk", 64))),
-            constant_cost=bool(cfg.get("predictor", {}).get("constant_cost", True)),
-            lr=float(cfg.get("predictor", {}).get("lr", 1e-3)),
         )
     torch = __import__("torch")
     opt = torch.optim.SGD(actor.trainable_params(), lr=float(cfg.get("optim", {}).get("lr", 0.05)))
@@ -184,6 +184,14 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
         if format_warmup_steps(cfg):
             info = run_format_warmup_tiny(actor, train_recs, actor.vocab, cfg, ledger)
             run.write_json("format_warmup.json", info)
+        persist_initial_checkpoint(
+            run,
+            cfg,
+            state,
+            actor.named_lora_params(),
+            opt,
+            actor_full=actor.named_all_params(),
+        )
     last = {}
     for _ in range(steps):
         if last.get("next_n"):

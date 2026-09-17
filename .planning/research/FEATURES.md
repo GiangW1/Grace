@@ -1,6 +1,6 @@
 # GRACE 功能范围
 
-**Updated:** 2026-09-16
+**Updated:** 2026-09-17。现役工作树另有 residual-risk 就绪门、可逆仿射、ridge/γ、换基对齐，见 `.planning/research/GRACE_FIDELITY.md`。
 
 ## 本轮全部实现
 

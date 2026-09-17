@@ -34,13 +34,34 @@ class ComputeLedger:
         row.update(extra)
         self.rows.append(row)
 
+    def exclusive_rows(self) -> list[dict]:
+        """Skip nested phase/step rows when an envelope already covers them."""
+        envelopes = {"train", "eval", "audit"}
+        names = {str(r["name"]) for r in self.rows}
+        has_envelope = bool(names & envelopes)
+        out = []
+        for row in self.rows:
+            name = str(row["name"])
+            if name.startswith("phase_"):
+                continue
+            if has_envelope and name not in envelopes:
+                continue
+            out.append(row)
+        if out:
+            return out
+        return [r for r in self.rows if not str(r["name"]).startswith("phase_")]
+
     def summary(self) -> dict:
+        rows = self.exclusive_rows()
         return {
             "hardware": self.hardware,
             "n_gpu": self.n_gpu,
-            "gpu_reserved_seconds": sum(r["gpu_reserved_seconds"] for r in self.rows),
-            "cpu_seconds": sum(r["cpu_seconds"] for r in self.rows),
-            "note": "A100 and 5090 hours are recorded separately and never converted.",
+            "gpu_reserved_seconds": sum(r["gpu_reserved_seconds"] for r in rows),
+            "cpu_seconds": sum(r["cpu_seconds"] for r in rows),
+            "note": (
+                "A100 and 5090 hours are recorded separately and never converted. "
+                "Totals skip nested phase_* / train_step when train/eval/audit is present."
+            ),
             "rows": list(self.rows),
         }
 

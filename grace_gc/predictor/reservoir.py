@@ -42,6 +42,11 @@ class GradientReservoir:
     def problem_ids(self) -> list[str]:
         return [it.problem_id for it in self.items]
 
+    def stamp_basis_id(self, basis_id: int) -> None:
+        bid = int(basis_id)
+        for it in self.items:
+            it.basis_id = bid
+
     def state_dict(self) -> dict:
         return {
             "capacity": self.capacity,

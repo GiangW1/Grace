@@ -787,10 +787,12 @@ def test_prescan_sets_baseline_to_sample_mean():
         reservoir=GradientReservoir(capacity=4),
     )
     _ = torch
+    token_before = dict(state.rng.counters)
     assert state.baseline.get("a") == pytest.approx(0.5)
     n = prescan_unseen_baselines(engines, state, [[1, 2], [1, 2]], ["a", "a"], ["1", "1"], 8, 2)
     assert n == 1
     assert calls == [(2, 8, "token")]
+    assert state.rng.counters == token_before
     assert state.baseline.values["a"] == pytest.approx(1.0)
     assert prescan_unseen_baselines(engines, state, [[1, 2]], ["a"], ["1"], 8, 2) == 0
     assert calls == [(2, 8, "token")]
@@ -1183,7 +1185,12 @@ def test_frozen_predictor_changes_actual_variance_cost():
     out_low = audit_bundles([low], np.eye(2, 1), {"beta": 0.5, "p_min": 0.2}, np.random.default_rng(0))
     assert "frozen_predictor" in str(out_high["variance_cost_note"])
     assert out_high["variance_cost"]["actual_p_var"] != out_high["variance_cost_oracle"]["actual_p_var"]
-    assert out_high["variance_cost"]["actual_p_cost"] != out_low["variance_cost"]["actual_p_cost"]
+    from grace_gc.core.allocation import allocate_continuation
+
+    # One prefix can only hit β. Different r_hat change p only in a mixed set.
+    mixed = allocate_continuation(np.array([8.0, 0.05]), np.ones(2), beta=0.5, p_min=0.2)
+    assert mixed.p[0] > mixed.p[1]
+    _ = out_low
 
 
 def test_resume_start_counts_uses_scheduled_n():

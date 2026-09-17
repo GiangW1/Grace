@@ -42,6 +42,7 @@ class StartRecord:
     baseline_b: float | None = None
     q_hat: float | None = None
     g_norm_sq: float | None = None
+    rollout_logprob_sum: float | None = None
     prompt_token_ids: list[int] | None = None
     prefix_token_ids: list[int] | None = None
     full_token_ids: list[int] | None = None
@@ -77,6 +78,44 @@ class GraceBatchState:
     leak_warned: bool = False
 
 
+def neyman_ready(basis_id: int, predictor_synced_basis_id: int) -> bool:
+    """Residual-risk Neyman needs a real U and heads trained on that U."""
+    return int(basis_id) > 0 and int(predictor_synced_basis_id) == int(basis_id)
+
+
+def heads_trained_on_current_u(spec: MethodSpec, pred_metrics: dict | None) -> bool:
+    """True only if this method's coord head and risk head ran on the live U."""
+    metrics = pred_metrics or {}
+    if metrics.get("coord_loss") is None:
+        return False
+    mode = str(getattr(spec, "risk_mode", "full") or "full")
+    if mode == "none":
+        return True
+    if mode == "reward":
+        return metrics.get("reward_risk_loss") is not None
+    return metrics.get("risk_loss") is not None
+
+
+def maybe_mark_predictor_synced(state, pred_metrics: dict | None, basis_changed: bool) -> None:
+    """Invalidate sync on a new U; restore it only after both required heads train."""
+    if basis_changed:
+        state.predictor_synced_basis_id = -1
+    if int(getattr(state, "basis_id", 0) or 0) > 0 and heads_trained_on_current_u(state.spec, pred_metrics):
+        state.predictor_synced_basis_id = int(state.basis_id)
+
+
+def allocation_ready_from_checkpoint(spec: MethodSpec, payload: dict | None, cfg: dict | None) -> bool:
+    """Same warmup / U-sync gate the next training batch would use."""
+    if not spec.use_allocation:
+        return True
+    raw = payload or {}
+    warmup = int(((cfg or {}).get("predictor") or {}).get("warmup_steps", 0) or 0)
+    if int(raw.get("step", 0) or 0) < warmup:
+        return False
+    basis = raw.get("basis") or {}
+    return neyman_ready(int(basis.get("basis_id", 0) or 0), int(basis.get("predictor_synced_basis_id", -1)))
+
+
 def decide_continuation(
     spec: MethodSpec,
     risk: np.ndarray,
@@ -86,9 +125,10 @@ def decide_continuation(
     p_min: float,
     warmup: bool,
     iters: int = 20,
+    basis_ready: bool = True,
 ) -> tuple[np.ndarray, float]:
     n = int(risk.shape[0])
-    if warmup or spec.name in {"full_pg", "grpo", "grpo_short"} or spec.objective == "grpo":
+    if warmup or not basis_ready or spec.name in {"full_pg", "grpo", "grpo_short"} or spec.objective == "grpo":
         return np.ones(n, dtype=np.float64), 0.0
     if spec.name == "uniform_ht" or spec.name == "uniform_cv" or not spec.use_allocation:
         p = np.full(n, uniform_p(n, beta, p_min), dtype=np.float64)
@@ -124,6 +164,16 @@ def assemble_ghat(
     g_c = np.stack([r.g for r in completed], axis=0) if completed else np.zeros((0, u.shape[0]))
     p_c = np.array([r.p for r in completed], dtype=np.float64)
     return dual_stream_mean(g_c, p_c, u, f, z, p, n)
+
+
+def incremental_token_costs(remainings, finished) -> np.ndarray:
+    """Neyman ĉ is leftover tokens, not a learned head, when cost is constant."""
+    c = np.maximum(np.asarray(remainings, dtype=np.float64).reshape(-1), 1.0)
+    fin = np.asarray(finished, dtype=bool).reshape(-1)
+    if fin.shape[0] != c.shape[0]:
+        raise ValueError("remainings/finished dimensions do not match")
+    c[fin] = 1.0
+    return c
 
 
 def batch_token_costs(

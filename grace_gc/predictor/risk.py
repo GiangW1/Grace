@@ -6,7 +6,7 @@ import numpy as np
 
 
 def full_space_residual(g: np.ndarray, f: np.ndarray, u: np.ndarray) -> np.ndarray:
-    """e = ||G||^2 - 2 f^T U^T G + f^T (U^T U) f."""
+    """e = ||G - U f||^2. Equivalent to the Gram expansion when all terms are finite."""
     g = np.asarray(g, dtype=np.float64)
     f = np.asarray(f, dtype=np.float64)
     u = np.asarray(u, dtype=np.float64)
@@ -18,9 +18,10 @@ def full_space_residual(g: np.ndarray, f: np.ndarray, u: np.ndarray) -> np.ndarr
         squeeze = False
     if g.shape[1] != u.shape[0] or f.shape[1] != u.shape[1]:
         raise ValueError("G/f/U dimensions do not match")
-    coords = g @ u
-    gram = u.T @ u
-    e = np.sum(g * g, axis=1) - 2.0 * np.sum(f * coords, axis=1) + np.sum(f * (f @ gram), axis=1)
+    pred = f @ u.T
+    e = np.sum((g - pred) * (g - pred), axis=1)
+    if not np.all(np.isfinite(e)):
+        raise ValueError("full-space residual is not finite")
     if squeeze:
         return e.reshape(())
     return e

@@ -78,6 +78,16 @@ def extract_answer(text: str) -> str | None:
 
 
 _LEFT_RIGHT = re.compile(r"\\(?:left|right|bigl|bigr|Bigl|Bigr|biggl|biggr|Biggl|Biggr)\s*")
+# Digit-prefixed 2pi / 3pi/2 count; pine / api / \pi do not.
+_PLAIN_PI = re.compile(r"(?<!\\)(?<![A-Za-z_])pi(?![A-Za-z_])", re.I)
+
+
+def _gold_has_pi_constant(text: str) -> bool:
+    return bool(re.search(r"\\pi\b", str(text).replace("\u03c0", r"\pi")))
+
+
+def _plain_pi_to_latex(text: str) -> str:
+    return _PLAIN_PI.sub(r"\\pi", str(text))
 
 
 def normalize_answer(text: str) -> str:
@@ -94,13 +104,16 @@ def normalize_answer(text: str) -> str:
     return re.sub(r"\s+", "", text.strip().lower())
 
 
+_NUMERIC_CORE = re.compile(r"^-?\d+(?:/\d+)?$")
+
+
 def _compat_number_unit(pred: str, gold: str) -> bool:
-    """5 vs 5cm. Does not equate 5cm with 5mm."""
+    """5 vs 5cm. Does not equate 5cm with 5mm, or x with xy."""
     if not pred or not gold or pred == gold:
         return pred == gold
     short, long = (pred, gold) if len(pred) <= len(gold) else (gold, pred)
     extra = long[len(short) :]
-    return long.startswith(short) and extra.isalpha()
+    return bool(_NUMERIC_CORE.fullmatch(short)) and long.startswith(short) and extra.isalpha()
 
 
 _TEXT_GOLD = re.compile(r"\\text\s*\{([^{}]+)\}")
@@ -147,10 +160,12 @@ def rule_reward(text: str | None, gold: str, truncated: bool = False) -> float |
         return None
     _ = truncated
     pred = extract_answer(text)
-    gold_s = str(gold)
+    gold_s = str(gold).replace("\u03c0", r"\pi")
     if pred is not None:
         pred_n = normalize_answer(pred)
         gold_n = normalize_answer(gold_s)
+        if _gold_has_pi_constant(gold_s):
+            pred_n = _plain_pi_to_latex(pred_n)
         if pred_n == gold_n or _compat_number_unit(pred_n, gold_n):
             return 1.0
     if text_gold_in_response(pred if pred is not None else text, gold_s):
@@ -163,7 +178,10 @@ def rule_reward(text: str | None, gold: str, truncated: bool = False) -> float |
     gold_expr = r"\boxed{" + gold_s + "}"
     if pred is None:
         return 0.0
+    pred_expr = str(pred).replace("\u03c0", r"\pi")
+    if _gold_has_pi_constant(gold_expr):
+        pred_expr = _plain_pi_to_latex(pred_expr)
     try:
-        return float(verify(parse(gold_expr), parse(r"\boxed{" + str(pred) + "}")))
+        return float(verify(parse(gold_expr), parse(r"\boxed{" + pred_expr + "}")))
     except Exception as exc:
         raise ValueError("math-verify failed; this is not a scored miss") from exc

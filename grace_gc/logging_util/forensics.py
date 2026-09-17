@@ -159,6 +159,7 @@ def trajectory_row(
         "thinking_closed": rec.thinking_closed,
         "vllm_finish_reason": rec.vllm_finish_reason,
         "vllm_stop_reason": rec.vllm_stop_reason,
+        "rollout_logprob_sum": rec.rollout_logprob_sum,
         "step_wall_seconds": float(wall_s),
         "step_gpu_reserved_seconds": float(wall_s) * max(int(n_gpu), 0),
     }
@@ -277,6 +278,7 @@ def step_health(state, last: dict[str, Any], cfg: dict[str, Any] | None = None) 
     reservoir_n = len(getattr(getattr(state, "reservoir", None), "items", []) or [])
     out = {
         "basis_id": getattr(state, "basis_id", None),
+        "predictor_synced_basis_id": getattr(state, "predictor_synced_basis_id", None),
         "reservoir_n": reservoir_n,
         "n_parsed": sum(1 for r in records if r.extracted),
         "n_truncated": sum(1 for r in records if r.truncated),
@@ -287,7 +289,12 @@ def step_health(state, last: dict[str, Any], cfg: dict[str, Any] | None = None) 
             "mean_suffix_tokens",
             _mean(getattr(r, "suffix_tokens", None) for r in records),
         ),
-        "n_short_response": sum(1 for r in records if int(getattr(r, "response_tokens", 0) or 0) < 16),
+        "n_short_response": sum(
+            1
+            for r in records
+            if float(getattr(r, "z", 0.0) or 0.0) >= 1.0
+            and int(getattr(r, "response_tokens", 0) or 0) < 16
+        ),
         "n_prefix_finished": last.get(
             "n_prefix_finished",
             sum(1 for r in records if r.z >= 1.0 and r.finished and int(getattr(r, "suffix_tokens", 0) or 0) == 0),
@@ -316,6 +323,20 @@ def step_health(state, last: dict[str, Any], cfg: dict[str, Any] | None = None) 
             and not last.get("warmup")
             and reservoir_n < 2
         ),
+        "allocation_ready": last.get("allocation_ready"),
+        "basis_id_at_allocate": last.get("basis_id_at_allocate"),
+        "allocating_with_init_basis": bool(
+            getattr(getattr(state, "spec", None), "use_allocation", False)
+            and not last.get("warmup")
+            and int(last.get("basis_id_at_allocate", getattr(state, "basis_id", 0)) or 0) <= 0
+        ),
+        "token_cost_proxy_used": last.get("token_cost_proxy_used", last.get("token_cost_used")),
+        "token_cost_proxy_full": last.get("token_cost_proxy_full", last.get("token_cost_full")),
+        "token_cost_proxy_ratio": last.get("token_cost_proxy_ratio"),
+        "mean_actual_response_tokens": last.get("mean_actual_response_tokens"),
+        "basis_rank": last.get("basis_rank"),
+        "m_shrink": (last.get("predictor") or {}).get("m_shrink"),
+        "coord_kind": (last.get("predictor") or {}).get("coord_kind"),
         "mean_baseline_b": _mean(baseline_vals),
         "n_baseline": len(baseline_vals),
         "n_baseline_zero": n_baseline_zero,
@@ -387,6 +408,23 @@ def _update_checkpoint_index(run: RunDirectory, step: int, sha: str | None) -> N
         "checkpoints.json",
         {"latest": "checkpoint.npz", "latest_sha256": sha, "steps": steps},
     )
+
+
+def persist_initial_checkpoint(
+    run: RunDirectory,
+    cfg: dict[str, Any],
+    state,
+    actor_named,
+    optimizer,
+    actor_full=None,
+    extra=None,
+) -> None:
+    """Post-format-SFT snapshot so eval-0 compares RL against the shared start."""
+    if not cfg.get("save_initial_checkpoint") or cfg.get("resume"):
+        return
+    path = Path(run.root) / "checkpoints" / "step_0.npz"
+    dump_train_state(path, state, actor_named, optimizer, actor_full=actor_full, extra=extra)
+    _update_checkpoint_index(run, 0, sha256_file(path) if path.is_file() else None)
 
 
 def persist_training_step(

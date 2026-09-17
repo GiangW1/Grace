@@ -76,8 +76,13 @@ def allocate_continuation(
             n_eligible=0,
         )
 
-    r = np.maximum(risk[eligible], 0.0)
+    r_raw = np.maximum(risk[eligible], 0.0)
     c = cost[eligible]
+    # Solve on r / mean(r) so a global risk scale does not move p.
+    scale = float(np.mean(r_raw))
+    if not np.isfinite(scale) or scale <= 0.0:
+        scale = 1.0
+    r = r_raw / scale
     c_sum = float(np.sum(np.maximum(c, 0.0)))
     target = beta * c_sum
 
@@ -106,7 +111,7 @@ def allocate_continuation(
     deviation = expected - target
     return AllocationResult(
         p=p,
-        lam=float(lam),
+        lam=float(lam * scale),
         budget_target=target,
         budget_expected=expected,
         budget_deviation=deviation,

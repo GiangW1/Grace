@@ -1,7 +1,7 @@
 # 最小证伪：代码完成后直接用小配置运行
 
-**当前状态：** 训练/评测/审计脚本已在仓库；本机 CPU 可跑；真实 GPU 实验未跑。
-**顺序：** 按 README 全流程：单卡 smoke Full-PG → Pilot Full-PG → Pilot GRACE。完整 4 卡尚未接线。
+**当前状态：** 训练/评测/审计脚本已在仓库；本机 CPU 可跑；现役工作树上的真实 GPU 实验未跑。
+**顺序：** 当前分支先单卡 `scripts/run_minimal_gpu.sh`（Full-PG / GRACE / Uniform-CV / GRPO）。论文规模仍按 README：smoke Full-PG → Pilot Full-PG → Pilot GRACE。完整 4 卡尚未接线。
 
 ## 简单使用方式
 

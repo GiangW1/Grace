@@ -7,7 +7,13 @@ import pytest
 from grace_gc.audit.prefix_audit import PrefixBundle, audit_bundles
 from grace_gc.audit.stats import elf, lag_index, plc
 from grace_gc.data.math_data import MathRecord, load_math_records, records_for_split, split_records
-from grace_gc.data.reward import extract_boxed, first_parseable_index, rule_reward
+from grace_gc.data.reward import (
+    _gold_has_pi_constant,
+    _plain_pi_to_latex,
+    extract_boxed,
+    first_parseable_index,
+    rule_reward,
+)
 from grace_gc.evaluation.eval_full import EvalItem, evaluate_items
 from grace_gc.evaluation.metrics import pass_at_k, time_to_target, wilson_interval
 
@@ -307,6 +313,29 @@ def test_reward_and_parse_position():
     assert rule_reward("The girl is Alice.", r"\text{Evelyn}") == 0.0
 
 
+def test_plain_pi_rewrite_when_gold_has_constant(monkeypatch):
+    monkeypatch.setattr("grace_gc.data.reward.math_verify_fns", lambda: None)
+    assert _gold_has_pi_constant(r"\frac{\pi}{2}")
+    assert not _gold_has_pi_constant("p i")
+    assert _plain_pi_to_latex("(3, pi/2)") == r"(3, \pi/2)"
+    assert _plain_pi_to_latex("2pi") == r"2\pi"
+    assert _plain_pi_to_latex("3pi/2") == r"3\pi/2"
+    assert _plain_pi_to_latex("pine") == "pine"
+    assert _plain_pi_to_latex("api") == "api"
+    assert _plain_pi_to_latex(r"\pi") == r"\pi"
+    assert _plain_pi_to_latex("p*i") == "p*i"
+    assert rule_reward("Answer: (3, pi/2)", r"\left(3,\frac{\pi}{2}\right)") == 1.0
+    assert rule_reward("Answer: 2pi", r"2\pi") == 1.0
+    assert rule_reward("Answer: 3pi/2", r"3\pi/2") == 1.0
+    assert rule_reward("Answer: (3, \u03c0/2)", r"\left(3,\frac{\pi}{2}\right)") == 1.0
+    assert rule_reward("Answer: pi", r"\pi") == 1.0
+    assert rule_reward("Answer: pine", r"\pi") == 0.0
+    assert rule_reward("Answer: p*i", r"\pi") == 0.0
+    assert rule_reward("Answer: (3, pi/3)", r"\left(3,\frac{\pi}{2}\right)") == 0.0
+    assert rule_reward("Answer: 3", r"\left(3,\frac{\pi}{2}\right)") == 0.0
+    assert rule_reward("Answer: pi", "p-q") == 0.0
+
+
 def test_rule_reward_verifies_extracted_pred(monkeypatch):
     calls = []
 
@@ -328,6 +357,14 @@ def test_rule_reward_verifies_extracted_pred(monkeypatch):
     [
         ("Answer: 3", r"\left(3,\frac{\pi}{2}\right)", 0.0),
         (r"Answer: (3,\pi/2)", r"\left(3,\frac{\pi}{2}\right)", 1.0),
+        ("Answer: (3, pi/2)", r"\left(3,\frac{\pi}{2}\right)", 1.0),
+        ("Answer: (3, pi/3)", r"\left(3,\frac{\pi}{2}\right)", 0.0),
+        ("Answer: (3, \u03c0/2)", r"\left(3,\frac{\pi}{2}\right)", 1.0),
+        ("Answer: pi", r"\pi", 1.0),
+        ("Answer: 2pi", r"2\pi", 1.0),
+        ("Answer: 3pi/2", r"3\pi/2", 1.0),
+        (r"Answer: p*i", r"\pi", 0.0),
+        ("Answer: pine", r"\pi", 0.0),
         ("Answer: q-p", "p-q", 0.0),
         ("Answer: -q+p", "p-q", 1.0),
         ("Answer: 0.5", r"\frac{1}{2}", 1.0),
@@ -553,3 +590,50 @@ def test_lora_and_baseline_health_fields():
     later = step_health(state, {"records": [rec]})
     assert later["n_baseline_zero"] == 1
     assert later["baseline_collapsed_with_zero_reward"] is False
+
+    stopped = StartRecord(
+        problem_id="s",
+        finished=False,
+        p=0.2,
+        z=0.0,
+        f=np.zeros(1),
+        r_hat=1.0,
+        c_hat=1.0,
+        reward=None,
+        advantage=None,
+        g=None,
+        audited=False,
+        response_tokens=0,
+    )
+    long_done = StartRecord(
+        problem_id="c",
+        finished=True,
+        p=1.0,
+        z=1.0,
+        f=np.zeros(1),
+        r_hat=1.0,
+        c_hat=1.0,
+        reward=1.0,
+        advantage=0.5,
+        g=None,
+        audited=False,
+        response_tokens=40,
+    )
+    short_done = StartRecord(
+        problem_id="q",
+        finished=True,
+        p=1.0,
+        z=1.0,
+        f=np.zeros(1),
+        r_hat=1.0,
+        c_hat=1.0,
+        reward=0.0,
+        advantage=-0.5,
+        g=None,
+        audited=False,
+        response_tokens=5,
+    )
+    ignored = step_health(state, {"records": [stopped, long_done]})
+    assert ignored["n_short_response"] == 0
+    counted = step_health(state, {"records": [stopped, short_done]})
+    assert counted["n_short_response"] == 1

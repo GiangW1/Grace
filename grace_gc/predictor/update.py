@@ -8,6 +8,7 @@ from grace_gc.predictor.heads import PredictorHeads
 from grace_gc.predictor.ipw import assign_new_problems, ipw_weights
 from grace_gc.predictor.reservoir import GradientReservoir
 from grace_gc.predictor.risk import full_space_residual
+from grace_gc.predictor.scale import design_shrink_gamma
 
 
 def update_predictor_from_reservoir(
@@ -39,13 +40,21 @@ def update_predictor_from_reservoir(
     risk_loss = None
     rewards = np.array([0.0 if it.reward is None else float(it.reward) for it in reservoir.items], dtype=np.float64)
     if np.any(fit):
+        heads.scaler.fit_features(feats[fit])
+        heads.scaler.fit_coord_scale(coords[fit])
         coord_loss = heads.train_coord(feats[fit], coords[fit], weights[fit], epochs=epochs)
         heads.train_success(feats[fit], rewards[fit], weights[fit], epochs=epochs)
+        if heads.shrink_m:
+            f_raw = heads.predict_f(feats[fit], shrink=False)
+            gamma = design_shrink_gamma(grads[fit], f_raw, u, p[fit], weights=weights[fit])
+            if gamma is not None:
+                heads.m_shrink = float(gamma)
     e = None
     risk_idx = hold
     if np.any(hold):
         pred = heads.forward_numpy(feats[hold])
         e = full_space_residual(grads[hold], pred.f, u)
+        heads.scaler.fit_risk_scale(e)
         risk_loss = heads.train_risk(feats[hold], e, weights[hold], epochs=epochs)
     cost_loss = 0.0
     cost_feat = []
@@ -83,4 +92,6 @@ def update_predictor_from_reservoir(
         "cost_loss": cost_loss,
         "reward_risk_loss": reward_loss,
         "n": len(reservoir.items),
+        "m_shrink": float(heads.m_shrink),
+        "coord_kind": heads.coord_kind,
     }

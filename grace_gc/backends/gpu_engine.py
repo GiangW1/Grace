@@ -48,6 +48,8 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
             engines.last_rollout = {
                 "prefix_finish_reasons": list(phase.finish_reasons or []),
                 "prefix_stop_reasons": list(phase.stop_reasons or []),
+                "prefix_logprob_sums": list(phase.logprob_sums or []),
+                "has_generate_logprobs": True,
                 "sampling": phase.sampling,
             }
         return phase.token_ids, phase.natural_finish
@@ -70,16 +72,21 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
             roll = dict(engines.last_rollout or {})
             finish_map = dict(roll.get("continue_finish_reasons") or {})
             stop_map = dict(roll.get("continue_stop_reasons") or {})
+            logprob_map = dict(roll.get("continue_logprob_sums") or {})
             if phase is not None:
                 for j, i in enumerate(idx):
                     if phase.finish_reasons:
                         finish_map[i] = phase.finish_reasons[j]
                     if phase.stop_reasons:
                         stop_map[i] = phase.stop_reasons[j]
+                    if phase.logprob_sums:
+                        logprob_map[i] = phase.logprob_sums[j]
                 if phase.sampling is not None:
                     roll["sampling"] = phase.sampling
             roll["continue_finish_reasons"] = finish_map
             roll["continue_stop_reasons"] = stop_map
+            roll["continue_logprob_sums"] = logprob_map
+            roll["has_generate_logprobs"] = True
             engines.last_rollout = roll
         return out
 

@@ -17,6 +17,7 @@ class PhaseResult:
     finish_reasons: list[str | None] | None = None
     stop_reasons: list | None = None
     sampling: dict | None = None
+    logprob_sums: list[float | None] | None = None
 
 
 def _require_vllm():
@@ -51,6 +52,8 @@ def build_sampling_params(
         "stop": [],
         "repetition_penalty": 1.0,
         "min_p": 0.0,
+        # Behavior log-prob at generate time. Dropped on old vLLM. Not TIS.
+        "logprobs": 1,
     }
     if seed is not None:
         kwargs["seed"] = int(seed)
@@ -65,13 +68,13 @@ def build_sampling_params(
 
 
 def _fit_sampling_params(SamplingParams, kwargs: dict, need_seed: bool) -> tuple[dict, list[str]]:
-    """Keep required fields. Only min_p / repetition_penalty may be dropped."""
+    """Keep required fields. Only min_p / repetition_penalty / logprobs may be dropped."""
     try:
         SamplingParams(**kwargs)
         return dict(kwargs), []
     except TypeError:
         pass
-    optional = ("min_p", "repetition_penalty")
+    optional = ("logprobs", "min_p", "repetition_penalty")
     for drop in optional:
         trial = dict(kwargs)
         if drop not in trial:
@@ -99,6 +102,55 @@ def _fit_sampling_params(SamplingParams, kwargs: dict, need_seed: bool) -> tuple
             "vLLM SamplingParams rejected a required sampling field; "
             "generation would not match the actor log-prob"
         ) from exc
+
+
+def _logprob_from_record(rec, tok: int | None) -> float | None:
+    if rec is None:
+        return None
+    if isinstance(rec, dict):
+        item = None
+        if tok is not None:
+            if tok in rec:
+                item = rec[tok]
+            else:
+                for key, val in rec.items():
+                    try:
+                        if int(key) == int(tok):
+                            item = val
+                            break
+                    except (TypeError, ValueError):
+                        continue
+        rec = item
+    if rec is None:
+        return None
+    if isinstance(rec, (int, float, np.floating)):
+        val = float(rec)
+    else:
+        val = getattr(rec, "logprob", None)
+        if val is None:
+            return None
+        val = float(val)
+    if not np.isfinite(val):
+        return None
+    return val
+
+
+def _sum_sampled_logprobs(completion, kept_n: int) -> float | None:
+    raw = getattr(completion, "logprobs", None)
+    if not raw:
+        return None
+    toks = [int(t) for t in list(getattr(completion, "token_ids", []) or [])]
+    n = min(int(kept_n), len(raw), len(toks) if toks else len(raw))
+    if n <= 0:
+        return None
+    total = 0.0
+    for i in range(n):
+        tok = toks[i] if i < len(toks) else None
+        val = _logprob_from_record(raw[i], tok)
+        if val is None:
+            return None
+        total += val
+    return total
 
 
 def _usable_stop_reason(stop_reason, stop_set: set[int]) -> int | None:
@@ -226,6 +278,7 @@ def generate_phase(
     prompt_lens = []
     finish_reasons = []
     stop_reasons = []
+    logprob_sums: list[float | None] = []
     for prompt, out in zip(prompt_token_ids, outputs):
         out_prompt = getattr(out, "prompt_token_ids", None)
         if out_prompt is None:
@@ -251,6 +304,7 @@ def generate_phase(
         finished.append(ended)
         finish_reasons.append(_finish_name(raw_finish))
         stop_reasons.append(None if raw_stop is None else raw_stop)
+        logprob_sums.append(_sum_sampled_logprobs(completion, len(gen)))
     # Independent draws can coincide, especially for short format-SFT answers.
     sampling = getattr(build_sampling_params, "last", None)
     if sampling is not None:
@@ -262,6 +316,7 @@ def generate_phase(
         finish_reasons=finish_reasons,
         stop_reasons=stop_reasons,
         sampling=None if sampling is None else dict(sampling),
+        logprob_sums=logprob_sums,
     )
 
 

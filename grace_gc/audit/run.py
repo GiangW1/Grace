@@ -19,6 +19,7 @@ from grace_gc.logging_util.run_log import RunLog
 from grace_gc.versions import collect_environment
 from grace_gc.trainer.algorithm import _length_truncated, _traj_natural_finish
 from grace_gc.trainer.checkpoint import load_checkpoint
+from grace_gc.trainer.grace_step import allocation_ready_from_checkpoint, incremental_token_costs
 from grace_gc.trainer.state_io import load_numpy_module_state
 
 
@@ -155,7 +156,12 @@ def _bundles_from_engines(
         baseline_fn = lambda _pid: None
     eos_id = getattr(engines, "eos_id", None)
     bundles = []
-    for rec in records:
+    for record_index, rec in enumerate(records, start=1):
+        print(
+            f"phase=audit_problem_begin problem={record_index}/{len(records)} "
+            f"problem_id={rec.problem_id} n_bundles={len(bundles)}",
+            flush=True,
+        )
         b_grad = _independent_pass_rate(engines, rec, encode_fn, n_cont, max_new, rng, eos_id)
         explicit = None if baseline_fn is None else baseline_fn(rec.problem_id)
         b_feat = b_grad if explicit is None else float(explicit)
@@ -218,7 +224,14 @@ def _bundles_from_engines(
                     r_list = [float(r_hat[i]) for i in range(len(prefixes))]
                 else:
                     r_list = [float(pred.r_hat[i]) for i in range(len(prefixes))]
-                c_list = [float(pred.c_hat[i]) for i in range(len(prefixes))]
+                remain_c = [
+                    max(0, int(max_new) - (len(prefixes[i]) - int(prompt_lens_t[i])))
+                    for i in range(len(prefixes))
+                ]
+                if getattr(predictor, "constant_cost", True):
+                    c_list = [float(x) for x in incremental_token_costs(remain_c, finished)]
+                else:
+                    c_list = [float(pred.c_hat[i]) for i in range(len(prefixes))]
                 f_list = [np.asarray(pred.f[i], dtype=np.float64) for i in range(len(prefixes))]
             for loc, prefix in enumerate(prefixes):
                 prompt_len = prompt_lens_t[loc]
@@ -299,6 +312,11 @@ def _bundles_from_engines(
                         prompt_truncated=prompt_truncated,
                     )
                 )
+                print(
+                    f"phase=audit_prefix_done problem={record_index}/{len(records)} "
+                    f"t={t} path={idx} n_bundles={len(bundles)}",
+                    flush=True,
+                )
     return bundles
 
 
@@ -365,15 +383,9 @@ def _frozen_predictor(cfg: dict[str, Any] | None):
     stored = (payload.get("basis") or {}).get("u")
     if not raw or stored is None:
         return None, None
-    from grace_gc.predictor.heads import PredictorHeads
+    from grace_gc.predictor.heads import predictor_from_spec
 
-    heads = PredictorHeads(
-        in_dim=int(raw.get("in_dim")),
-        k=int(raw.get("k")),
-        hidden_coord=int(raw.get("hidden_coord", 256)),
-        hidden_risk=int(raw.get("hidden_risk", 64)),
-        constant_cost=bool(raw.get("constant_cost", True)),
-    )
+    heads = predictor_from_spec(int(raw.get("in_dim")), int(raw.get("k")), raw)
     heads.load_state_dict(raw)
     return heads, np.asarray(stored, dtype=np.float64)
 
@@ -619,6 +631,9 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
             analysis.setdefault("p_min", alloc.get("p_min", 0.2))
             analysis["method"] = spec.name
             analysis["max_new_tokens"] = max_new
+            ckpt = cfg.get("checkpoint") or cfg.get("resume")
+            payload = load_checkpoint(ckpt) if ckpt else {}
+            analysis["allocation_ready"] = allocation_ready_from_checkpoint(spec, payload, cfg)
             if cfg.get("audit", {}).get("jl_dim"):
                 analysis["jl_dim"] = int(cfg["audit"]["jl_dim"])
             result = audit_bundles(bundles, u, analysis, rng)

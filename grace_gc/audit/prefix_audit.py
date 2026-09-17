@@ -543,6 +543,8 @@ def _p_at_decision(eval_b: list[PrefixBundle], spec, analysis: dict, problem_ris
         p_alloc = np.full(len(eval_b), uniform_p(len(eval_b), beta, p_min), dtype=np.float64)
         p_alloc[finished] = 1.0
         return p_alloc
+    if not analysis.get("allocation_ready", True):
+        return np.ones(len(eval_b), dtype=np.float64)
     if spec.use_predictor and all(b.r_hat is not None and b.c_hat is not None for b in eval_b):
         risk = np.array([float(b.r_hat) for b in eval_b], dtype=np.float64)
         cost = np.array([float(b.c_hat) for b in eval_b], dtype=np.float64)
@@ -608,7 +610,7 @@ def _restricted_variance_cost(
         if use_pred and bundle.m_pred is not None:
             actual = np.asarray(bundle.m_pred, dtype=np.float64)
         else:
-            actual = oracle
+            actual = np.zeros_like(oracle)
         for j, row in enumerate(rows):
             g_rows.append(row)
             m_oracle.append(oracle)
@@ -640,9 +642,9 @@ def _restricted_variance_cost(
     if use_pred and any(b.m_pred is not None for b in eval_b):
         note = "token_proxy_cost; frozen_predictor; same-prefix oracle"
     elif used_within:
-        note = "token_proxy_cost; same-prefix oracle"
+        note = "token_proxy_cost; same-prefix oracle; actual_m=0"
     else:
-        note = "token_proxy_cost"
+        note = "token_proxy_cost; actual_m=0"
     g_rows = np.stack(g_rows, axis=0)
     return {
         "oracle": variance_times_cost(

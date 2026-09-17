@@ -33,5 +33,6 @@
 - .planning/REQUIREMENTS.md：精简功能清单。
 - .planning/MINIMAL_FALSIFICATION.md：实验脚本的用法设想。
 - .planning/research/PITFALLS.md：数学与实现笔记，按实现需要查阅。
+- .planning/research/GRACE_FIDELITY.md：本分支保真/方差接线；以代码为准。
 - docs/TEST_STATUS.md：已跑/未跑测试；不写虚构 GPU 数字。
-- README.md：服务器全流程。现役工作树若未推送，clone GitHub 拿到的是上一份。
+- README.md：服务器全流程。GitHub 默认分支是 `master`。
