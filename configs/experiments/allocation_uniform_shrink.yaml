@@ -1,0 +1,4 @@
+# Diagnostic candidate, not an empirically selected optimum.
+experiment_variant: allocation_uniform_shrink_half
+allocation:
+  uniform_shrink: 0.5

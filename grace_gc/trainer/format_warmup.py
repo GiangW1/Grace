@@ -85,6 +85,9 @@ def run_format_warmup_tiny(actor, records: list[MathRecord], vocab: int, cfg: di
         opt.step()
         losses.append(float(loss.detach().cpu()))
     summary = _sft_summary(steps, n, losses)
+    summary["n_presentations"] = steps * bs
+    summary["n_unique_examples_used"] = min(steps * bs, n)
+    summary["problem_ids_used"] = [rec.problem_id for rec in records[:min(steps * bs, n)]]
     if ledger is not None:
         ledger.add("format_warmup", timer.elapsed(), **{k: v for k, v in summary.items() if k != "skipped"})
     return summary
@@ -114,7 +117,7 @@ def run_format_warmup_hf(actor, tokenizer, records: list[MathRecord], cfg: dict[
     import torch
     import torch.nn.functional as F
 
-    from grace_gc.backends.hf_actor import trainable_params
+    from grace_gc.backends.hf_actor import actor_compute_context, trainable_params
 
     pad_id = getattr(tokenizer, "pad_token_id", None)
     if pad_id is None:
@@ -145,8 +148,9 @@ def run_format_warmup_hf(actor, tokenizer, records: list[MathRecord], cfg: dict[
         ids = ids.to(device)
         labels = labels.to(device)
         attn = attn.to(device)
-        out = actor(input_ids=ids, attention_mask=attn)
-        logits = out.logits[:, :-1].contiguous()
+        with actor_compute_context(actor):
+            out = actor(input_ids=ids, attention_mask=attn, use_cache=False)
+        logits = out.logits[:, :-1].float().contiguous()
         tgt = labels[:, 1:].contiguous()
         loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), tgt.reshape(-1), ignore_index=-100)
         opt.zero_grad()
@@ -154,6 +158,9 @@ def run_format_warmup_hf(actor, tokenizer, records: list[MathRecord], cfg: dict[
         opt.step()
         losses.append(float(loss.detach().cpu()))
     summary = _sft_summary(steps, n, losses)
+    summary["n_presentations"] = steps * bs
+    summary["n_unique_examples_used"] = min(steps * bs, n)
+    summary["problem_ids_used"] = [rec.problem_id for rec in records[:min(steps * bs, n)]]
     if ledger is not None:
         ledger.add("format_warmup", timer.elapsed(), **{k: v for k, v in summary.items() if k != "skipped"})
     return summary

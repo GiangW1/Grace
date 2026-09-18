@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, replace
 
 import numpy as np
 
@@ -17,9 +17,10 @@ from grace_gc.audit.stats import (
     t_answer,
     t_learn,
 )
-from grace_gc.audit.variance_cost import fit_eval_split, variance_times_cost
-from grace_gc.core.allocation import allocate_continuation
+from grace_gc.audit.variance_cost import fit_eval_split, match_observed_cost, variance_times_cost
+from grace_gc.audit.mechanism import full_space_decomposition, summarize_decompositions
 from grace_gc.predictor.risk import full_space_residual
+from grace_gc.trainer.grace_step import control_variate_coordinates, decide_continuation
 
 
 @dataclass
@@ -40,6 +41,33 @@ class PrefixBundle:
     prefix_text: str | None = None
     suffix_texts: list[str] | None = None
     prompt_truncated: bool | None = None
+    gold: str | None = None
+    baseline: float | None = None
+    baseline_samples: list[dict] | None = None
+    prompt_token_ids: list[int] | None = None
+    prefix_token_ids: list[int] | None = None
+    continuation_records: list[dict] | None = None
+    prefix_request_seed: int | None = None
+    true_grad_norm_sq: list[float] | None = None
+    true_grad_coords: list[list[float]] | None = None
+    full_orthogonal_energy: float | None = None
+    projection: dict | None = None
+    basis_gram: list[list[float]] | None = None
+    effective_coords: list[float] | None = None
+    control_variate_enabled: bool | None = None
+
+
+def bundle_to_dict(bundle: PrefixBundle) -> dict:
+    return {f.name: (value.tolist() if isinstance(value := getattr(bundle, f.name), np.ndarray) else value)
+            for f in fields(PrefixBundle)}
+
+
+def bundle_from_dict(raw: dict) -> PrefixBundle:
+    values = {f.name: raw[f.name] for f in fields(PrefixBundle) if f.name in raw}
+    for key in ("grads", "rewards", "coords", "suffix_cost", "m_pred"):
+        if values.get(key) is not None:
+            values[key] = np.asarray(values[key], dtype=np.float64)
+    return PrefixBundle(**values)
 
 
 _SKETCH_CACHE: dict[tuple[int, int, int], tuple[np.ndarray, np.ndarray]] = {}
@@ -61,7 +89,8 @@ def _count_sketch(g: np.ndarray, dim: int, seed: int) -> np.ndarray:
     weighted = g * signs
     for i in range(g.shape[0]):
         np.add.at(out[i], idx, weighted[i])
-    return out / np.sqrt(float(dim))
+    # One signed bucket per input coordinate already preserves norm in expectation.
+    return out
 
 
 def jl_project(g: np.ndarray, dim: int, seed: int) -> np.ndarray:
@@ -87,9 +116,27 @@ def jl_project(g: np.ndarray, dim: int, seed: int) -> np.ndarray:
 def orthogonal_energy(g: np.ndarray, u: np.ndarray) -> float:
     g = np.asarray(g, dtype=np.float64)
     u = np.asarray(u, dtype=np.float64)
-    proj = (g @ u) @ u.T if g.ndim == 2 else u @ (u.T @ g)
-    resid = g - proj
-    return float(np.mean(np.sum(resid * resid, axis=-1)))
+    coords = g @ u
+    # PU need not be orthonormal. This is the projection in the supplied
+    # coordinate space, not a reconstruction of full-space energy from a sketch.
+    captured = np.sum((coords @ np.linalg.pinv(u.T @ u)) * coords, axis=-1)
+    return float(np.mean(np.maximum(np.sum(g * g, axis=-1) - captured, 0.0)))
+
+
+def full_space_error_summary(bundles, control_variate=True):
+    rows = []
+    for bundle in bundles:
+        f = bundle.effective_coords if bundle.effective_coords is not None else bundle.coords
+        if not control_variate and f is not None:
+            f = np.zeros_like(f)
+        item = full_space_decomposition(bundle.true_grad_norm_sq, bundle.true_grad_coords, bundle.basis_gram, f)
+        rows.append({"problem_id": bundle.problem_id, "t": int(bundle.t), "path_id": bundle.path_id, **item})
+    return {"all": summarize_decompositions(rows),
+            "by_t": [{"t": t, **summarize_decompositions([r for r in rows if r["t"] == t])}
+                     for t in sorted({r["t"] for r in rows})],
+            "bundles": rows,
+            "scope": "Pre-compression full-space labels and U.T@U; observed-label weighted means, separate from rho aggregation. Missing legacy fields are unavailable, never inferred from sketches.",
+            "note": "Coordinates are U.T@G; coords stores predicted f and effective_coords is the actual CV coefficient. Captured energy is stochastic-gradient energy, not predictable mean energy. The coordinate error includes suffix noise; no oracle bound is claimed."}
 
 
 def _detect_report_rows(g: np.ndarray, rewards: np.ndarray, min_split: int = 8):
@@ -244,14 +291,16 @@ def audit_bundles(
                 if prompt_var_r > 0.0
                 else float("nan")
             )
-            if bundle.coords is not None:
+            if not analysis.get("control_variate", True):
+                residuals.append(float(np.mean(np.sum(g*g, axis=1))))
+            elif bundle.m_pred is not None:
+                m = np.asarray(bundle.m_pred, dtype=np.float64)
+                residuals.append(float(np.mean(np.sum((g - m) ** 2, axis=1))))
+            elif bundle.coords is not None and u.size:
                 f = np.asarray(bundle.coords, dtype=np.float64)
                 if f.ndim == 1:
                     f = np.broadcast_to(f, (g.shape[0], f.shape[0]))
                 residuals.append(full_space_residual(g, f, u))
-            elif bundle.m_pred is not None:
-                m = np.asarray(bundle.m_pred, dtype=np.float64)
-                residuals.append(float(np.mean(np.sum((g - m) ** 2, axis=1))))
     var_r = np.asarray(var_r)
     cond_var = np.asarray(cond_var)
     energy = np.asarray(energy)
@@ -314,6 +363,7 @@ def audit_bundles(
     path_ids = [getattr(b, "path_id", None) for b in bundles]
     have_paths = all(pid is not None for pid in path_ids) and len({(b.path_id, b.t) for b in bundles}) > len({b.path_id for b in bundles})
     result = {
+        "measurement_version": 2,
         "n_bundles": len(bundles),
         "rho_a_all": float(np.nanmean(rho_a_vals)) if np.any(np.isfinite(rho_a_vals)) else float("nan"),
         "rho_l_all": float(np.nanmean(rho_l_vals)) if np.any(np.isfinite(rho_l_vals)) else float("nan"),
@@ -321,6 +371,8 @@ def audit_bundles(
         "rho_l_curve": rho_l_curve.tolist(),
         "rho_l_detect_curve": rho_l_detect.tolist(),
         "rho_l_detect_ucb_curve": rho_l_detect_ucb.tolist(),
+        "rho_l_detect_ucb_note": "normal approximation across problems; undefined for fewer than two finite problem estimates; not a simultaneous or post-selection coverage guarantee",
+        "headline_selection_note": "legacy headline uses all continuations for selection and prompt denominators; see independent_report for detect-only selection",
         "rho_a_curve": rho_a_curve.tolist(),
         "var_r_curve": var_r_curve.tolist(),
         "rho_l_curve_all": [float(x) for x in rho_l_curve_all],
@@ -338,7 +390,21 @@ def audit_bundles(
         "variance_cost": vc["actual"],
         "variance_cost_oracle": vc["oracle"],
         "variance_cost_note": vc.get("note"),
+        "variance_cost_diagnostics": vc.get("diagnostics"),
         "orthogonal_energy": None if not u.size or n_g == 0 else float(ortho),
+        "orthogonal_energy_space": "stored gradient coordinates; projected-space span if gradients are sketched",
+        "full_orthogonal_energy": (
+            float(sum(b.full_orthogonal_energy * len(b.grads) for b in bundles) / n_g)
+            if n_g and all(b.full_orthogonal_energy is not None for b in bundles) else None
+        ),
+        "full_space_error_decomposition": full_space_error_summary(bundles, bool(analysis.get("control_variate", True))),
+        "estimator_ablation": {"control_variate": bool(analysis.get("control_variate", True)),
+                               "uniform_shrink": float(analysis.get("uniform_shrink", 0.)),
+                               "note": "Disabling CV zeros only the estimator m; stored risk predictions and their ranking are retained."},
+        "independent_report": independent_report_statistics(bundles, analysis),
+        "cost_scope": "expected response prefix plus suffix token proxy; excludes prompt prefill, baseline generation, scoring, backward, predictor, I/O and engine overhead; audit wall time is separate",
+        "variance_scope": "pooled empirical report rows across problems, paths and t; not independent task replicates or the variance of a fixed-prompt training batch",
+        "oracle_note": "first-half same-prefix sample mean predicting second half at unchanged p; noisy estimator, not an ideal oracle or theoretical bound",
         "t_L": t_learn(rho_l_detect_ucb, times, float(analysis.get("epsilon_learn", 0.2))),
         "t_L_point": t_learn(rho_l_detect, times, float(analysis.get("epsilon_learn", 0.2))),
         # t_A is Var(R)≤δ on the trajectory, including prefixes that already left the Wilson set.
@@ -387,6 +453,44 @@ def audit_bundles(
     if jl_dim:
         result["jl_shape"] = [n_g, min(int(jl_dim), int(bundles[0].grads.shape[1]))]
     return result
+
+
+def independent_report_statistics(bundles: list[PrefixBundle], analysis: dict) -> dict:
+    """Supplement only: neither the selection nor denominators read report rows.
+
+    The original headline and its problem-level averaging stay unchanged. Small
+    bundles remain there; this separate statistic is unavailable without the
+    existing eight-row detect/report split.
+    """
+    eligible = [b for b in bundles if len(b.grads) >= 8]
+    detection = [replace(b, grads=b.grads[:len(b.grads)//2],
+                         rewards=b.rewards[:len(b.rewards)//2]) for b in eligible]
+    grouped = _by_problem(detection)
+    vg = {pid: _prompt_stats(bs)[0] for pid, bs in grouped.items()}
+    vr = {pid: _prompt_var_r(bs) for pid, bs in grouped.items()}
+    energy = [_ab_energy(b.grads, _prompt_stats(grouped[b.problem_id])[1]) for b in detection]
+    mask = headline_mask(
+        np.asarray([np.var(b.rewards, ddof=1) for b in detection]), np.asarray(energy),
+        float(analysis.get("answer_undecided", .15)), float(analysis.get("nonzero_signal_kappa", .05)),
+        [b.answer_emitted for b in detection], [b.rewards for b in detection],
+        float(analysis.get("wilson_lo", .05)), float(analysis.get("wilson_hi", .95)),
+        bool(analysis.get("require_pre_emit", True)),
+    )
+    selected = [b for b, keep in zip(eligible, mask) if keep]
+    curves = []
+    for t in sorted({int(b.t) for b in bundles}):
+        part = audit_rho_at_t([b for b in selected if int(b.t) == t], vg, vr)
+        curves.append({"t": t, **part})
+    return {
+        "selection": "first-half rewards and within-first-half A/B energy only",
+        "denominator": "first-half rows of earliest prefixes, frozen before report",
+        "report": "second half; unchanged within-problem then across-problem averaging",
+        "n_split_bundles": len(eligible), "n_unsplit_bundles": len(bundles)-len(eligible),
+        "n_selected": len(selected),
+        "selected": [{"problem_id": b.problem_id, "path_id": b.path_id, "t": b.t} for b in selected],
+        "curve": curves,
+        "note": "conditional on sampled prefixes; finite detection denominators remain noisy; no minimum sample gate and no replacement of the headline",
+    }
 
 
 def _token_plc_fields(bundles: list[PrefixBundle], prompt_var_g_by: dict[str, float], eps: float) -> dict:
@@ -530,28 +634,21 @@ def _path_elf_arrays(
 
 def _p_at_decision(eval_b: list[PrefixBundle], spec, analysis: dict, problem_risk: dict, problem_cost: dict) -> np.ndarray:
     """One λ per visible decision set. Mixed-t prefixes are not a training batch."""
-    from grace_gc.trainer.methods import uniform_p
-
     if not eval_b:
         return np.zeros(0, dtype=np.float64)
     finished = np.array([bool(b.finished) for b in eval_b], dtype=bool)
     beta = float(analysis.get("beta", 0.5))
     p_min = float(analysis.get("p_min", 0.2))
-    if spec.name in {"full_pg", "grpo", "grpo_short"} or spec.objective == "grpo":
-        return np.ones(len(eval_b), dtype=np.float64)
-    if spec.name in {"uniform_ht", "uniform_cv"} or not spec.use_allocation:
-        p_alloc = np.full(len(eval_b), uniform_p(len(eval_b), beta, p_min), dtype=np.float64)
-        p_alloc[finished] = 1.0
-        return p_alloc
-    if not analysis.get("allocation_ready", True):
-        return np.ones(len(eval_b), dtype=np.float64)
     if spec.use_predictor and all(b.r_hat is not None and b.c_hat is not None for b in eval_b):
         risk = np.array([float(b.r_hat) for b in eval_b], dtype=np.float64)
         cost = np.array([float(b.c_hat) for b in eval_b], dtype=np.float64)
     else:
         risk = np.array([problem_risk.get(b.problem_id, 1.0) for b in eval_b], dtype=np.float64)
         cost = np.array([problem_cost.get(b.problem_id, 1.0) for b in eval_b], dtype=np.float64)
-    return allocate_continuation(risk, cost, beta=beta, p_min=p_min, finished=finished).p
+    return decide_continuation(spec, risk, cost, finished, beta, p_min,
+                               warmup=bool(analysis.get("warmup", False)),
+                               basis_ready=bool(analysis.get("allocation_ready", True)),
+                               uniform_shrink=float(analysis.get("uniform_shrink", 0.)))[0]
 
 
 def _restricted_variance_cost(
@@ -593,8 +690,9 @@ def _restricted_variance_cost(
     p_rows = []
     suffix = []
     prefix_rows = []
+    row_bundle = []
     used_within = False
-    for bundle, p_i in zip(eval_b, p_alloc):
+    for bundle_index, (bundle, p_i) in enumerate(zip(eval_b, p_alloc)):
         g = np.asarray(bundle.grads, dtype=np.float64)
         if g.ndim == 1:
             g = g[None, :]
@@ -608,10 +706,11 @@ def _restricted_variance_cost(
         else:
             continue
         if use_pred and bundle.m_pred is not None:
-            actual = np.asarray(bundle.m_pred, dtype=np.float64)
+            actual = control_variate_coordinates(bundle.m_pred, enabled=bool(analysis.get("control_variate", True)))
         else:
             actual = np.zeros_like(oracle)
         for j, row in enumerate(rows):
+            row_bundle.append(bundle_index)
             g_rows.append(row)
             m_oracle.append(oracle)
             m_actual.append(actual)
@@ -639,19 +738,72 @@ def _restricted_variance_cost(
             "ratio": None,
         }
         return {"oracle": empty, "actual": empty, "note": "token_proxy_cost; no independent same-prefix rows"}
-    if use_pred and any(b.m_pred is not None for b in eval_b):
+    if use_pred and analysis.get("control_variate", True) and any(b.m_pred is not None for b in eval_b):
         note = "token_proxy_cost; frozen_predictor; same-prefix oracle"
     elif used_within:
         note = "token_proxy_cost; same-prefix oracle; actual_m=0"
     else:
         note = "token_proxy_cost; actual_m=0"
     g_rows = np.stack(g_rows, axis=0)
+    m_rows = np.stack(m_actual, axis=0)
+    p_rows = np.asarray(p_rows)
+    prefix_rows = np.asarray(prefix_rows)
+    suffix = np.asarray(suffix)
+    diagnostics = _allocation_diagnostics(eval_b, row_bundle, g_rows, m_rows, p_rows,
+                                         prefix_rows, suffix, float(analysis.get("p_min", .2)))
     return {
         "oracle": variance_times_cost(
             g_rows, np.stack(m_oracle, axis=0), np.asarray(p_rows), prefix_cost=np.asarray(prefix_rows), suffix_cost=np.asarray(suffix)
         ),
         "actual": variance_times_cost(
-            g_rows, np.stack(m_actual, axis=0), np.asarray(p_rows), prefix_cost=np.asarray(prefix_rows), suffix_cost=np.asarray(suffix)
+            g_rows, m_rows, p_rows, prefix_cost=prefix_rows, suffix_cost=suffix
         ),
         "note": note,
+        "diagnostics": diagnostics,
+    }
+
+
+def _allocation_diagnostics(bundles, row_bundle, g, m, p, prefix, suffix, p_min):
+    """Small fixed-actor replay; leaves the recorded headline ratio untouched."""
+    row_bundle = np.asarray(row_bundle)
+    used = sorted(set(row_bundle.tolist()))
+    indices = [np.flatnonzero(row_bundle == i) for i in used]
+    selected = [bundles[i] for i in used]
+    weights = np.asarray([len(ix) for ix in indices], dtype=float)
+    observed_r = np.asarray([np.mean(np.sum((g[ix] - m[ix])**2, axis=1)) for ix in indices])
+    observed_c = np.asarray([np.mean(suffix[ix]) for ix in indices])
+    base_p = np.asarray([p[ix[0]] for ix in indices])
+    finished = np.asarray([b.finished for b in selected], dtype=bool)
+    uniform = base_p.copy()
+    policies = {name: base_p.copy() for name in ("pred_r_observed_c", "observed_r_pred_c", "observed_r_observed_c")}
+    have_predictions = all(b.r_hat is not None and b.c_hat is not None for b in selected)
+    predicted_r = np.asarray([b.r_hat for b in selected], dtype=float) if have_predictions else None
+    predicted_c = np.asarray([b.c_hat for b in selected], dtype=float) if have_predictions else None
+    for t in sorted({int(b.t) for b in selected}):
+        ix = np.asarray([i for i, b in enumerate(selected) if int(b.t) == t])
+        target = float(np.sum(weights[ix] * base_p[ix] * observed_c[ix]))
+        free = ix[~finished[ix]]
+        free_cost = float(np.sum(weights[free] * observed_c[free]))
+        fixed_cost = float(np.sum(weights[ix[finished[ix]]] * observed_c[ix[finished[ix]]]))
+        uniform[free] = np.clip((target - fixed_cost) / free_cost, p_min, 1.) if free_cost > 0 else 1.
+        pairs = [("observed_r_observed_c", observed_r, observed_c)]
+        if have_predictions:
+            pairs += [("pred_r_observed_c", predicted_r, observed_c),
+                      ("observed_r_pred_c", observed_r, predicted_c)]
+        for name, risk, cost in pairs:
+            policies[name][ix] = match_observed_cost(risk[ix], cost[ix], observed_c[ix], target,
+                                                    p_min, weights[ix], finished[ix])
+    def score(probabilities):
+        expanded = np.empty_like(p)
+        for ix, value in zip(indices, probabilities):
+            expanded[ix] = value
+        return variance_times_cost(g, m, expanded, prefix, suffix)
+    return {
+        "scope": "same frozen actor, m and report rows; per-t observed suffix cost matched; token proxy only, not GPU training comparisons",
+        "hindsight_note": "observed risk/cost come from report labels; oracle allocations are retrospective diagnostics, not deployable or generalization results",
+        "m_zero_same_p": variance_times_cost(g, np.zeros_like(m), p, prefix, suffix),
+        "actual_m_uniform_same_cost": score(uniform),
+        **{name: score(policy) if have_predictions or name == "observed_r_observed_c" else None
+           for name, policy in policies.items()},
+        "prediction_inputs_available": have_predictions,
     }

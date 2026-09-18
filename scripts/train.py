@@ -25,7 +25,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--data-path", dest="data_path", default=None)
     parser.add_argument("--run-dir", dest="run_dir", default=None, help="default: runs/train-UTC")
     parser.add_argument("--num-steps", dest="num_steps", type=int, default=None)
+    parser.add_argument("--run-wall-seconds", type=float, default=None, help="cumulative run budget; stop at a batch boundary")
+    parser.add_argument("--session-wall-seconds", type=float, default=None, help="wall budget for this invocation")
+    parser.add_argument("--target-step-seconds", type=float, default=None, help="enable measured-cost feedback for the next batch N")
     parser.add_argument("--resume", default=None)
+    parser.add_argument("--init-checkpoint", default=None, help="load shared actor only; start a new method")
     args = parser.parse_args(argv)
     overrides = {}
     if args.method:
@@ -40,8 +44,16 @@ def main(argv: list[str] | None = None) -> int:
         overrides["data_path"] = args.data_path
     if args.num_steps is not None:
         overrides["num_steps"] = args.num_steps
+    if args.run_wall_seconds is not None:
+        overrides["run_wall_seconds"] = args.run_wall_seconds
+    if args.session_wall_seconds is not None:
+        overrides["session_wall_seconds"] = args.session_wall_seconds
+    if args.target_step_seconds is not None:
+        overrides["cost_control"] = {"enabled": True, "target_step_seconds": args.target_step_seconds}
     if args.resume:
         overrides["resume"] = args.resume
+    if args.init_checkpoint:
+        overrides["init_checkpoint"] = args.init_checkpoint
     cfg = build_run_config(args.config, overrides)
     run_dir = args.run_dir or str(default_run_dir("train"))
     payload = run_training(cfg, run_dir)

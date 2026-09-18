@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import json
+from functools import lru_cache
+import os
 import re
+import subprocess
+import sys
 
 
 FINAL = re.compile(r"(?:final\s+answer|answer)\s*(?:is\s+|[:=]\s*)(?:\n\s*)?([^\n]+)", re.I)
+REWARD_PROTOCOL_VERSION = 2
 
 
 def extract_boxed(text: str) -> str | None:
@@ -101,19 +107,21 @@ def normalize_answer(text: str) -> str:
     text = re.sub(r"\\text\s*\{([^{}]*)\}", r"\1", text)
     text = re.sub(r"\\frac\{(-?[0-9]+)\}\{(-?[0-9]+)\}", r"\1/\2", text)
     text = re.sub(r"\\frac\{(\\pi)\}\{([0-9]+)\}", r"\1/\2", text)
-    return re.sub(r"\s+", "", text.strip().lower())
+    return re.sub(r"\s+", "", text.strip())
 
 
 _NUMERIC_CORE = re.compile(r"^-?\d+(?:/\d+)?$")
+_UNIT_SUFFIXES = {"mm", "cm", "km", "kg", "mg", "mph", "feet", "foot", "inches", "inch",
+                  "meters", "metres", "centimeters", "centimetres", "seconds", "minutes", "hours"}
 
 
 def _compat_number_unit(pred: str, gold: str) -> bool:
-    """5 vs 5cm. Does not equate 5cm with 5mm, or x with xy."""
+    """Accept known unit suffixes, never arbitrary algebraic variable suffixes."""
     if not pred or not gold or pred == gold:
         return pred == gold
     short, long = (pred, gold) if len(pred) <= len(gold) else (gold, pred)
     extra = long[len(short) :]
-    return bool(_NUMERIC_CORE.fullmatch(short)) and long.startswith(short) and extra.isalpha()
+    return bool(_NUMERIC_CORE.fullmatch(short)) and long.startswith(short) and extra.lower() in _UNIT_SUFFIXES
 
 
 _TEXT_GOLD = re.compile(r"\\text\s*\{([^{}]+)\}")
@@ -127,7 +135,12 @@ def text_gold_in_response(text: str, gold: str) -> bool:
     name = match.group(1).strip()
     if len(name) < 2:
         return False
-    return re.search(r"(?<!\w)" + re.escape(name) + r"(?!\w)", str(text), re.I) is not None
+    # Accept the answer itself or a single explicit concluding assertion, not
+    # mentions of the gold name anywhere in a longer reasoning paragraph.
+    return re.fullmatch(
+        r"\s*(?:the\s+[\w -]+\s+is\s+)?" + re.escape(name) + r"[.!]?\s*",
+        str(text), re.I,
+    ) is not None
 
 
 def first_parseable_index(tokens_text: list[str]) -> int | None:
@@ -139,11 +152,34 @@ def first_parseable_index(tokens_text: list[str]) -> int | None:
     return None
 
 
+_VERIFY_WORKER = """import json, sys
+from math_verify import parse, verify
+gold, pred = json.load(sys.stdin)
+g = parse(gold, parsing_timeout=None)
+p = parse(pred, parsing_timeout=None)
+print(json.dumps(bool(verify(g, p, timeout_seconds=None))))
+"""
+
+
+@lru_cache(maxsize=4096)
+def _windows_verify(gold: str, pred: str) -> bool:
+    """Bound the whole symbolic operation without math-verify's broken Win32 IPC."""
+    result = subprocess.run(
+        [sys.executable, "-c", _VERIFY_WORKER], input=json.dumps([gold, pred]),
+        text=True, encoding="utf-8", capture_output=True, timeout=15, check=True,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    return bool(json.loads(result.stdout.strip().splitlines()[-1]))
+
+
 def math_verify_fns():
     try:
         from math_verify import parse, verify
     except ImportError:
         return None
+    if os.name == "nt":
+        # One bounded process for both parses and verify; no callable pickling.
+        return str, _windows_verify
     return parse, verify
 
 

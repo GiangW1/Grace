@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from grace_gc.config import default_config, merge_configs, require_training_leaves_warmup, validate_config
+from grace_gc.config import default_config, merge_configs, validate_config
 from grace_gc.logging_util.ledger import ComputeLedger
 from grace_gc.trainer.checkpoint import load_checkpoint, required_keys, save_checkpoint
 from grace_gc.trainer.loop import build_run_config, run_training
@@ -27,12 +27,18 @@ def test_validate_rejects_decision_beyond_budget():
         validate_config(cfg)
 
 
-def test_train_rejects_all_warmup_grace():
+def test_train_reports_all_warmup_grace_without_rejecting_run(tmp_path, monkeypatch):
+    import grace_gc.trainer.loop as loop
+    monkeypatch.setattr(loop, 'collect_environment', lambda *a, **kw: {'missing': []})
     cfg = default_config()
     cfg["num_steps"] = 1
+    cfg.update(n_start=2, n_prompts=2, decision_tokens=2, max_new_tokens=4)
     cfg["predictor"]["warmup_steps"] = 20
-    with pytest.raises(ValueError, match="warmup"):
-        require_training_leaves_warmup(cfg)
+    result = run_training(cfg, tmp_path/'warmup-only')
+    assert result['run_status'] == 'complete'
+    assert result['summary']['post_warmup_steps'] == 0
+    assert result['summary']['allocation_ready_steps_this_session'] == 0
+    assert load_checkpoint(tmp_path/'warmup-only/checkpoint.npz')['step'] == 1
 
 
 def test_validate_rejects_bad_pmin():

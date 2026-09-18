@@ -11,23 +11,24 @@ import numpy as np
 from grace_gc.backends import require_gpu_stack
 from grace_gc.backends.fsdp_actor import maybe_wrap_fsdp
 from grace_gc.backends.gpu_engine import make_gpu_engines
-from grace_gc.backends.hf_actor import named_lora_params
+from grace_gc.backends.hf_actor import actor_numerics, named_lora_params
 from grace_gc.core.layout import collect_lora_layout
 from grace_gc.core.rng import IsolatedRNG, seed_all
 from grace_gc.data.format_prompt import apply_solve_instruction
 from grace_gc.data.math_data import last_load_report, load_math_records, split_records
 from grace_gc.data.tokenize import encode_records_hf, load_hf_tokenizer, tokenizer_inventory
 from grace_gc.trainer.format_warmup import format_warmup_steps, run_format_warmup_hf
-from grace_gc.logging_util.forensics import persist_initial_checkpoint, persist_training_step, write_data_inventory
+from grace_gc.logging_util.forensics import persist_final_checkpoint, persist_initial_checkpoint, persist_training_step, write_data_inventory
 from grace_gc.logging_util.ledger import ComputeLedger, Timer
 from grace_gc.logging_util.run_dir import RunDirectory
 from grace_gc.predictor.heads import predictor_from_spec
 from grace_gc.predictor.reservoir import GradientReservoir
 from grace_gc.trainer.algorithm import TrainState, run_algorithm1_step
-from grace_gc.trainer.baseline import HistoricalBaseline
+from grace_gc.trainer.baseline import baseline_from_config
 from grace_gc.trainer.loop import resolve_start_counts, resume_start_counts, sample_prompt_indices, sample_starts
 from grace_gc.trainer.methods import apply_method_defaults, method_spec
 from grace_gc.trainer.state_io import restore_train_state
+from grace_gc.trainer.cost_control import cost_start_counts, ensure_cost_control, observe_batch_cost, start_cost_control
 
 
 def _ensure_bf16(model):
@@ -69,6 +70,9 @@ def load_lora_actor(model_path: str, lora_cfg: dict[str, Any]):
         task_type="CAUSAL_LM",
     )
     model = get_peft_model(model, cfg)
+    model._grace_compute_dtype = str(lora_cfg.get("compute_dtype", "native"))
+    # Dropout-free behavior for scoring and generation; gradients remain enabled.
+    model.eval()
     if torch.cuda.is_available():
         model = model.cuda()
     return model
@@ -116,6 +120,8 @@ def build_vllm_engine(model_path: str, cfg: dict[str, Any], lora_rank: int):
         "max_loras": 4,
         "tensor_parallel_size": int(cfg.get("tensor_parallel", 1)),
         "dtype": cfg.get("dtype", "bfloat16"),
+        "lora_dtype": cfg.get("lora_dtype", "bfloat16"),
+        "seed": int(cfg.get("seed", 17)),
         "trust_remote_code": True,
         # Qwen3-*-Base ships max_new_tokens=2048. vLLM's default
         # generation_config="auto" can cap every request at 2048, so
@@ -161,6 +167,7 @@ def build_vllm_engine(model_path: str, cfg: dict[str, Any], lora_rank: int):
 
 
 def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None = None) -> dict[str, Any]:
+    start_cost_control(cfg, Timer())
     n_gpu = int(cfg.get("hardware", {}).get("n_gpu", 1))
     if n_gpu > 1:
         raise RuntimeError(
@@ -203,7 +210,8 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         train_recs = buckets["train"]
         if not train_recs:
             raise ValueError("training split is empty")
-        write_data_inventory(run, buckets, data_path, source="file", load_report=last_load_report())
+        write_data_inventory(run, buckets, data_path, source="file", load_report=last_load_report(),
+                             split_seed=int(cfg.get("split_seed", 17)))
         report = last_load_report()
         if report and int(report.get("n_conflict_groups") or 0) > 0:
             print(
@@ -219,16 +227,28 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         ledger = ComputeLedger(n_gpu=max(n_gpu, 1), hardware=str(cfg.get("hardware", {}).get("name", "gpu")))
     actor = load_lora_actor(str(model_path), cfg.get("lora", {}))
     actor = maybe_wrap_fsdp(actor, n_gpu)
-    if format_warmup_steps(cfg) and not cfg.get("resume") and train_recs:
+    from grace_gc.trainer.initialization import initialize_actor
+
+    initial_actor = initialize_actor(actor, cfg, run)
+    if format_warmup_steps(cfg) and not cfg.get("resume") and not initial_actor and train_recs:
         info = run_format_warmup_hf(actor, tokenizer, train_recs, cfg, ledger)
         run.write_json("format_warmup.json", info)
         print(f"format warmup steps={info.get('steps')} last_loss={info.get('last_loss')}")
     vllm_cfg = dict(cfg.get("vllm") or {})
+    vllm_cfg.setdefault("seed", int(cfg.get("seed", 17)))
     vllm_cfg["max_model_len"] = vllm_needed_max_model_len(cfg)
     llm = build_vllm_engine(str(model_path), vllm_cfg, int(cfg.get("lora", {}).get("rank", 16)))
     if getattr(build_vllm_engine, "last", None):
         run.write_json("vllm_engine.json", build_vllm_engine.last)
     engines, extra = make_gpu_engines(actor, llm, tokenizer, cfg, Path(run.root) / "lora")
+    from grace_gc.backends.logprob_probe import probe_behavior_batch
+
+    engines.before_update = lambda records: probe_behavior_batch(
+        actor, llm, records, int(extra.get("pad_id") or 0), eos_id=extra.get("eos_id"),
+        lora_request=extra.get("lora_request"), max_n=(cfg.get("diagnostics") or {}).get("probe_tokens", 64),
+        max_sequences=(cfg.get("diagnostics") or {}).get("probe_sequences", 1),
+        include_stopped=bool((cfg.get("diagnostics") or {}).get("probe_stopped_prefixes", True)),
+    )
     extra["sync"]()
     print(
         "phase=post_sync implementation=gpu_vllm_hf "
@@ -266,13 +286,10 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
     in_dim = 1
     predictor = None
     if spec.use_predictor:
-        print("phase=predictor_probe", flush=True)
-        probe_rng = IsolatedRNG.create(rng.seed)
-        probe_ids, _pp, _gg, _mm = _batch_ids(probe_rng)
-        prefixes, _fin = engines.generate_prefix(probe_ids[:1], 2, probe_rng, "token")
-        feat = engines.prefix_features(prefixes, np.array([len(probe_ids[0])]), [0.5])["features"]
-        in_dim = int(feat.shape[1])
-        predictor = predictor_from_spec(in_dim, k, pcfg)
+        # The feature schema is 3 hidden vectors + 3 entropy + length + b.
+        # Avoid a method-specific generation request before the common start.
+        in_dim = 3 * int(actor.config.hidden_size) + 5
+        predictor = predictor_from_spec(in_dim, k, {**pcfg, "train_auxiliary": spec.risk_mode == "reward"})
     opt = torch.optim.AdamW(
         [p for _, p in named],
         lr=float(cfg.get("optim", {}).get("lr", 1e-4)),
@@ -281,7 +298,7 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
     )
     state = TrainState(
         spec=spec,
-        baseline=HistoricalBaseline(alpha=float(cfg.get("baseline", {}).get("ema_alpha", 0.7))),
+        baseline=baseline_from_config(cfg.get("baseline")),
         rng=rng,
         layout=layout,
         u=np.eye(layout.dim, k, dtype=np.float64),
@@ -293,8 +310,14 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         from grace_gc.trainer.checkpoint import load_checkpoint
         from grace_gc.trainer.state_io import check_snapshot_identity
 
-        check_snapshot_identity(load_checkpoint(cfg["resume"]), cfg)
-        state = restore_train_state(cfg["resume"], actor, opt, in_dim, k, spec.name)
+        resume_payload = cfg.pop("_resume_payload", None)
+        if resume_payload is None:
+            resume_payload = load_checkpoint(cfg["resume"])
+        check_snapshot_identity(resume_payload, cfg)
+        state = restore_train_state(cfg["resume"], actor, opt, in_dim, k, spec.name, payload=resume_payload)
+        from grace_gc.logging_util.forensics import record_effective_config
+
+        record_effective_config(run, cfg, state, opt)
         extra["sync"]()
         print(
             f"phase=resume_sync adapter={extra.get('adapter_path')} lora_id={extra.get('lora_id')}",
@@ -314,7 +337,9 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
             "starts_per": starts_per,
             "adapter_path": None if extra.get("adapter_path") is None else str(extra.get("adapter_path")),
             "lora_id": extra.get("lora_id"),
-            "format_warmup_steps": 0 if cfg.get("resume") else format_warmup_steps(cfg),
+            "format_warmup_steps": 0 if cfg.get("resume") or initial_actor else format_warmup_steps(cfg),
+            "initial_actor": initial_actor,
+            "actor_numerics": actor_numerics(actor),
             "has_predictor": predictor is not None,
             "grpo_advantage": "group_mean_no_std",
         },
@@ -325,6 +350,7 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         flush=True,
     )
 
+    controller = ensure_cost_control(cfg, state)
     persist_initial_checkpoint(
         run,
         cfg,
@@ -333,29 +359,29 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         opt,
         extra={"model_path": str(model_path), "lora": dict(cfg.get("lora") or {})},
     )
+    controller.record(run, "setup_complete", state=state, cfg=cfg)
     last = {}
-    for _step in range(int(cfg.get("num_steps", 1))):
-        if last.get("next_n"):
+    steps, completed, allocation_steps = int(cfg.get("num_steps", 1)), 0, 0
+    checkpoint_extra = {"model_path": str(model_path), "lora": dict(cfg.get("lora") or {})}
+    for _step in range(steps):
+        if controller.stop_reason():
+            break
+        if controller.enabled:
+            n_prompts, starts_per, n_start = cost_start_counts(cfg, spec, state, (n_prompts, starts_per, n_start))
+        elif last.get("next_n"):
             n_prompts, starts_per, n_start = resolve_start_counts(cfg, spec, n_start=max(1, int(last["next_n"])))
-        prompts, pids, golds, prompt_meta = _batch_ids(state.rng)
         step_timer = Timer()
+        prompts, pids, golds, prompt_meta = _batch_ids(state.rng)
         print(
             f"phase=train_step_begin next_step={int(state.step) + 1} "
             f"n_prompts={n_prompts} starts_per={starts_per}",
             flush=True,
         )
         last = run_algorithm1_step(engines, state, prompts, pids, golds, cfg, opt, prompt_meta=prompt_meta)
+        sync_timer = Timer()
         extra["sync"]()
-        from grace_gc.backends.logprob_probe import probe_first_completed
-
-        last["logprob_probe"] = probe_first_completed(
-            actor,
-            llm,
-            last.get("records"),
-            int(extra.get("pad_id") or 0),
-            eos_id=extra.get("eos_id"),
-            lora_request=extra.get("lora_request"),
-        )
+        last["timings"]["sync"] = sync_timer.elapsed()
+        last["force_final_checkpoint"] = controller.stop_reason() is not None
         persist_training_step(
             run,
             cfg,
@@ -371,20 +397,38 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
                 "lora_id": extra.get("lora_id"),
             },
             wall_s=step_timer.elapsed(),
+            cpu_s=step_timer.cpu_elapsed(),
         )
+        if controller.stop_reason():
+            persist_final_checkpoint(run, cfg, state, named, opt, ledger, extra=checkpoint_extra)
+        observe_batch_cost(controller, cfg, state, last, step_timer.elapsed())
+        controller.record(run, "batch_complete", state=state, cfg=cfg)
+        completed += 1
+        allocation_steps += int(bool(last.get("allocation_ready")))
         print(
             f"step {state.step} n={last['n']} completed={last['n_completed']} "
             f"audited={last['n_audited']} loss={last['loss']} "
             f"n_prescan={last.get('n_prescan')} timings={last.get('timings')}",
             flush=True,
         )
+    stop_reason = controller.stop_reason() or "num_steps"
+    persist_final_checkpoint(run, cfg, state, named, opt, ledger, extra=checkpoint_extra)
+    cost = controller.record(run, "terminal", state=state, cfg=cfg, stop_reason=stop_reason,
+                             num_steps_cap_reached=completed >= steps,
+                             cap_before_wall_budget=stop_reason == "num_steps" and (controller.run_budget is not None or controller.session_budget is not None))
     return {
         "versions": versions,
         "method": spec.name,
         "backend": "gpu_vllm_hf",
         "n": last.get("n"),
         "n_completed": last.get("n_completed"),
-        "steps": int(cfg.get("num_steps", 1)),
+        "steps": completed,
+        "num_steps_cap": steps,
+        "stop_reason": stop_reason,
+        "cost_control": cost,
+        "allocation_ready_last_batch": bool(last.get("allocation_ready", False)),
+        "allocation_ready_steps_this_session": allocation_steps,
+        "post_warmup_steps": max(0, state.step - int((cfg.get("predictor") or {}).get("warmup_steps", 0))),
         "step": state.step,
         "status": "gpu_loop_ran",
         "checkpoint": str(Path(run.root) / "checkpoint.npz"),

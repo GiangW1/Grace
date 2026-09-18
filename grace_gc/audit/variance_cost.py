@@ -87,3 +87,22 @@ def fit_eval_split(
         idx = np.arange(n)
         return idx, idx
     return fit, ev
+
+
+def match_observed_cost(risk, cost, observed_cost, target, p_min, weights, finished):
+    """Offline allocation diagnostic; match an observed suffix budget by bisection."""
+    risk = np.maximum(np.asarray(risk, dtype=float), 1e-12)
+    risk = risk / max(float(risk.mean()), 1e-12)
+    cost = np.maximum(np.asarray(cost, dtype=float), 1e-12)
+    observed_cost = np.asarray(observed_cost, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    finished = np.asarray(finished, dtype=bool)
+    lo, hi = 1e-30, 1e30
+    for _ in range(80):
+        mid = np.sqrt(lo * hi)
+        p = np.where(finished, 1., np.clip(np.sqrt(risk / (mid * cost)), p_min, 1.))
+        if float(np.sum(weights * p * observed_cost)) > target:
+            lo = mid
+        else:
+            hi = mid
+    return np.where(finished, 1., np.clip(np.sqrt(risk / (np.sqrt(lo * hi) * cost)), p_min, 1.))

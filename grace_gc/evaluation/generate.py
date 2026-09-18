@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from grace_gc.data.format_prompt import apply_solve_instruction
-from grace_gc.data.math_data import MathRecord, looks_like_math500
-from grace_gc.data.reward import extract_answer
+from grace_gc.data.math_data import MathRecord, looks_like_math500, select_records, selection_manifest
+from grace_gc.data.reward import REWARD_PROTOCOL_VERSION, extract_answer
 from grace_gc.evaluation.eval_full import EvalItem, evaluate_items
 from grace_gc.logging_util.forensics import persist_eval_items, persist_load_report, write_failed
 from grace_gc.logging_util.ledger import ComputeLedger, Timer
@@ -47,11 +47,11 @@ def generate_answers_tiny(
 
     actor = _load_tiny_actor(cfg)
     engines = make_tiny_engines(actor, actor.vocab)
-    rng = IsolatedRNG.create(seed)
     prompt_max = int((cfg or {}).get("prompt_max_tokens", 1024))
     from grace_gc.trainer.algorithm import _length_truncated, _traj_natural_finish
 
     items = []
+    sample_offset = 0
     eos_id = getattr(engines, "eos_id", None)
     for rec in records:
         prompt_meta: list = []
@@ -64,7 +64,10 @@ def generate_answers_tiny(
         token_ids = []
         sample_seeds = []
         for sample_i in range(n):
-            full = engines.continue_selected(prompts, [True], max_new, rng)
+            request_seed = int(seed) + sample_offset
+            request_rng = IsolatedRNG.create(request_seed)
+            full = engines.continue_selected(prompts, [True], max_new, request_rng)
+            sample_offset += 1
             if not full or full[0] is None:
                 raise ValueError("eval generate returned no sequence")
             seq = full[0]
@@ -78,7 +81,7 @@ def generate_answers_tiny(
             response_tokens.append(len(resp))
             finish_reasons.append(finish_reason(1.0, ended, trunc))
             token_ids.append([int(x) for x in resp])
-            sample_seeds.append(int(seed) + sample_i)
+            sample_seeds.append(request_seed)
         items.append(
             EvalItem(
                 rec.problem_id,
@@ -107,6 +110,7 @@ def generate_answers_vllm(
     seed: int,
     lora_request=None,
     max_prompt: int = 1024,
+    sample_batch_size: int = 1,
 ) -> list[EvalItem]:
     from grace_gc.backends.vllm_two_phase import (
         _require_known_finish,
@@ -134,27 +138,34 @@ def generate_answers_vllm(
         sample_seeds = []
         vllm_finish_reasons = []
         fulls = []
-        for prompt in prompts:
-            params = build_sampling_params(
-                int(max_new),
-                float(temperature),
-                int(seed) + sample_i,
-                eos_id=eos_id,
-                top_p=float(top_p),
-            )
-            sample_i += 1
-            gen_kwargs = {"sampling_params": params, "use_tqdm": False}
+        generated = []
+        request_seeds = [int(seed) + sample_i + i for i in range(len(prompts))]
+        sample_i += len(prompts)
+        batch_size = max(int(sample_batch_size), 1)
+        for start in range(0, len(prompts), batch_size):
+            chunk = prompts[start:start + batch_size]
+            params = [build_sampling_params(int(max_new), float(temperature), request_seeds[i],
+                       eos_id=eos_id, top_p=float(top_p)) for i in range(start, start + len(chunk))]
+            gen_kwargs = {"use_tqdm": False}
             if lora_request is not None:
                 gen_kwargs["lora_request"] = lora_request
-            outputs = llm.generate(_vllm_prompts([prompt]), **gen_kwargs)
-            if len(outputs) != 1:
-                raise ValueError(f"vLLM returned {len(outputs)} outputs for 1 prompt")
-            out_prompt = getattr(outputs[0], "prompt_token_ids", None)
+            try:
+                outputs = llm.generate(_vllm_prompts(chunk),
+                                       sampling_params=params[0] if len(chunk) == 1 else params, **gen_kwargs)
+            except TypeError:
+                outputs = []
+                for prompt, param in zip(chunk, params):
+                    outputs.extend(llm.generate(_vllm_prompts([prompt]), sampling_params=param, **gen_kwargs))
+            if len(outputs) != len(chunk):
+                raise ValueError(f"vLLM returned {len(outputs)} outputs for {len(chunk)} prompts")
+            generated.extend(outputs)
+        for prompt, output, request_seed in zip(prompts, generated, request_seeds):
+            out_prompt = getattr(output, "prompt_token_ids", None)
             if out_prompt is None:
                 raise ValueError("vLLM output is missing prompt_token_ids; cannot verify request order")
             if [int(x) for x in out_prompt] != [int(x) for x in prompt]:
                 raise ValueError("vLLM output prompt_token_ids do not match the request order")
-            completions = getattr(outputs[0], "outputs", None)
+            completions = getattr(output, "outputs", None)
             if not completions:
                 raise ValueError("vLLM returned a request with no completions")
             completion = completions[0]
@@ -176,7 +187,7 @@ def generate_answers_vllm(
             finish_reasons.append("length" if trunc else ("eos" if ended else "completed"))
             vllm_finish_reasons.append(None if finish_reason is None else str(finish_reason))
             token_ids.append([int(x) for x in gen])
-            sample_seeds.append(int(seed) + sample_i - 1)
+            sample_seeds.append(request_seed)
         # Equal answers are valid independent samples; keep their request seeds.
         items.append(
             EvalItem(
@@ -238,9 +249,8 @@ def limit_eval_records(records: list[MathRecord], cfg: dict[str, Any]) -> list[M
     n_problems = int(cfg.get("eval_n_problems", ev.get("n_problems", 0)) or 0)
     if n_problems < 0:
         raise ValueError(f"eval.n_problems must be >= 0, got {n_problems}")
-    if n_problems == 0:
-        return list(records)
-    return list(records[:n_problems])
+    return select_records(records, n_problems, str(ev.get("selection", "first")),
+                          int(ev.get("selection_seed", cfg.get("split_seed", cfg.get("seed", 17)))))
 
 
 def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, run_dir):
@@ -265,6 +275,13 @@ def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, 
         payload = load_checkpoint(ckpt)
         check_snapshot_identity(payload, cfg)
         load_numpy_module_state(named_lora_params(actor), payload.get("actor") or {})
+        from grace_gc.versions import sha256_named
+
+        RunDirectory(run_dir).write_json("actor_source.json", {
+            "checkpoint": str(ckpt), "checkpoint_step": payload.get("step"),
+            "method": payload.get("spec"), "actor_sha256": sha256_named(named_lora_params(actor)),
+            "hash_stage": "loaded_checkpoint_before_generation", "layout": "all_qv_lora_A_B",
+        })
         adapter = Path(run_dir) / "eval_lora"
         save_lora_adapter(actor, adapter)
         del actor
@@ -291,6 +308,7 @@ def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, 
             int(cfg.get("seed", 17)),
             lora_request=lora_request,
             max_prompt=int(cfg.get("prompt_max_tokens", 1024)),
+            sample_batch_size=int((cfg.get("eval") or {}).get("sample_batch_size", 1)),
         )
     else:
         items = generate_answers_tiny(records, n, max_new, int(cfg.get("seed", 17)), cfg=cfg)
@@ -298,6 +316,13 @@ def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, 
 
 
 def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path) -> dict:
+    cfg = dict(cfg)
+    ckpt = cfg.get("checkpoint") or cfg.get("resume")
+    if ckpt:
+        from grace_gc.trainer.checkpoint import load_checkpoint
+
+        payload = load_checkpoint(ckpt)
+        cfg["method"] = payload.get("spec") or cfg.get("method", "grace")
     backend = cfg.get("backend", "cpu_tiny")
     n_source = len(records)
     math500 = looks_like_math500(records, path=cfg.get("data_path"), n_source=n_source)
@@ -313,6 +338,14 @@ def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path
     run.write_run_meta(kind="eval", started=started, requested=requested)
     run.write_yaml("config.yaml", cfg)
     run.write_json("environment.json", versions)
+    ev = cfg.get("eval") or {}
+    manifest = selection_manifest(records, str(ev.get("selection", "first")),
+                                  int(ev.get("selection_seed", cfg.get("split_seed", cfg.get("seed", 17)))))
+    manifest.update(sample_seed_start=int(cfg.get("seed", 17)), samples_per_problem=n,
+                    temperature=temperature, top_p=top_p, max_new_tokens=max_new,
+                    sample_batch_size=int(ev.get("sample_batch_size", 1)),
+                    reward_protocol_version=REWARD_PROTOCOL_VERSION)
+    run.write_json("evaluation_manifest.json", manifest)
     n_gpu = int((cfg.get("hardware") or {}).get("n_gpu", 1 if backend == "gpu_verl" else 0))
     hardware = str((cfg.get("hardware") or {}).get("name", "gpu" if backend == "gpu_verl" else "cpu"))
     ledger = ComputeLedger(n_gpu=n_gpu, hardware=hardware)
@@ -326,7 +359,11 @@ def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path
             result = evaluate_items(items, k=k)
             result["seed"] = int(cfg.get("seed", 17))
             result["checkpoint"] = cfg.get("checkpoint") or cfg.get("resume")
+            result["checkpoint_step"] = payload.get("step") if ckpt else None
             result["actor_source"] = "checkpoint" if result["checkpoint"] else "base_or_random"
+            result["method"] = cfg.get("method")
+            result["evaluation_manifest"] = manifest
+            result["measurement_version"] = 2
             result["n_problems_requested"] = len(records)
             result["started"] = started
             result["run_dir"] = str(run.root)
@@ -355,13 +392,15 @@ def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path
                 },
             )
             print(f"eval done avg={result.get('avg')} pass_at_k={result.get('pass_at_k')}")
-        ledger.add("eval", timer.elapsed())
+        ledger.add("eval", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status="completed")
         result["finished"] = utc_now()
         run.write_json("eval_summary.json", result)
         run.write_json("compute_ledger.json", ledger.summary())
         run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])
         return result
     except Exception as exc:
+        ledger.add("eval", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status="failed")
+        run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])
         write_failed(run, exc, versions, started)
         run.write_json("compute_ledger.json", ledger.summary())
         raise

@@ -10,10 +10,11 @@ import numpy as np
 
 from grace_gc.core.layout import layout_hash
 from grace_gc.data.reward import extract_answer
-from grace_gc.logging_util.ledger import ComputeLedger
+from grace_gc.logging_util.ledger import ComputeLedger, Timer
 from grace_gc.logging_util.run_dir import RunDirectory, utc_now
 from grace_gc.trainer.grace_step import StartRecord, finish_reason
-from grace_gc.trainer.state_io import dump_train_state
+from grace_gc.trainer.state_io import dump_train_state, effective_run_config
+from grace_gc.trainer.checkpoint import copy_checkpoint, load_checkpoint
 from grace_gc.versions import sha256_array, sha256_file, sha256_mapping, sha256_named
 
 
@@ -72,14 +73,17 @@ def step_context(run: RunDirectory, cfg: dict[str, Any], state, last: dict[str, 
         "run_id": run.root.name,
         "domain": str(cfg.get("domain", "math")),
         "method": getattr(getattr(state, "spec", None), "name", cfg.get("method", "grace")),
-        "seed": int(cfg.get("seed", 17)),
+        "seed": int(getattr(state.rng, "seed", cfg.get("seed", 17))),
         "decision_t": int(cfg.get("decision_tokens", 0)),
         "data_split": "train",
         "warmup": bool(last.get("warmup", False)),
         "rng_counters": dict(getattr(state.rng, "counters", {})),
-        "snapshot_sha": None if named is None else sha256_named(named),
-        "basis_sha": None if u is None else sha256_array(u),
-        "predictor_sha": None if predictor is None else sha256_mapping(predictor),
+        "rng_counters_before_rollout": (last.get("behavior_context") or {}).get("rng_counters"),
+        "snapshot_sha": (last.get("behavior_context") or {}).get("snapshot_sha"),
+        "basis_sha": (last.get("behavior_context") or {}).get("basis_sha", None if u is None else sha256_array(u)),
+        "predictor_sha": (last.get("behavior_context") or {}).get("predictor_sha"),
+        "post_update_snapshot_sha": None if named is None else sha256_named(named),
+        "post_update_predictor_sha": None if predictor is None else sha256_mapping(predictor),
         "layout_sha": None if getattr(state, "layout", None) is None else layout_hash(state.layout),
     }
 
@@ -114,7 +118,11 @@ def trajectory_row(
         "step": int(step),
         "problem_id": rec.problem_id,
         "trajectory_id": f"{ctx.get('run_id')}:{step}:{index}:{rec.problem_id}",
+        "checkpoint_sha256": ctx.get("checkpoint_sha256"),
+        "last_saved_step": ctx.get("last_saved_step"),
         "snapshot_sha": ctx.get("snapshot_sha"),
+        "post_update_snapshot_sha": ctx.get("post_update_snapshot_sha"),
+        "post_update_predictor_sha": ctx.get("post_update_predictor_sha"),
         "basis_sha": ctx.get("basis_sha"),
         "predictor_sha": ctx.get("predictor_sha"),
         "layout_sha": ctx.get("layout_sha"),
@@ -122,6 +130,9 @@ def trajectory_row(
         "prompt_len": rec.prompt_len,
         "prefix_tokens": rec.prefix_tokens,
         "response_tokens": rec.response_tokens,
+        "generated_response_tokens": int(rec.prefix_tokens or 0) + int(rec.suffix_tokens or 0),
+        "total_generated_tokens": int(rec.prefix_tokens or 0) + int(rec.suffix_tokens or 0),
+        "completed_response_tokens": rec.response_tokens if rec.reward is not None else None,
         "suffix_tokens": rec.suffix_tokens,
         "natural_finish": rec.finished,
         "finish_reason": reason,
@@ -142,6 +153,7 @@ def trajectory_row(
         "answer_first_token": rec.answer_first_token,
         "baseline_b": rec.baseline_b,
         "rng_counters": ctx.get("rng_counters"),
+        "rng_counters_before_rollout": ctx.get("rng_counters_before_rollout"),
         "global_starts_denominator": int(n),
         "gpu_reserved_seconds": None,
         "cpu_verifier_seconds": None,
@@ -160,6 +172,8 @@ def trajectory_row(
         "vllm_finish_reason": rec.vllm_finish_reason,
         "vllm_stop_reason": rec.vllm_stop_reason,
         "rollout_logprob_sum": rec.rollout_logprob_sum,
+        "rollout_token_logprobs": getattr(rec, "rollout_token_logprobs", None),
+        "request_seeds": getattr(rec, "request_seeds", None),
         "step_wall_seconds": float(wall_s),
         "step_gpu_reserved_seconds": float(wall_s) * max(int(n_gpu), 0),
     }
@@ -183,7 +197,7 @@ def persist_load_report(run: RunDirectory, report=None, data_path=None) -> dict 
     return report
 
 
-def write_data_inventory(run: RunDirectory, records_or_buckets, data_path=None, source: str = "file", load_report=None) -> None:
+def write_data_inventory(run: RunDirectory, records_or_buckets, data_path=None, source: str = "file", load_report=None, split_seed: int | None = None) -> None:
     if isinstance(records_or_buckets, dict):
         buckets = records_or_buckets
     else:
@@ -203,6 +217,13 @@ def write_data_inventory(run: RunDirectory, records_or_buckets, data_path=None, 
             for name, rows in buckets.items()
         },
     }
+    from grace_gc.data.math_data import selection_manifest
+
+    payload["splits"] = {}
+    for name, rows in buckets.items():
+        manifest = selection_manifest(rows, "split:" + name, 0 if split_seed is None else split_seed)
+        manifest["selection_seed"] = split_seed
+        payload["splits"][name] = manifest
     if report:
         payload["load"] = {
             "n_raw": report.get("n_raw"),
@@ -280,11 +301,16 @@ def step_health(state, last: dict[str, Any], cfg: dict[str, Any] | None = None) 
         "basis_id": getattr(state, "basis_id", None),
         "predictor_synced_basis_id": getattr(state, "predictor_synced_basis_id", None),
         "reservoir_n": reservoir_n,
+        "n_problems": last.get("n_problems", len({r.problem_id for r in records})),
         "n_parsed": sum(1 for r in records if r.extracted),
+        "n_parsed_completed": sum(1 for r in completed if r.extracted),
+        "n_parsed_stopped_prefix": sum(1 for r in records if r.reward is None and r.extracted),
         "n_truncated": sum(1 for r in records if r.truncated),
         "n_prompt_truncated": sum(1 for r in records if r.prompt_truncated),
         "n_reward_pos": sum(1 for r in rewards if r >= 1.0),
         "mean_response_tokens": _mean(getattr(r, "response_tokens", None) for r in records),
+        "mean_generated_response_tokens": _mean(int(r.prefix_tokens or 0) + int(r.suffix_tokens or 0) for r in records),
+        "mean_completed_response_tokens": _mean(r.response_tokens for r in completed),
         "mean_suffix_tokens": last.get(
             "mean_suffix_tokens",
             _mean(getattr(r, "suffix_tokens", None) for r in records),
@@ -314,7 +340,9 @@ def step_health(state, last: dict[str, Any], cfg: dict[str, Any] | None = None) 
         "predictor_untrained": last.get("warmup") or reservoir_n < 2,
         "grad_norm": last.get("grad_norm"),
         "grad_norm_preclip": last.get("grad_norm_preclip"),
-        "logprob_probe": last.get("logprob_probe"),
+        "logprob_probe": None if last.get("logprob_probe") is None else {
+            key: value for key, value in last["logprob_probe"].items() if not isinstance(value, list)
+        },
         "adapter_path": last.get("adapter_path"),
         "lora_id": last.get("lora_id"),
         "sampling": last.get("sampling"),
@@ -324,6 +352,10 @@ def step_health(state, last: dict[str, Any], cfg: dict[str, Any] | None = None) 
             and reservoir_n < 2
         ),
         "allocation_ready": last.get("allocation_ready"),
+        "allocation_uniform_shrink": last.get("allocation_uniform_shrink"),
+        "control_variate_enabled": last.get("control_variate_enabled"),
+        "control_variate_used": last.get("control_variate_used"),
+        "baseline_configuration": last.get("baseline_configuration"),
         "basis_id_at_allocate": last.get("basis_id_at_allocate"),
         "allocating_with_init_basis": bool(
             getattr(getattr(state, "spec", None), "use_allocation", False)
@@ -352,10 +384,11 @@ def step_health(state, last: dict[str, Any], cfg: dict[str, Any] | None = None) 
     return out
 
 
-def step_metrics_row(state, last: dict[str, Any], ctx: dict[str, Any], wall_s: float) -> dict[str, Any]:
+def step_metrics_row(state, last: dict[str, Any], ctx: dict[str, Any], wall_s: float, health=None) -> dict[str, Any]:
     records = last.get("records") or []
     pred = last.get("predictor") or {}
-    health = step_health(state, last, last.get("cfg"))
+    if health is None:
+        health = step_health(state, last, last.get("cfg"))
     return {
         "run_id": ctx.get("run_id"),
         "step": int(state.step),
@@ -373,6 +406,9 @@ def step_metrics_row(state, last: dict[str, Any], ctx: dict[str, Any], wall_s: f
         "deviation": last.get("deviation"),
         "coord_loss": pred.get("coord_loss"),
         "risk_loss": pred.get("risk_loss"),
+        "predictor": pred,
+        "parameter_update_norm": last.get("parameter_update_norm"),
+        "update_ascent_cosine": last.get("update_ascent_cosine"),
         "residual_mean": last.get("residual_mean"),
         "token_cost_used": last.get("token_cost_used"),
         "token_cost_full": last.get("token_cost_full"),
@@ -380,6 +416,8 @@ def step_metrics_row(state, last: dict[str, Any], ctx: dict[str, Any], wall_s: f
         "written_at": utc_now(),
         "phases": last.get("timings") or {},
         "snapshot_sha": ctx.get("snapshot_sha"),
+        "post_update_snapshot_sha": ctx.get("post_update_snapshot_sha"),
+        "post_update_predictor_sha": ctx.get("post_update_predictor_sha"),
         "basis_sha": ctx.get("basis_sha"),
         "predictor_sha": ctx.get("predictor_sha"),
         "rng_counters": ctx.get("rng_counters"),
@@ -410,6 +448,48 @@ def _update_checkpoint_index(run: RunDirectory, step: int, sha: str | None) -> N
     )
 
 
+def record_effective_config(run, cfg, state, optimizer) -> dict:
+    cfg.setdefault("_session_initial_step", int(state.step))
+    if cfg.get("resume"):
+        cfg.setdefault("_last_saved_step", int(state.step))
+    effective = effective_run_config(cfg, state, optimizer)
+    run.write_yaml("effective_config.yaml", effective)
+    if cfg.get("resume") and not cfg.get("_resume_recorded"):
+        payload = cfg.get("_resume_metadata")
+        if payload is None:
+            payload = load_checkpoint(cfg["resume"])
+        previous = payload.get("run_config") or {}
+        requested = {key: value for key, value in cfg.items() if not key.startswith("_")}
+        changes = {key: {"checkpoint": previous[key], "requested": requested.get(key)}
+                   for key in previous if key in requested and previous[key] != requested[key]}
+        run.write_json("resume.json", {
+            "checkpoint": str(cfg["resume"]), "checkpoint_step": payload.get("step"),
+            "requested_changes": changes,
+            "checkpoint_identity": payload.get("identity"), "current_identity": cfg.get("_run_identity"),
+            "global_rng_restored": bool(payload.get("global_rng")),
+            "note": "Effective loaded optimizer, predictor, baseline and RNG values are in effective_config.yaml; requested changes are allowed.",
+        })
+        cfg["_resume_recorded"] = True
+    return effective
+
+
+def _publish_snapshot(run, cfg, state, actor_named, optimizer, actor_full=None, extra=None):
+    if cfg.get("_cost_controller") is not None:
+        state.cost_control = cfg["_cost_controller"].snapshot()
+    effective = record_effective_config(run, cfg, state, optimizer)
+    payload_extra = {**(extra or {}), "run_config": effective, "identity": cfg.get("_run_identity")}
+    step_path = run.root / "checkpoints" / f"step_{int(state.step)}.npz"
+    timings = dump_train_state(step_path, state, actor_named, optimizer, actor_full=actor_full, extra=payload_extra)
+    timings.update(copy_checkpoint(step_path, run.root / "checkpoint.npz"))
+    hash_timer = Timer()
+    sha = sha256_file(step_path)
+    timings.update(hash_wall_seconds=hash_timer.elapsed(), hash_cpu_seconds=hash_timer.cpu_elapsed())
+    _update_checkpoint_index(run, int(state.step), sha)
+    cfg["_last_saved_step"] = int(state.step)
+    cfg["_last_checkpoint_sha"] = sha
+    return timings, sha
+
+
 def persist_initial_checkpoint(
     run: RunDirectory,
     cfg: dict[str, Any],
@@ -420,11 +500,13 @@ def persist_initial_checkpoint(
     extra=None,
 ) -> None:
     """Post-format-SFT snapshot so eval-0 compares RL against the shared start."""
-    if not cfg.get("save_initial_checkpoint") or cfg.get("resume"):
+    if (not cfg.get("save_initial_checkpoint") and int(cfg.get("num_steps", 1)) != 0) or cfg.get("resume"):
+        record_effective_config(run, cfg, state, optimizer)
         return
-    path = Path(run.root) / "checkpoints" / "step_0.npz"
-    dump_train_state(path, state, actor_named, optimizer, actor_full=actor_full, extra=extra)
-    _update_checkpoint_index(run, 0, sha256_file(path) if path.is_file() else None)
+    timer = Timer()
+    timings, sha = _publish_snapshot(run, cfg, state, actor_named, optimizer, actor_full, extra)
+    run.append_jsonl("persistence.jsonl", {"step": 0, "checkpoint_sha256": sha, **timings,
+                                          "wall_seconds": timer.elapsed(), "cpu_seconds": timer.cpu_elapsed()})
 
 
 def persist_training_step(
@@ -439,14 +521,27 @@ def persist_training_step(
     actor_full=None,
     extra=None,
     wall_s: float = 0.0,
+    cpu_s: float | None = None,
 ) -> None:
+    persist_timer = Timer()
     last = dict(last)
     last["actor_named"] = actor_named
     last["cfg"] = cfg
     if extra:
         last.setdefault("adapter_path", None if extra.get("adapter_path") is None else str(extra.get("adapter_path")))
         last.setdefault("lora_id", extra.get("lora_id"))
+    every = int(cfg.get("checkpoint_every", 1))
+    if every <= 0:
+        raise ValueError("checkpoint_every must be positive")
+    final_step = int(cfg.get("_session_initial_step", 0)) + int(cfg.get("num_steps", 1))
+    save_now = bool(last.get("force_final_checkpoint")) or int(state.step) % every == 0 or int(state.step) in {20, 40, final_step}
+    # When a save is due, publish it before rows claim that state is recoverable.
+    timings, checkpoint_sha = {}, None
+    if save_now:
+        timings, checkpoint_sha = _publish_snapshot(run, cfg, state, actor_named, optimizer, actor_full, extra)
     ctx = step_context(run, cfg, state, last)
+    ctx["checkpoint_sha256"] = checkpoint_sha
+    ctx["last_saved_step"] = cfg.get("_last_saved_step")
     n = int(last.get("n") or len(last.get("records") or []))
     n_gpu = int(ledger.n_gpu)
     u = last.get("u_frozen")
@@ -464,9 +559,20 @@ def persist_training_step(
                 n_gpu=n_gpu,
             ),
         )
-    step_row = step_metrics_row(state, last, ctx, wall_s)
-    run.append_jsonl("steps.jsonl", step_row)
+    for row in last.get("prescan_records") or []:
+        run.append_jsonl("prescan.jsonl", {**row, "step": int(state.step), "snapshot_sha": ctx.get("snapshot_sha")})
+    for row in last.get("supervision_records") or []:
+        run.append_jsonl("fresh_supervision.jsonl", {**row, "step": int(state.step)})
     health = {"step": int(state.step), "written_at": utc_now(), **step_health(state, last, cfg)}
+    health.update(checkpoint_saved=save_now, last_saved_step=ctx["last_saved_step"])
+    step_row = step_metrics_row(state, last, ctx, wall_s, health=health)
+    if (cfg.get("cost_control") or {}).get("enabled", False):
+        step_row["token_proxy_next_n"] = step_row["next_n"]
+        step_row["next_n"] = None
+        step_row["next_n_source"] = "post_save_cost_control.jsonl"
+    step_row["checkpoint_sha256"] = checkpoint_sha
+    step_row["checkpoint_timings"] = timings
+    run.append_jsonl("steps.jsonl", step_row)
     run.write_json("health.json", health)
     if last.get("logprob_probe") is not None:
         run.append_jsonl("logprob_probe.jsonl", {"step": int(state.step), **dict(last["logprob_probe"])})
@@ -477,6 +583,7 @@ def persist_training_step(
     ledger.add(
         "train_step",
         float(wall_s),
+        cpu_s=cpu_s,
         step=int(state.step),
         n=n,
         n_completed=last.get("n_completed"),
@@ -485,25 +592,28 @@ def persist_training_step(
     )
     for name, seconds in phases.items():
         ledger.add(f"phase_{name}", float(seconds), step=int(state.step))
+    persistence = {"step": int(state.step), "checkpoint_sha256": checkpoint_sha, **timings,
+                   "checkpoint_saved": save_now, "last_saved_step": ctx["last_saved_step"],
+                   "wall_seconds": persist_timer.elapsed(), "cpu_seconds": persist_timer.cpu_elapsed()}
+    run.append_jsonl("persistence.jsonl", persistence)
+    ledger.add("persistence", persistence["wall_seconds"], cpu_s=persistence["cpu_seconds"],
+               step=int(state.step), checkpoint_timings=timings)
     _append_ledger(run, ledger, n_before)
-    dump_train_state(
-        Path(run.root) / "checkpoint.npz",
-        state,
-        actor_named,
-        optimizer,
-        actor_full=actor_full,
-        extra=extra,
-    )
-    step_path = Path(run.root) / "checkpoints" / f"step_{int(state.step)}.npz"
-    dump_train_state(
-        step_path,
-        state,
-        actor_named,
-        optimizer,
-        actor_full=actor_full,
-        extra=extra,
-    )
-    _update_checkpoint_index(run, int(state.step), sha256_file(step_path) if step_path.is_file() else None)
+
+
+def persist_final_checkpoint(run, cfg, state, actor_named, optimizer, ledger, actor_full=None, extra=None):
+    """Budget termination may fall between scheduled saves; publish it once."""
+    if cfg.get("_last_saved_step") == int(state.step) and (run.root / "checkpoint.npz").is_file():
+        return
+    timer = Timer()
+    timings, sha = _publish_snapshot(run, cfg, state, actor_named, optimizer, actor_full, extra)
+    row = {"step": int(state.step), "checkpoint_sha256": sha, "checkpoint_saved": True,
+           "last_saved_step": int(state.step), "terminal": True, **timings,
+           "wall_seconds": timer.elapsed(), "cpu_seconds": timer.cpu_elapsed()}
+    run.append_jsonl("persistence.jsonl", row)
+    before = len(ledger.rows)
+    ledger.add("persistence", row["wall_seconds"], cpu_s=row["cpu_seconds"], step=int(state.step), terminal=True)
+    _append_ledger(run, ledger, before)
 
 
 def persist_eval_items(run: RunDirectory, items, cfg: dict[str, Any], result: dict[str, Any]) -> None:

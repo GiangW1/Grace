@@ -77,6 +77,8 @@ def should_refresh_basis(
     step: int,
     basis_id: int,
     refresh_every: int,
+    warmup_steps: int | None = None,
+    refresh_after_warmup: bool = False,
 ) -> bool:
     """Form U as soon as k grads exist; then every refresh_every actor steps.
 
@@ -86,6 +88,8 @@ def should_refresh_basis(
     if int(n_grads) < int(k) or int(k) <= 0:
         return False
     if int(basis_id) == 0:
+        return True
+    if refresh_after_warmup and warmup_steps is not None and int(step) + 1 == int(warmup_steps):
         return True
     every = int(refresh_every)
     return every > 0 and (int(step) + 1) % every == 0
@@ -107,12 +111,25 @@ def refresh_basis(
     oversample: int = 16,
     seed: int = 0,
     problem_ids: list[str] | None = None,
+    weights: np.ndarray | None = None,
+    solver: str = "auto",
+    center: str = "problem",
 ) -> Basis | None:
     g = np.asarray(grads, dtype=np.float64)
     if g.ndim != 2:
         raise ValueError("grads must be (n, d)")
-    if problem_ids is None:
-        centered = _stable_center(g)
+    if center not in {"problem", "global", "none"}:
+        raise ValueError("basis center must be problem, global or none")
+    w = np.ones(g.shape[0]) if weights is None else np.asarray(weights, dtype=np.float64).reshape(-1)
+    if w.shape[0] != g.shape[0] or np.any(w < 0) or not np.all(np.isfinite(w)):
+        raise ValueError("basis weights must be finite, nonnegative and match grads")
+    if not g.shape[0] or not np.any(w > 0):
+        return None
+    if center == "none":
+        centered = g.copy()
+    elif problem_ids is None or center == "global":
+        diffs = g - g[0]
+        centered = diffs - np.average(diffs, axis=0, weights=w)
     else:
         pids = np.asarray(problem_ids)
         if pids.shape[0] != g.shape[0]:
@@ -120,11 +137,138 @@ def refresh_basis(
         centered = np.zeros_like(g)
         for pid in np.unique(pids):
             mask = pids == pid
-            centered[mask] = _stable_center(g[mask])
-    u, rank = randomized_svd(centered, k=k, oversample=oversample, seed=seed)
+            if np.any(w[mask] > 0):
+                diffs = g[mask] - g[mask][0]
+                centered[mask] = diffs - np.average(diffs, axis=0, weights=w[mask])
+    centered *= np.sqrt(w)[:, None]
+    if solver == "randomized":
+        u, rank = randomized_svd(centered, k=k, oversample=oversample, seed=seed)
+    elif solver in {"auto", "gram", "svd"}:
+        u, rank = exact_basis(centered, k, use_gram=solver == "gram" or (solver == "auto" and g.shape[0] < g.shape[1]))
+    else:
+        raise ValueError("basis solver must be auto, gram, svd or randomized")
     if rank <= 0:
         return None
     return Basis(u=u, basis_id=int(basis_id), k=int(u.shape[1]), rank=int(rank))
+
+
+def exact_basis(matrix: np.ndarray, k: int, use_gram: bool = True) -> tuple[np.ndarray, int]:
+    """Top right singular vectors; small-n Gram avoids a D×(k+oversample) array."""
+    x = np.asarray(matrix, dtype=np.float64)
+    if x.ndim != 2 or int(k) <= 0:
+        raise ValueError("matrix must be 2d and k must be positive")
+    if not np.all(np.isfinite(x)):
+        raise ValueError("basis gradients must be finite")
+    if use_gram:
+        eigenvalues, left = np.linalg.eigh(x @ x.T)
+        order = np.argsort(eigenvalues)[::-1]
+        singular = np.sqrt(np.maximum(eigenvalues[order], 0.0))
+        rank = effective_rank(singular, min(int(k), *x.shape))
+        if rank:
+            u = x.T @ (left[:, order[:rank]] / singular[:rank])
+            # Gram eigenvectors lose a little orthogonality near rank deficiency.
+            u, _ = np.linalg.qr(u, mode="reduced")
+        else:
+            u = np.zeros((x.shape[1], 0))
+    else:
+        _left, singular, vt = np.linalg.svd(x, full_matrices=False)
+        rank = effective_rank(singular, int(k))
+        u = vt[:rank].T
+    return pad_basis_cols(u, int(k)), rank
+
+
+def crossfit_ridge_operator(features, problem_ids, weights=None, ridge_l2=1.0):
+    """A @ G predicts G while excluding every label from each row's problem.
+
+    Each fold fits weighted-mean ridge with unpenalized intercept, feature scales
+    fit on that fold's training problems, and a small n_train dual system. A is
+    independent of gradient labels; entire same-problem blocks are exactly zero.
+    """
+    x = np.asarray(features, dtype=np.float64)
+    pids = np.asarray(problem_ids)
+    if x.ndim != 2 or pids.shape != (len(x),):
+        raise ValueError("crossfit features and problem ids must match")
+    w = np.ones(len(x)) if weights is None else np.asarray(weights, dtype=np.float64).reshape(-1)
+    if w.shape != (len(x),) or np.any(w < 0) or not np.all(np.isfinite(w)) or not np.all(np.isfinite(x)):
+        raise ValueError("crossfit features/weights must be finite with nonnegative weights")
+    if not np.isfinite(ridge_l2) or ridge_l2 < 0:
+        raise ValueError("crossfit ridge_l2 must be finite and nonnegative")
+    operator = np.zeros((len(x), len(x)), dtype=np.float64)
+    available = np.zeros(len(x), dtype=bool)
+    for pid in np.unique(pids):
+        hold = np.flatnonzero((pids == pid) & (w > 0))
+        train = np.flatnonzero((pids != pid) & (w > 0))
+        if not len(train) or not len(hold):
+            continue
+        tw = w[train] / w[train].sum()
+        mean = np.average(x[train], axis=0, weights=tw)
+        centered = x[train] - mean
+        std = np.sqrt(np.average(centered ** 2, axis=0, weights=tw))
+        std = np.where(std > 1e-6, std, 1.)
+        xc = centered / std * np.sqrt(tw)[:, None]
+        xh = (x[hold] - mean) / std
+        gram = xc @ xc.T + float(ridge_l2) * np.eye(len(train))
+        rhs = np.diag(np.sqrt(tw))
+        solved = (np.linalg.solve(gram, rhs) if ridge_l2 > 0
+                  else np.linalg.lstsq(gram, rhs, rcond=None)[0])
+        smoother = (xh @ xc.T) @ solved
+        # Apply the intercept to the original G, not a target-centered copy.
+        operator[np.ix_(hold, train)] = smoother + (1. - smoother.sum(axis=1))[:, None] * tw
+        available[hold] = True
+    return operator, available
+
+
+def refresh_predictable_basis(grads, features, problem_ids, k, basis_id,
+                              weights=None, ridge_l2=1.0) -> tuple[Basis | None, dict]:
+    """Low-rank conditional-mean variant; caller supplies ONLY fit-side labels.
+
+    M = A G is leave-one-problem-out ridge prediction, not in-sample fitted G.
+    Maximize sum_i w_i ||U.T M_i||² subject to U.T U=I; no problem-mean removal.
+    This is a predictive-signal surrogate, not proof of predictable energy on
+    future policies. Hold/calibration labels must never enter this function.
+
+    Stream M in dimension blocks: O(n²D + nDk) work outside ridge folds and
+    O(n² + n*block + Dk) extra storage, without storing another full n-by-D M.
+    """
+    g = np.asarray(grads, dtype=np.float64)
+    if g.ndim != 2 or int(k) <= 0:
+        raise ValueError("grads must be (n,d) and k must be positive")
+    if not all(np.all(np.isfinite(row)) for row in g):
+        raise ValueError("basis gradients must be finite")
+    if len(features) != len(g) or len(problem_ids) != len(g):
+        raise ValueError("predictable basis rows do not match")
+    w = np.ones(len(g)) if weights is None else np.asarray(weights, dtype=np.float64).reshape(-1)
+    operator, available = crossfit_ridge_operator(features, problem_ids, w, ridge_l2)
+    metrics = {"variant": "predictable_crossfit", "crossfit_problems": len(set(problem_ids)),
+               "prediction_rows": int(available.sum()), "rank": 0,
+               "objective": "uncentered weighted energy of leave-one-problem-out ridge predictions",
+               "ridge_l2": float(ridge_l2), "gradient_labels": "historical, not recomputed under current policy"}
+    if not np.any(available):
+        metrics["reason"] = "no_cross_problem_training_rows"
+        return None, metrics
+    weighted = operator * np.sqrt(w * available)[:, None]
+    gram = np.zeros((len(g), len(g)), dtype=np.float64)
+    block = 65536
+    for start in range(0, g.shape[1], block):
+        prediction = weighted @ g[:, start:start + block]
+        gram += prediction @ prediction.T
+    eigenvalues, left = np.linalg.eigh(gram)
+    order = np.argsort(eigenvalues)[::-1]
+    singular = np.sqrt(np.maximum(eigenvalues[order], 0.))
+    rank = effective_rank(singular, min(int(k), *g.shape))
+    metrics["rank"] = rank
+    metrics["predicted_energy"] = float(np.trace(gram))
+    if not rank:
+        metrics["reason"] = "zero_predicted_rank"
+        return None, metrics
+    projected = left[:, order[:rank]] / singular[:rank]
+    u = np.empty((g.shape[1], rank), dtype=np.float64)
+    for start in range(0, g.shape[1], block):
+        prediction = weighted @ g[:, start:start + block]
+        u[start:start + block] = prediction.T @ projected
+    u, _ = np.linalg.qr(u, mode="reduced")
+    metrics["reason"] = "formed"
+    return Basis(pad_basis_cols(u, int(k)), int(basis_id), int(k), rank), metrics
 
 
 def align_basis(new_u: np.ndarray, old_u: np.ndarray) -> np.ndarray:

@@ -9,18 +9,28 @@ def hf_response_logprobs(model, token_ids: list[int], prompt_len: int, pad_id: i
     from grace_gc.backends.hf_actor import actor_forward
     from grace_gc.data.tokenize import as_stop_ids
 
-    out, ids, _mask = actor_forward(model, [token_ids], pad_id, output_hidden_states=False)
-    logp = out.logits[:, :-1].float().log_softmax(-1)
-    target = ids[:, 1:]
-    token_lp = logp.gather(-1, target.unsqueeze(-1)).squeeze(-1)[0]
+    import torch
+
+    if max_n is not None and int(max_n) > 0:
+        token_ids = token_ids[:int(prompt_len) + int(max_n)]
+    with torch.no_grad():
+        out, ids, _mask = actor_forward(model, [token_ids], pad_id, output_hidden_states=False)
+        # Softmax only response positions, in bounded chunks.
+        chunks = []
+        for pos in range(max(int(prompt_len) - 1, 0), len(token_ids) - 1, 64):
+            end = min(pos + 64, len(token_ids) - 1)
+            logp = out.logits[:, pos:end].float().log_softmax(-1)
+            targets = ids[:, pos + 1:end + 1]
+            chunks.append(logp.gather(-1, targets.unsqueeze(-1)).squeeze(-1)[0].cpu())
+        token_lp = torch.cat(chunks) if chunks else torch.empty(0)
     start = max(int(prompt_len) - 1, 0)
-    end = min(len(token_ids) - 1, token_lp.shape[0])
+    end = len(token_ids) - 1
     stops = set(as_stop_ids(eos_id))
     for j in range(int(prompt_len), len(token_ids)):
         if int(token_ids[j]) in stops:
             end = min(end, j)
             break
-    sl = token_lp[start:end][: int(max_n)]
+    sl = token_lp[:max(end - start, 0)]
     return sl.detach().float().cpu().numpy()
 
 
@@ -46,17 +56,16 @@ def vllm_prompt_logprobs(llm, token_ids: list[int], lora_request=None, max_n: in
         raise ValueError("vLLM output has no prompt_logprobs")
     out = []
     for i, item in enumerate(raw):
-        if i == 0 or item is None:
+        if i == 0:
             continue
         tid = int(token_ids[i])
         rec = item.get(tid) if hasattr(item, "get") else None
         if rec is None and isinstance(item, dict):
             rec = item.get(str(tid))
-        if rec is None:
-            continue
         lp = getattr(rec, "logprob", rec)
-        out.append(float(lp))
-        if len(out) >= int(max_n):
+        # Keep token positions; dropping a missing entry silently shifts scores.
+        out.append(float("nan") if lp is None else float(lp))
+        if max_n is not None and int(max_n) > 0 and len(out) >= int(max_n):
             break
     return out
 
@@ -73,7 +82,8 @@ def compare_hf_vllm_logprob(
 ) -> dict[str, Any]:
     """Same tokens, two engines. Large mean_abs means rollout ≠ score."""
     payload: dict[str, Any] = {
-        "status": "ok",
+        "status": "compared",
+        "meaning": "numerical comparison only; no on-policy acceptance threshold",
         "n_tokens": 0,
         "hf_sum": None,
         "vllm_sum": None,
@@ -83,8 +93,9 @@ def compare_hf_vllm_logprob(
         "seq_len": len(token_ids),
     }
     try:
-        hf = hf_response_logprobs(model, token_ids, prompt_len, pad_id, eos_id, max_n=max_n)
-        vllm = vllm_prompt_logprobs(llm, token_ids, lora_request=lora_request, max_n=len(hf) + int(prompt_len))
+        checked_ids = token_ids if max_n is None or int(max_n) <= 0 else token_ids[:int(prompt_len) + int(max_n)]
+        hf = hf_response_logprobs(model, checked_ids, prompt_len, pad_id, eos_id, max_n=max_n)
+        vllm = vllm_prompt_logprobs(llm, checked_ids, lora_request=lora_request, max_n=len(hf) + int(prompt_len))
         # vLLM prompt_logprobs[i] is p(token i | prefix). HF slice starts at prompt_len-1
         # which is p(token[prompt_len] | prompt). Align on the response tokens.
         start = max(int(prompt_len) - 1, 0)
@@ -101,6 +112,13 @@ def compare_hf_vllm_logprob(
 
         a = np.asarray(hf[:n], dtype=np.float64)
         b = np.asarray(vllm_resp[:n], dtype=np.float64)
+        if n != len(hf):
+            payload.update(status="misaligned", n_hf=len(hf), n_vllm=len(vllm_resp))
+            return payload
+        if not np.all(np.isfinite(a)) or not np.all(np.isfinite(b)):
+            payload.update(status="nonfinite", hf_finite=int(np.isfinite(a).sum()),
+                           vllm_finite=int(np.isfinite(b).sum()))
+            return payload
         diff = np.abs(a - b)
         payload.update(
             {
@@ -109,6 +127,10 @@ def compare_hf_vllm_logprob(
                 "vllm_sum": float(b.sum()),
                 "mean_abs": float(diff.mean()),
                 "max_abs": float(diff.max()),
+                "hf_token_logprobs": a.tolist(),
+                "vllm_prompt_token_logprobs": b.tolist(),
+                "response_token_ids": list(checked_ids[int(prompt_len):int(prompt_len) + n]),
+                "full_response_checked": n == len(token_ids) - int(prompt_len),
             }
         )
         return payload
@@ -118,21 +140,111 @@ def compare_hf_vllm_logprob(
         return payload
 
 
-def probe_first_completed(model, llm, records, pad_id: int, eos_id=None, lora_request=None) -> dict[str, Any]:
+def _probe_first_completed(model, llm, records, pad_id: int, eos_id=None, lora_request=None, max_n=64) -> dict[str, Any]:
     for rec in records or []:
         if rec.z < 1.0 or not rec.full_token_ids or rec.prompt_len <= 0:
             continue
-        if len(rec.full_token_ids) <= int(rec.prompt_len) + 1:
+        if len(rec.full_token_ids) <= int(rec.prompt_len):
             continue
-        out = compare_hf_vllm_logprob(
-            model,
-            llm,
-            rec.full_token_ids,
-            int(rec.prompt_len),
-            pad_id,
-            eos_id=eos_id,
-            lora_request=lora_request,
-        )
+        behavior = getattr(rec, "rollout_token_logprobs", None)
+        if behavior is not None:
+            import numpy as np
+
+            hf = hf_response_logprobs(model, rec.full_token_ids, int(rec.prompt_len), pad_id, eos_id, max_n=max_n)
+            raw = behavior[:len(hf)]
+            out = {"status": "misaligned", "source": "sampled_behavior",
+                   "meaning": "measured difference, not an acceptance threshold",
+                   "expected_tokens": len(hf), "behavior_tokens": len(raw),
+                   "missing_behavior_positions": [i for i, value in enumerate(raw) if value is None]}
+            if len(raw) == len(hf) and len(hf) and all(v is not None for v in raw):
+                if not np.all(np.isfinite(hf)) or not np.all(np.isfinite(raw)):
+                    return {"status": "nonfinite", "source": "sampled_behavior",
+                            "hf_finite": int(np.isfinite(hf).sum()),
+                            "vllm_finite": int(np.isfinite(raw).sum()),
+                            "problem_id": rec.problem_id, "timing": "before_actor_update"}
+                diff = np.asarray(hf, dtype=np.float64) - np.asarray(raw, dtype=np.float64)
+                out.update(status="compared", n_tokens=len(hf), hf_sum=float(np.sum(hf, dtype=np.float64)),
+                           vllm_sum=float(sum(raw)), mean_abs=float(np.mean(np.abs(diff))),
+                           max_abs=float(np.max(np.abs(diff))), hf_token_logprobs=hf.tolist(),
+                           behavior_token_logprobs=raw,
+                           response_token_ids=list(rec.full_token_ids[rec.prompt_len:rec.prompt_len+len(hf)]),
+                           full_response_checked=len(hf) == len(rec.full_token_ids) - rec.prompt_len)
+        else:
+            out = compare_hf_vllm_logprob(
+                model, llm, rec.full_token_ids, int(rec.prompt_len), pad_id,
+                eos_id=eos_id, lora_request=lora_request, max_n=max_n,
+            )
+            out["source"] = "teacher_forced_prompt_logprobs"
         out["problem_id"] = rec.problem_id
+        out["timing"] = "before_actor_update"
+        out["behavior_logprob_sum"] = rec.rollout_logprob_sum
+        if out.get("full_response_checked") and rec.rollout_logprob_sum is not None:
+            out["hf_minus_behavior_sum"] = out["hf_sum"] - rec.rollout_logprob_sum
         return out
     return {"status": "no_completed_sequence"}
+
+
+def probe_first_completed(model, llm, records, pad_id: int, eos_id=None, lora_request=None, max_n=64) -> dict[str, Any]:
+    try:
+        return _probe_first_completed(model, llm, records, pad_id, eos_id, lora_request, max_n)
+    except Exception as exc:
+        return {"status": "unavailable", "error": f"{type(exc).__name__}: {exc}",
+                "timing": "before_actor_update"}
+
+
+def probe_behavior_batch(model, llm, records, pad_id, eos_id=None, lora_request=None,
+                         max_n=0, max_sequences=0, include_stopped=True):
+    """Cover observed behavior, including stopped prefixes; never generate suffixes.
+
+    Round-robin across problem/outcome groups if coverage is explicitly limited.
+    The summary is token-weighted and keeps every failed comparison in details.
+    """
+    import copy
+
+    groups = {}
+    for index, rec in enumerate(records or []):
+        stopped = rec.z < 1.
+        ids = getattr(rec, "prefix_token_ids", None) if stopped else rec.full_token_ids
+        if (stopped and not include_stopped) or not ids or len(ids) <= rec.prompt_len:
+            continue
+        key = (rec.problem_id, "stopped_prefix" if stopped else "completed")
+        groups.setdefault(key, []).append((index, rec, ids))
+    candidates = []
+    while any(groups.values()):
+        for group in groups.values():
+            if group:
+                candidates.append(group.pop(0))
+    chosen = candidates if max_sequences is None or int(max_sequences) <= 0 else candidates[:int(max_sequences)]
+    details = []
+    for index, rec, ids in chosen:
+        proxy = copy.copy(rec)
+        stopped = rec.z < 1.
+        proxy.z, proxy.full_token_ids = 1., list(ids)
+        if getattr(proxy, "rollout_token_logprobs", None) is None:
+            out = {"status": "unavailable", "source": "sampled_behavior",
+                   "reason": "original_behavior_scores_missing", "problem_id": rec.problem_id,
+                   "timing": "before_actor_update"}
+        else:
+            out = probe_first_completed(model, llm, [proxy], pad_id, eos_id, lora_request, max_n)
+        out.update(record_index=index, observed_scope="stopped_prefix" if stopped else "completed_response",
+                   request_seeds=getattr(rec, "request_seeds", None),
+                   prefix_response_tokens=getattr(rec, "prefix_tokens", None))
+        details.append(out)
+    compared = [row for row in details if row.get("status") == "compared"]
+    tokens = sum(row["n_tokens"] for row in compared)
+    counts = {}
+    for row in details:
+        counts[row["status"]] = counts.get(row["status"], 0) + 1
+    return {
+        "status": ("no_observed_sequence" if not details else
+                   "compared" if len(compared) == len(details) else "partial"),
+        "timing": "before_actor_update", "source": "observed_behavior_batch",
+        "meaning": "numerical evidence; coverage and missing scores do not certify policy equality",
+        "eligible_sequences": len(candidates), "checked_sequences": len(details),
+        "coverage_complete": len(details) == len(candidates), "status_counts": counts,
+        "n_tokens": tokens,
+        "mean_abs": sum(row["mean_abs"] * row["n_tokens"] for row in compared) / tokens if tokens else None,
+        "max_abs": max((row["max_abs"] for row in compared), default=None),
+        "full_observed_tokens_checked": bool(details) and all(row.get("full_response_checked", False) for row in details),
+        "details": details,
+    }

@@ -18,6 +18,7 @@ class PhaseResult:
     stop_reasons: list | None = None
     sampling: dict | None = None
     logprob_sums: list[float | None] | None = None
+    token_logprobs: list[list[float | None]] | None = None
 
 
 def _require_vllm():
@@ -136,21 +137,19 @@ def _logprob_from_record(rec, tok: int | None) -> float | None:
 
 
 def _sum_sampled_logprobs(completion, kept_n: int) -> float | None:
+    values = _sampled_token_logprobs(completion, kept_n)
+    if not values or any(v is None for v in values):
+        return None
+    return float(sum(values))
+
+
+def _sampled_token_logprobs(completion, kept_n: int) -> list[float | None]:
     raw = getattr(completion, "logprobs", None)
     if not raw:
-        return None
+        return [None] * int(kept_n)
     toks = [int(t) for t in list(getattr(completion, "token_ids", []) or [])]
-    n = min(int(kept_n), len(raw), len(toks) if toks else len(raw))
-    if n <= 0:
-        return None
-    total = 0.0
-    for i in range(n):
-        tok = toks[i] if i < len(toks) else None
-        val = _logprob_from_record(raw[i], tok)
-        if val is None:
-            return None
-        total += val
-    return total
+    return [_logprob_from_record(raw[i], toks[i]) if i < len(raw) and i < len(toks) else None
+            for i in range(int(kept_n))]
 
 
 def _usable_stop_reason(stop_reason, stop_set: set[int]) -> int | None:
@@ -279,6 +278,7 @@ def generate_phase(
     finish_reasons = []
     stop_reasons = []
     logprob_sums: list[float | None] = []
+    token_logprobs = []
     for prompt, out in zip(prompt_token_ids, outputs):
         out_prompt = getattr(out, "prompt_token_ids", None)
         if out_prompt is None:
@@ -305,6 +305,7 @@ def generate_phase(
         finish_reasons.append(_finish_name(raw_finish))
         stop_reasons.append(None if raw_stop is None else raw_stop)
         logprob_sums.append(_sum_sampled_logprobs(completion, len(gen)))
+        token_logprobs.append(_sampled_token_logprobs(completion, len(gen)))
     # Independent draws can coincide, especially for short format-SFT answers.
     sampling = getattr(build_sampling_params, "last", None)
     if sampling is not None:
@@ -317,6 +318,7 @@ def generate_phase(
         stop_reasons=stop_reasons,
         sampling=None if sampling is None else dict(sampling),
         logprob_sums=logprob_sums,
+        token_logprobs=token_logprobs,
     )
 
 

@@ -117,6 +117,39 @@ def _nvidia_smi_text() -> str | None:
         return None
 
 
+def _nvidia_processes() -> str | None:
+    try:
+        return subprocess.check_output(
+            ["nvidia-smi", "--query-compute-apps=gpu_uuid,pid,process_name,used_memory", "--format=csv,noheader,nounits"],
+            stderr=subprocess.DEVNULL, text=True, timeout=8,
+        ).strip()
+    except Exception:
+        return None
+
+
+def _nvidia_power_clocks() -> list[dict[str, Any]] | None:
+    try:
+        output = subprocess.check_output(
+            ["nvidia-smi", "--query-gpu=index,uuid,power.draw,clocks.sm,clocks.mem", "--format=csv,noheader,nounits"],
+            stderr=subprocess.DEVNULL, text=True, timeout=8,
+        ).strip()
+        rows = []
+        for line in output.splitlines():
+            fields = [value.strip() for value in line.split(",")]
+            if len(fields) != 5:
+                continue
+            row = {"index": fields[0], "uuid": fields[1]}
+            for name, value in zip(("power_draw_watts", "sm_clock_mhz", "memory_clock_mhz"), fields[2:]):
+                try:
+                    row[name] = float(value)
+                except ValueError:
+                    row[name] = None
+            rows.append(row)
+        return rows
+    except Exception:
+        return None
+
+
 def _disk_usage() -> dict[str, Any] | None:
     try:
         usage = shutil.disk_usage(str(Path.cwd()))
@@ -130,9 +163,14 @@ def resource_snapshot() -> dict[str, Any]:
     info: dict[str, Any] = {
         "pid": os.getpid(),
         "nvidia_smi": _nvidia_smi_text(),
+        "nvidia_compute_processes": _nvidia_processes(),
+        "nvidia_power_clocks": _nvidia_power_clocks(),
         "disk": _disk_usage(),
         "torch_cuda_allocated_bytes": None,
         "torch_cuda_reserved_bytes": None,
+        "torch_cuda_peak_allocated_bytes": None,
+        "torch_cuda_peak_reserved_bytes": None,
+        "peak_memory_scope": "current_process_since_last_peak_reset",
     }
     try:
         import torch
@@ -140,6 +178,8 @@ def resource_snapshot() -> dict[str, Any]:
         if torch.cuda.is_available():
             info["torch_cuda_allocated_bytes"] = int(torch.cuda.memory_allocated(0))
             info["torch_cuda_reserved_bytes"] = int(torch.cuda.memory_reserved(0))
+            info["torch_cuda_peak_allocated_bytes"] = int(torch.cuda.max_memory_allocated(0))
+            info["torch_cuda_peak_reserved_bytes"] = int(torch.cuda.max_memory_reserved(0))
     except Exception:
         pass
     return info
@@ -205,6 +245,8 @@ def cuda_environment() -> dict[str, Any]:
     except Exception:
         pass
     info["nvidia_smi"] = _nvidia_smi_text()
+    info["nvidia_compute_processes"] = _nvidia_processes()
+    info["nvidia_power_clocks"] = _nvidia_power_clocks()
     info["disk"] = _disk_usage()
     return info
 
@@ -221,7 +263,9 @@ def git_info() -> dict[str, Any]:
             stderr=subprocess.DEVNULL,
             text=True,
         )
-        return {"head": head, "dirty": bool(dirty.strip())}
+        return {"head": head, "dirty": bool(dirty.strip()),
+                "tracked_dirty": any(line and not line.startswith("??") for line in dirty.splitlines()),
+                "untracked_entries": sum(line.startswith("??") for line in dirty.splitlines())}
     except Exception:
         return {"head": None, "dirty": None}
 
@@ -229,6 +273,7 @@ def git_info() -> dict[str, Any]:
 def collect_versions(
     extra_modules: tuple[str, ...] = _PACKAGES,
     files_to_hash: dict[str, str] | None = None,
+    include_source: bool = False,
 ) -> dict[str, Any]:
     info: dict[str, Any] = {
         "python": sys.version.split()[0],
@@ -254,15 +299,30 @@ def collect_versions(
             info["file_hashes"][label] = None
             info["missing"].append(label)
             continue
-        info["file_hashes"][label] = sha256_file(p)
+        try:
+            is_source = include_source and label.split("/", 1)[0] in {"grace_gc", "scripts", "configs"} and p.name != "env.sh"
+            if is_source:
+                raw = p.read_bytes()
+                info["file_hashes"][label] = sha256_bytes(raw)
+                info.setdefault("source_files", {})[label] = raw.decode("utf-8")
+            else:
+                info["file_hashes"][label] = sha256_file(p)
+        except (OSError, UnicodeError):
+            info["missing"].append(label)
     return info
 
 
 def collect_environment(cfg: dict[str, Any] | None = None, files_to_hash: dict[str, str] | None = None) -> dict[str, Any]:
     hashes = dict(files_to_hash or {})
-    if Path("GRACE_ICLR????_v3.md").is_file() and "paper" not in hashes:
-        hashes["paper"] = "GRACE_ICLR????_v3.md"
-    info = collect_versions(files_to_hash=hashes or None)
+    repo = Path(__file__).resolve().parents[1]
+    for folder in ("grace_gc", "scripts", "configs"):
+        for path in sorted((repo / folder).rglob("*")):
+            if path.is_file() and path.suffix in {".py", ".sh", ".yaml", ".yml"} and path.name != "env.sh":
+                hashes.setdefault(str(path.relative_to(repo)).replace("\\", "/"), str(path))
+    paper = repo / "GRACE_ICLR\u8bba\u6587\u6846\u67b6_v3.md"
+    if paper.is_file() and "paper" not in hashes:
+        hashes["paper"] = str(paper)
+    info = collect_versions(files_to_hash=hashes or None, include_source=True)
     info["process"] = {
         "pid": os.getpid(),
         "argv": list(sys.argv),
@@ -277,6 +337,11 @@ def collect_environment(cfg: dict[str, Any] | None = None, files_to_hash: dict[s
         "HF_HOME": os.environ.get("HF_HOME"),
         "HF_HUB_CACHE": os.environ.get("HF_HUB_CACHE"),
         "VLLM_ATTENTION_BACKEND": os.environ.get("VLLM_ATTENTION_BACKEND"),
+        "VLLM_ENABLE_V1_MULTIPROCESSING": os.environ.get("VLLM_ENABLE_V1_MULTIPROCESSING"),
+        "VLLM_BATCH_INVARIANT": os.environ.get("VLLM_BATCH_INVARIANT"),
+        "OMP_NUM_THREADS": os.environ.get("OMP_NUM_THREADS"),
+        "OPENBLAS_NUM_THREADS": os.environ.get("OPENBLAS_NUM_THREADS"),
+        "MKL_NUM_THREADS": os.environ.get("MKL_NUM_THREADS"),
     }
     if not cfg:
         return info

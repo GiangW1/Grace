@@ -48,7 +48,7 @@ def real_stream_backward_each(logprob_fn, advantages: np.ndarray, p: np.ndarray,
         raise ValueError("chosen mask dimension does not match N")
     total = None
     for i, keep in enumerate(chosen):
-        if not keep:
+        if not keep or float(scales[i]) == 0.0:
             continue
         lp = logprob_fn(i)
         if lp is None:
@@ -98,6 +98,7 @@ def apply_correction_clip_step(
     clip: float = 1.0,
     use_correction: bool = True,
     stats: dict | None = None,
+    log_geometry: bool = False,
 ) -> tuple[np.ndarray, bool]:
     torch = _torch()
     packed = pack_grads(
@@ -114,6 +115,8 @@ def apply_correction_clip_step(
     )
     if use_correction:
         packed = packed + prediction_grad_correction(u, f, z, p, n)
+    if not np.all(np.isfinite(packed)):
+        raise ValueError("actor gradient is nonfinite; optimizer state was not advanced")
     norm = float(np.linalg.norm(packed))
     triggered = clip > 0.0 and norm > clip
     if triggered:
@@ -128,9 +131,19 @@ def apply_correction_clip_step(
         written += 1
     if written != len(layout.entries):
         raise ValueError("correction writeback missed layout entries")
+    before = [param.detach().clone() for _name, param in named_params] if log_geometry else []
     optimizer.step()
     if stats is not None:
         stats["grad_norm_preclip"] = float(norm)
         stats["grad_norm"] = float(np.linalg.norm(packed))
         stats["clip_triggered"] = bool(triggered)
+        if log_geometry:
+            delta_sq, ascent_dot = 0.0, 0.0
+            for old, (_name, param) in zip(before, named_params):
+                delta = param.detach().float() - old.float()
+                delta_sq += float(delta.square().sum())
+                ascent_dot += float((delta * -param.grad.detach().float()).sum())
+            denom = np.sqrt(delta_sq) * float(np.linalg.norm(packed))
+            stats["parameter_update_norm"] = float(np.sqrt(delta_sq))
+            stats["update_ascent_cosine"] = None if denom == 0 else float(ascent_dot / denom)
     return packed, triggered

@@ -1,0 +1,6 @@
+# Explicit baseline-noise ablation; pair using measured wall budgets.
+baseline:
+  prescan: 16
+batch_audit:
+  baseline_mode: prescan
+  prescan_samples: 16

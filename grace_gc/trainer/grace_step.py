@@ -43,6 +43,8 @@ class StartRecord:
     q_hat: float | None = None
     g_norm_sq: float | None = None
     rollout_logprob_sum: float | None = None
+    rollout_token_logprobs: list[float | None] | None = None
+    request_seeds: dict | None = None
     prompt_token_ids: list[int] | None = None
     prefix_token_ids: list[int] | None = None
     full_token_ids: list[int] | None = None
@@ -126,16 +128,24 @@ def decide_continuation(
     warmup: bool,
     iters: int = 20,
     basis_ready: bool = True,
+    uniform_shrink: float = 0.0,
 ) -> tuple[np.ndarray, float]:
     n = int(risk.shape[0])
-    if warmup or not basis_ready or spec.name in {"full_pg", "grpo", "grpo_short"} or spec.objective == "grpo":
+    if beta == 1.0 or warmup or not basis_ready or spec.name in {"full_pg", "grpo", "grpo_short"} or spec.objective == "grpo":
         return np.ones(n, dtype=np.float64), 0.0
     if spec.name == "uniform_ht" or spec.name == "uniform_cv" or not spec.use_allocation:
         p = np.full(n, uniform_p(n, beta, p_min), dtype=np.float64)
         p[finished] = 1.0
         return p, 0.0
-    result = allocate_continuation(risk, cost, beta=beta, p_min=p_min, finished=finished, iters=int(iters))
+    result = allocate_continuation(risk, cost, beta=beta, p_min=p_min, finished=finished,
+                                   iters=int(iters), uniform_shrink=uniform_shrink)
     return result.p, result.budget_deviation
+
+
+def control_variate_coordinates(f: np.ndarray, enabled: bool = True) -> np.ndarray:
+    """Ablate m in the estimator without changing predictor training or risk p."""
+    values = np.asarray(f, dtype=np.float64)
+    return values if enabled else np.zeros_like(values)
 
 
 def assemble_ghat(
@@ -143,10 +153,12 @@ def assemble_ghat(
     records: list[StartRecord],
     u: np.ndarray,
     n: int,
+    control_variate_enabled: bool = True,
 ) -> np.ndarray:
     z = np.array([r.z for r in records], dtype=np.float64)
     p = np.array([r.p for r in records], dtype=np.float64)
     f = np.stack([r.f for r in records], axis=0) if records else np.zeros((0, u.shape[1]))
+    f = control_variate_coordinates(f, control_variate_enabled)
     completed = [r for r in records if r.z >= 1.0]
     if any(r.g is None for r in completed):
         raise ValueError("assemble_ghat needs G for every completed start")
@@ -232,12 +244,14 @@ def grace_batch_update(
     records: list[StartRecord],
     u: np.ndarray,
     n: int,
+    control_variate_enabled: bool = True,
 ) -> dict:
-    ghat = assemble_ghat(spec, records, u, n)
+    ghat = assemble_ghat(spec, records, u, n, control_variate_enabled=control_variate_enabled)
     grad = optimizer_grad_from_ghat(ghat)
     z = np.array([r.z for r in records], dtype=np.float64)
     p = np.array([r.p for r in records], dtype=np.float64)
     f = np.stack([r.f for r in records], axis=0)
+    f = control_variate_coordinates(f, control_variate_enabled)
     pred_grad = prediction_grad_correction(u, f, z, p, n) if spec.use_ht_correction and spec.use_predictor else np.zeros_like(grad)
     scales = real_stream_loss_scale(
         np.array([0.0 if r.advantage is None else r.advantage for r in records], dtype=np.float64),

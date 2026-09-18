@@ -413,7 +413,10 @@ def test_t_l_uses_detect_half_not_report():
     assert out["rho_l_curve"][0] < out["rho_l_detect_curve"][0]
     assert out["t_L"] == t_learn(np.asarray(out["rho_l_detect_ucb_curve"]), times, 0.2)
     assert out["t_L_point"] == t_learn(np.asarray(out["rho_l_detect_curve"]), times, 0.2)
-    assert out["t_L"] == pytest.approx(16.0)
+    # One problem has no between-problem standard error; retain point detection
+    # without presenting it as a confidence bound.
+    assert out["t_L"] is None
+    assert out["t_L_point"] == pytest.approx(16.0)
     report_t_l = t_learn(np.asarray(out["rho_l_curve"]), times, 0.2)
     assert report_t_l == pytest.approx(8.0)
 
@@ -584,10 +587,15 @@ def test_prompt_var_uses_earliest_prefix_per_path():
 
 
 def test_audit_jsonl_keeps_answer_emitted():
-    from grace_gc.audit.run import run_audit
+    from grace_gc.audit.prefix_audit import PrefixBundle, bundle_from_dict, bundle_to_dict
+    import json
 
-    src = __import__("inspect").getsource(run_audit)
-    assert '"answer_emitted": bool(b.answer_emitted)' in src
+    bundle = PrefixBundle("p", 4, np.array([1.]), np.ones((1, 2)), answer_emitted=True,
+                          gold="1", baseline=.5, continuation_records=[{"reward": 1., "seed": 17}])
+    restored = bundle_from_dict(json.loads(json.dumps(bundle_to_dict(bundle))))
+    assert restored.answer_emitted is True
+    assert restored.gold == "1" and restored.baseline == .5
+    assert restored.continuation_records == [{"reward": 1., "seed": 17}]
 
 
 def test_independent_pass_rate_uses_eval_stream():

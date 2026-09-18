@@ -108,10 +108,26 @@ def fit_weighted_ridge(features: np.ndarray, targets: np.ndarray, weights: np.nd
     n = x.shape[0]
     if n != y.shape[0] or n != w.shape[0]:
         raise ValueError("ridge features/targets/weights do not match")
+    if not np.isfinite(l2) or l2 < 0:
+        raise ValueError("ridge l2 must be finite and nonnegative")
+    # Preserve the sum-weighted objective and unpenalized intercept.
+    w = np.maximum(w, 0.0)
+    if not np.any(w > 0):
+        return np.zeros((x.shape[1] + 1, y.shape[1]), dtype=np.float64)
+    if float(l2) > 0.0 and n < x.shape[1] and np.sum(w) > 0:
+        xbar = np.average(x, axis=0, weights=w)
+        ybar = np.average(y, axis=0, weights=w)
+        sw = np.sqrt(w)[:, None]
+        xc, yc = (x - xbar) * sw, (y - ybar) * sw
+        gram = xc @ xc.T + float(l2) * np.eye(n)
+        coef = xc.T @ np.linalg.solve(gram, yc)
+        return np.vstack([coef, ybar - xbar @ coef])
     xb = np.concatenate([x, np.ones((n, 1), dtype=np.float64)], axis=1)
     sw = np.sqrt(np.maximum(w, 0.0))
     xw = xb * sw[:, None]
     yw = y * sw[:, None]
+    if float(l2) == 0:
+        return np.linalg.lstsq(xw, yw, rcond=None)[0]
     dim = xb.shape[1]
     gram = xw.T @ xw + float(l2) * np.eye(dim, dtype=np.float64)
     gram[-1, -1] -= float(l2)
@@ -161,10 +177,20 @@ def design_shrink_gamma(
         w = np.asarray(weights, dtype=np.float64).reshape(-1)
         if w.shape[0] != p.shape[0]:
             raise ValueError("shrink gamma weights do not match")
-    m = f @ u.T
+    return design_shrink_from_projections(g @ u, f, u.T @ u, p, w)
+
+
+def design_shrink_from_projections(coords, f, gram, p, weights=None) -> float | None:
+    """Same full-space γ using GᵀU and UᵀU, without an n×D prediction array."""
+    coords = np.asarray(coords, dtype=np.float64)
+    f = np.asarray(f, dtype=np.float64)
+    p = np.asarray(p, dtype=np.float64).reshape(-1)
+    w = np.ones(p.shape[0]) if weights is None else np.asarray(weights, dtype=np.float64)
+    if np.any(p <= 0) or np.any(p > 1) or not np.all(np.isfinite(p)):
+        raise ValueError("p must be finite and in (0, 1]")
     a = w * ((1.0 / p) - 1.0)
-    num = float(np.sum(a * np.sum(g * m, axis=1)))
-    den = float(np.sum(a * np.sum(m * m, axis=1)))
+    num = float(np.sum(a * np.sum(coords * f, axis=1)))
+    den = float(np.sum(a * np.sum((f @ gram) * f, axis=1)))
     if not np.isfinite(den) or den <= 1e-12:
         return None
     gamma = num / den

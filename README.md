@@ -18,10 +18,10 @@ GitHub 默认分支是 `master`。clone 后确认 `git log -1` 含保真接线�
 
 ```bash
 pip install -e ".[cpu,dev]"
-python -m pytest tests -k "not complete_final_expression and not u6_gpu"
+python -m pytest tests -q -o addopts=''
 ```
 
-Windows 上 `complete_final_expression` 会踩 math-verify 的 WinError 6；`u6_gpu` 要 CUDA。
+Windows 的 math-verify 超时路径已有隔离进程回归；需要 CUDA 的测试在没有 GPU 时跳过。
 
 ### B. 服务器环境
 
@@ -103,14 +103,38 @@ python scripts/audit.py --generate \
 
 ### E2. 最小比较（现役工作树）
 
-16 题、40 步、单卡。用来看 GRACE 分配是否压过 Full-PG / Uniform-CV / GRPO，不是 Pilot。不要把 2026-09-16 那次链当这份代码的结果。
+修复后的比较默认使用 **3 个 seed（17/23/41）、4 个方法、每方法 40 步、128 道评测题×4 次、16 道审计题**，依次在单卡运行。每个 seed 只做一次 256 步 reasoning-lead 格式 SFT，然后四方法加载同一份 actor，各自重新建立优化器和预测器。它仍是最小比较，不是 Pilot；工作量比原来的单 seed、16 题链明显增加，尚无新 GPU 耗时预测。
 
 ```bash
-export CUDA_VISIBLE_DEVICES=0
-bash scripts/run_minimal_gpu.sh
+export CUDA_VISIBLE_DEVICES=1  # 按实际可用卡号设置
+bash scripts/run_minimal_gpu.sh runs/minimal-repaired
 ```
 
-默认方法是 `full_pg grace uniform_cv grpo`。看质量和实际成本，不要看停止者比例。
+默认方法为 `full_pg grace uniform_cv grpo`；只运行一个 seed 可设置 `SEEDS=17`，结果会保留实际范围。脚本叠加 [第一轮修复配置](configs/experiments/minimal_gpu_repaired.yaml) 和 [第二轮方法配置](configs/experiments/minimal_gpu_deeper.yaml)，旧 `minimal_gpu.yaml` 保留。新默认包括按题交叉拟合建基、监督年龄窗口、当前策略额外采样、独立校准、β=.75、每步4题和实际成本反馈，均是明确的方法/实验变体，尚未证明能提高质量。HF 使用 BF16 运算并保留 FP32 可训练参数和优化器状态；更新前核对所有完成响应及停止者已观测前缀的原行为 token 分数，缺失保持缺失。
+
+每个 seed 目录的 `comparison.json` 保存各方法质量、实际成本和三类审计；根目录的 `seeds_comparison.json` 按训练 seed 汇总。原多决策点审计、`audit-training`（t=512、horizon=2048、baseline=4）和新的 `batch-audit` 分开。批审计固定题集与N、全空间计算梯度方差，再复制checkpoint优化器在CPU上比较clip/Adam更新；它会生成全部续写并付费，不能当作实际省算。GRPO目标不同，批HT审计标为不适用。共同权重、seed和评测协议不匹配时不输出配对收益。
+
+按共同实测墙钟预算比较：
+
+```bash
+bash scripts/run_matched_cost_gpu.sh runs/minimal-matched-wall
+```
+
+每个seed先运行Full-PG参考40步，再将其实际训练时长作为另外三方法的预算，按真实终点保存和评测。批次边界可能超额，报告保留实际耗时、真实步数和停止原因；不会把预算相同当作耗时严格相等。`RUN_WALL_SECONDS` 可显式给共同预算，`MAX_STEPS` 默认10000是步数上限。共享SFT、评测与审计成本另列。
+
+`ABLATION_CONFIG=configs/experiments/baseline_prescan16.yaml` 提供baseline样本量对照；跨配置对照可设置 `SHARED_INIT_CHAIN=原链根目录` 复用每个seed的共同actor，并显式使用相同墙钟预算。`EXPERIMENT_CONFIG=configs/experiments/minimal_gpu_repaired.yaml` 可关闭第二轮覆盖，保留第一轮变体。
+
+附件评审吸收的独立对照同样通过`ABLATION_CONFIG`使用：`grace_full_completion.yaml`（全组件p=1）、`grace_no_cv.yaml`（只关闭补全，保留风险模型及辅助开销）、`allocation_uniform_shrink.yaml`（向同预计成本uniform收缩一半）、`baseline_fixed.yaml`（固定b=.5并跳过预扫）、`baseline_smoothed.yaml`（独立预扫加入先验平滑），均位于`configs/experiments/`。这些候选不会自动叠加，尚无GPU收益结论。GRPO/GRPO-short已移除不参与其组均值目标的prescan；批审计增加原始梯度、clip后梯度和Adam步的配对方向/误差，多前缀审计增加全空间基底遗漏与坐标预测误差分解。取舍和命令见[修复说明第6节](docs/GRACE_REMEDIATION_20260918.md#6-grace_reviewmd-的取舍与实现)。
+
+评估质量和实际成本，停止者比例不表示加速。40 步比较不代表 equal-compute；新结果不能覆盖 2026-09-17 的负结果，2026-09-16 也不是现役结果。完整修复与待验证事项见 [修复说明](docs/GRACE_REMEDIATION_20260918.md)。
+
+作业结束后保留完整检查点归档：
+
+```bash
+python scripts/archive_run.py runs/minimal-repaired runs/minimal-repaired.tar.gz --include-checkpoints
+```
+
+脚本若因同名重跑更换根目录，使用控制台打印的实际 `root`。不加 `--include-checkpoints` 时默认排除大于20 MiB的文件，排除项仍记录哈希；哈希不能替代被排除的权重。
 
 ### F. Pilot：先 Full-PG 30 步
 
@@ -155,7 +179,7 @@ python scripts/audit.py --generate \
 
 ### G. Pilot：再 GRACE 30 步
 
-GRACE 的 warmup 是 20 步，`--num-steps` 必须大于 20。评测/审计必须用**该方法自己的** `checkpoint.npz`。
+GRACE 的 warmup 是20步；只有超过暖身阶段才会观察到停止分配。短运行正常保存并报告是否启用分配。评测/审计使用**该方法自己的** `checkpoint.npz`。
 
 ```bash
 export CUDA_VISIBLE_DEVICES=0
