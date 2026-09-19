@@ -28,7 +28,7 @@ from grace_gc.trainer.baseline import baseline_from_config
 from grace_gc.trainer.loop import resolve_start_counts, resume_start_counts, sample_prompt_indices, sample_starts
 from grace_gc.trainer.methods import apply_method_defaults, method_spec
 from grace_gc.trainer.state_io import restore_train_state
-from grace_gc.trainer.cost_control import cost_start_counts, ensure_cost_control, observe_batch_cost, start_cost_control
+from grace_gc.trainer.cost_control import cost_start_counts, ensure_cost_control, observe_batch_cost, start_cost_control, start_count_mode
 
 
 def _ensure_bf16(model):
@@ -368,7 +368,7 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
             break
         if controller.enabled:
             n_prompts, starts_per, n_start = cost_start_counts(cfg, spec, state, (n_prompts, starts_per, n_start))
-        elif last.get("next_n"):
+        elif start_count_mode(cfg) != "fixed" and last.get("next_n"):
             n_prompts, starts_per, n_start = resolve_start_counts(cfg, spec, n_start=max(1, int(last["next_n"])))
         step_timer = Timer()
         prompts, pids, golds, prompt_meta = _batch_ids(state.rng)

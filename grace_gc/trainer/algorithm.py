@@ -18,13 +18,11 @@ from grace_gc.predictor.basis import align_basis, refresh_basis, should_refresh_
 from grace_gc.predictor.update import diagnose_frozen_predictor, prepare_predictor_split, update_predictor_from_reservoir
 from grace_gc.trainer.actor_update import (
     apply_correction_clip_step,
-    audit_one,
-    real_stream_backward_each,
-    restore_grads,
-    snapshot_grads,
+    real_stream_backward_and_audit,
 )
 from grace_gc.trainer.advantages import advantages_for_method
 from grace_gc.trainer.baseline import HistoricalBaseline
+from grace_gc.trainer.cost_control import start_count_mode
 from grace_gc.trainer.grace_step import (
     StartRecord,
     answer_first_token,
@@ -491,26 +489,27 @@ def run_algorithm1_step(
 
     adv = advantages_for_method(state.spec.objective, rewards, problem_ids, state.baseline)
     named = engines.named_lora()
-    params = engines.trainable_params()
     optimizer.zero_grad()
     chosen = z >= 1.0
-    loss = real_stream_backward_each(
+    audit_draw = (
+        state.rng.bernoulli("audit", np.full(n, audit_s))
+        if state.spec.use_predictor
+        else np.zeros(n, dtype=np.float64)
+    )
+    loss, audited_gradients = real_stream_backward_and_audit(
         lambda i: None if full_ids[i] is None else engines.logprob_one(full_ids[i], int(prompt_lens[i])),
         adv,
         p,
         z,
         n,
         chosen,
+        named,
+        state.layout,
+        audit_draw >= 1.0,
     )
-    saved = snapshot_grads(params)
     timings["backward"] = timer.lap()
 
     audited = 0
-    audit_draw = (
-        state.rng.bernoulli("audit", np.full(n, audit_s))
-        if state.spec.use_predictor
-        else np.zeros(n, dtype=np.float64)
-    )
     records = []
     for i in range(n):
         rec = StartRecord(
@@ -562,11 +561,7 @@ def run_algorithm1_step(
                     engines.logprob_one(full_ids[i], int(prompt_lens[i]))
                 )
         if state.spec.use_predictor and rec.z >= 1.0 and rec.reward is not None and audit_draw[i] >= 1.0:
-            if float(adv[i]) == 0.0:
-                rec.g = np.zeros(state.layout.dim, dtype=np.float64)
-            else:
-                scalar = adv[i] * engines.logprob_one(full_ids[i], int(prompt_lens[i]))
-                rec.g = audit_one(scalar, params, [nm for nm, _p in named], state.layout)
+            rec.g = audited_gradients[i]
             rec.audited = True
             rec.g_norm_sq = float(np.dot(rec.g, rec.g))
             audited += 1
@@ -590,7 +585,6 @@ def run_algorithm1_step(
             state.reservoir.add(item)
             new_audit_items.append(item)
         records.append(rec)
-    restore_grads(params, saved)
     timings["audit"] = timer.lap()
 
     from grace_gc.trainer.supervision import collect_fresh_supervision
@@ -650,21 +644,22 @@ def run_algorithm1_step(
     basis_changed = False
     if state.spec.use_predictor and state.predictor is not None and len(state.reservoir.items) >= 2:
         variant = str(pred_cfg.get("basis_variant", "pca"))
-        if variant not in {"pca", "predictable_crossfit"}:
-            raise ValueError("basis_variant must be pca or predictable_crossfit")
+        if variant not in {"pca", "predictable_crossfit", "predictable_crossfit_signal"}:
+            raise ValueError("basis_variant must be pca, predictable_crossfit or predictable_crossfit_signal")
+        crossfit_basis = variant in {"predictable_crossfit", "predictable_crossfit_signal"}
         split = prepare_predictor_split(
             state.predictor, state.reservoir, state.rng.generator("predictor"),
-            basis_fit_only=bool(pred_cfg.get("basis_fit_only", False)) or variant == "predictable_crossfit",
+            basis_fit_only=bool(pred_cfg.get("basis_fit_only", False)) or crossfit_basis,
             current_step=state.step + 1, max_age_steps=pred_cfg.get("max_age_steps"),
             age_half_life=pred_cfg.get("age_half_life"),
             missing_step_policy=pred_cfg.get("missing_step_policy", "exclude"),
         )
-        basis_mask = split["fit"] if variant == "predictable_crossfit" else split["basis"]
+        basis_mask = split["fit"] if crossfit_basis else split["basis"]
         basis_items = [it for it, keep in zip(state.reservoir.items, basis_mask) if keep]
         basis_metrics = {"variant": variant, "refreshed": False}
         if should_refresh_basis(
             len(basis_items),
-            min(k, len(basis_items)) if variant == "predictable_crossfit" else k,
+            min(k, len(basis_items)) if crossfit_basis else k,
             state.step,
             state.basis_id,
             int(pred_cfg.get("refresh_every", 32)),
@@ -679,12 +674,13 @@ def run_algorithm1_step(
             basis_args = dict(grads=np.stack([it.g for it in basis_items]), k=k,
                               basis_id=state.basis_id + 1,
                               problem_ids=[it.problem_id for it in basis_items], weights=basis_weights)
-            if variant == "predictable_crossfit":
+            if crossfit_basis:
                 from grace_gc.predictor.basis import refresh_predictable_basis
 
                 basis, details = refresh_predictable_basis(
                     **basis_args, features=np.stack([it.features for it in basis_items]),
                     ridge_l2=float(pred_cfg.get("basis_ridge_l2", pred_cfg.get("ridge_l2", 1.))),
+                    objective="cross_moment" if variant == "predictable_crossfit_signal" else "prediction_energy",
                 )
                 basis_metrics.update(details)
             else:
@@ -735,7 +731,8 @@ def run_algorithm1_step(
     from grace_gc.trainer.methods import start_group_size
 
     group = start_group_size(state.spec, int(cfg.get("n_prompts", 4)), state.n_ref or n)
-    next_n = next_start_count(state.history_costs, state.n_ref or n, c_full=1.0, group=group)
+    next_n = (state.n_ref or n) if start_count_mode(cfg) == "fixed" else next_start_count(
+        state.history_costs, state.n_ref or n, c_full=1.0, group=group)
     prefix_done = np.asarray(finished, dtype=bool).reshape(-1)
     n_continued = int(
         sum(
@@ -770,6 +767,7 @@ def run_algorithm1_step(
         "deviation": deviation,
         "loss": float(loss.detach()) if hasattr(loss, "detach") else float(loss),
         "n_audited": audited,
+        "audit_gradient_source": "mandatory_actor_backward",
         "clip_triggered": clipped,
         "next_n": next_n,
         "texts": texts,

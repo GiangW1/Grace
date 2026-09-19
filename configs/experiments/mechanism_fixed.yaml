@@ -1,0 +1,22 @@
+# Shared design for four mechanism arms. This is not a performance claim.
+n_start: 16
+n_prompts: 4
+cost_control:
+  mode: fixed
+  enabled: false
+run_wall_seconds: null
+session_wall_seconds: null
+predictor:
+  control_variate: true
+allocation:
+  beta: 0.75
+  uniform_shrink: 0.0
+batch_audit:
+  shape: training
+  interventions:
+    p1:
+      beta: 1.0
+    m0:
+      control_variate: false
+    uniform:
+      uniform_shrink: 1.0

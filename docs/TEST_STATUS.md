@@ -2,7 +2,27 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
-## 本机最近一次结果（2026-09-18）
+## 本机最近一次结果（2026-09-19）
+
+```text
+471 passed, 1 skipped in 61.03s
+```
+
+命令：`python -m pytest tests -q -o addopts=''`。这是9月19日最终合并工作树的全量CPU回归，比上一次增加50项；1项CUDA测试因本机无GPU跳过。requests仍报告既有可选依赖版本警告，未影响结果。
+
+本轮新增覆盖：
+
+- `test_backward_reuse_20260919.py`：一次求导复用真实G，HT权重/梯度符号、p=1、审计掩码隔离、零优势、停止者和unused参数；FP32与旧加权反向数值比较。
+- `test_fixed_n_20260919.py`：关闭wall之外仍绕开旧token回收；固定N续训；四臂真实tiny训练的初始actor、warmup更新和输入序列一致，p1/m0/停止者null。
+- `test_cost_feedback_20260919.py`：固定开销摊销、主成本反馈、预算/保存/恢复和配置模式；checkpoint无损紧凑存储、旧格式兼容及原子发布。
+- `test_predictor_signal_fixes.py`：零残差冷启动风险尺度、Reward-CV当前q特征、γ诊断与监督组成；跨题预测交叉矩的反向预测反例、显式谱等价及退化输入。
+- `test_batch_interventions.py`：同完整G的p1/m0/uniform冻结干预、训练checkpoint对应N、原始梯度方差×主token代理及零分母；开启额外干预不改变原审计样本/统计。
+- `test_eval_execution_trace.py`：eval/audit引擎继承seed、显式覆盖、逐请求seed/token hash与batch回退轨迹。
+- `test_mechanism_summary.py`、`test_mechanism_wrapper.py`：配对统计的actor/seed/评测协议/终点/完整输入与N核对；完整及后warmup成本、缺证据与已观测零生成的区分；真实Git Bash运行四臂编排，昂贵训练/审计以替身命令代替。
+
+Git Bash分别对 `run_minimal_gpu.sh`、`run_mechanism_gpu.sh`、`run_matched_cost_gpu.sh` 做语法检查，批审计CLI帮助和 `git diff --check` 通过。没有新GPU训练、质量或端到端速度验证。确定修复、研究候选及服务器运行方法见 [9月19日实现说明](GRACE_EFFICIENCY_REMEDIATION_20260919.md)。
+
+## 历史本机结果（2026-09-18）
 
 ```text
 421 passed, 1 skipped in 47.24s

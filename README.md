@@ -33,7 +33,7 @@ conda activate grace
 先装 vLLM（或 `pip install "verl[vllm]==0.9.0"`），再进仓库：
 
 ```bash
-git clone https://github.com/yiweinanzi/Grace.git
+git clone https://github.com/GiangW1/Grace.git
 cd Grace
 pip install -e ".[gpu,dev]"
 pip install pyarrow
@@ -127,6 +127,19 @@ bash scripts/run_matched_cost_gpu.sh runs/minimal-matched-wall
 附件评审吸收的独立对照同样通过`ABLATION_CONFIG`使用：`grace_full_completion.yaml`（全组件p=1）、`grace_no_cv.yaml`（只关闭补全，保留风险模型及辅助开销）、`allocation_uniform_shrink.yaml`（向同预计成本uniform收缩一半）、`baseline_fixed.yaml`（固定b=.5并跳过预扫）、`baseline_smoothed.yaml`（独立预扫加入先验平滑），均位于`configs/experiments/`。这些候选不会自动叠加，尚无GPU收益结论。GRPO/GRPO-short已移除不参与其组均值目标的prescan；批审计增加原始梯度、clip后梯度和Adam步的配对方向/误差，多前缀审计增加全空间基底遗漏与坐标预测误差分解。取舍和命令见[修复说明第6节](docs/GRACE_REMEDIATION_20260918.md#6-grace_reviewmd-的取舍与实现)。
 
 评估质量和实际成本，停止者比例不表示加速。40 步比较不代表 equal-compute；新结果不能覆盖 2026-09-17 的负结果，2026-09-16 也不是现役结果。完整修复与待验证事项见 [修复说明](docs/GRACE_REMEDIATION_20260918.md)。
+
+### E3. 9月18日结果之后的机制定位
+
+[逐文件实测审查](docs/MINIMAL_RESULTS_REVIEW_20260919.md)仍不支持“补全带来实际训练效率提升”。后续已接通固定N=16、共享actor的GRACE/p1/m0/uniform四臂训练，终点在同一冻结状态下另做一次多臂审计：
+
+```bash
+SEEDS=17 bash scripts/run_mechanism_gpu.sh runs/mechanism-fixed
+SEEDS=17 COMMON_CONFIG=configs/experiments/minimal_gpu_signal_candidate.yaml \
+  SHARED_INIT_CHAIN=runs/mechanism-fixed/grace \
+  bash scripts/run_mechanism_gpu.sh runs/mechanism-signal
+```
+
+若目录自动加后缀，`SHARED_INIT_CHAIN`使用第一条链`mechanism.json`里的`arms.grace`实际路径。候选收集主反向的完成梯度、取消额外fresh采样、平滑独立prescan，并按留出预测与真实G的交叉矩建基；这些改动尚无新GPU收益证据。p1臂保留预测器开销，不能替代高效Full-PG的性能基线。真正的共同墙钟比较、无prescan消融、六个问题的根因与剩余边界见[本轮实现说明](docs/GRACE_EFFICIENCY_REMEDIATION_20260919.md)。
 
 作业结束后保留完整检查点归档：
 

@@ -12,6 +12,7 @@ if (($#)); then shift; fi
 methods=("$@")
 if ((${#methods[@]} == 0)); then methods=(full_pg grace uniform_cv grpo); fi
 comparison_mode="${COMPARISON_MODE:-steps}"
+post_train_stages="${POST_TRAIN_STAGES:-eval audit batch-audit}"
 if [[ "$comparison_mode" != steps && "$comparison_mode" != wall ]]; then
   echo "COMPARISON_MODE must be steps or wall" >&2; exit 2
 fi
@@ -24,6 +25,7 @@ if [[ -e "$experiment_root" && ( ! -d "$experiment_root" || -n "$(find "$experim
 fi
 mkdir -p "$experiment_root/logs"
 exec > >(tee -a "$experiment_root/console.log") 2>&1
+echo "experiment_root $experiment_root"
 trap 'status=$?; echo "experiment exit=$status at $(date -u +%FT%TZ) root=$experiment_root"' EXIT
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-8}"
 export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-8}"
@@ -61,6 +63,7 @@ for seed in "${seeds[@]}"; do
     --config configs/experiments/minimal_gpu_repaired.yaml
     --config "${EXPERIMENT_CONFIG:-configs/experiments/minimal_gpu_deeper.yaml}"
     --config configs/hardware/a100_1.yaml --backend gpu_verl --model-path "$MODEL" --seed "$seed")
+  if [[ -n "${COMMON_CONFIG:-}" ]]; then common+=(--config "$COMMON_CONFIG"); fi
   if [[ -n "${ABLATION_CONFIG:-}" ]]; then common+=(--config "$ABLATION_CONFIG"); fi
   init_args=()
   if [[ -n "${SHARED_INIT_CHAIN:-}" ]]; then
@@ -118,6 +121,7 @@ import json, sys
 print(json.load(open(sys.argv[1]))["step"])
 PY
 )
+    if [[ " $post_train_stages " == *" eval "* ]]; then
     for step in 0 20 40; do
       if [[ ! -f "$train_run/checkpoints/step_$step.npz" ]]; then continue; fi
       python scripts/evaluate.py --generate "${common[@]}" --method "$method" --data-path "$EVAL_DATA" \
@@ -134,6 +138,8 @@ PY
         | tee "$seed_root/logs/$method-eval-final.stdout"
       record_stage "$method" eval-final "$seed_root/logs/$method-eval-final.stdout"
     fi
+    fi
+    if [[ " $post_train_stages " == *" audit "* ]]; then
     for stage in audit audit-training; do
       audit_extra=()
       if [[ "$stage" == audit-training ]]; then audit_extra=(--config configs/experiments/minimal_gpu_audit_training.yaml); fi
@@ -143,6 +149,8 @@ PY
         | tee "$seed_root/logs/$method-$stage.stdout"
       record_stage "$method" "$stage" "$seed_root/logs/$method-$stage.stdout"
     done
+    fi
+    if [[ " $post_train_stages " == *" batch-audit "* ]]; then
     if [[ "$method" != grpo && "$method" != grpo_short ]]; then
       python scripts/audit_batch.py --generate "${common[@]}" --method "$method" --data-path "$TRAIN_DATA" \
         --config configs/experiments/minimal_gpu_train_memory.yaml \
@@ -157,6 +165,7 @@ path = Path(sys.argv[1]); path.mkdir(parents=True, exist_ok=True)
 (path/"batch_audit_summary.json").write_text(json.dumps({"status":"not_applicable",
     "reason":"GRPO has a different objective; this audit estimates R-minus-b HT/CV", "checkpoint":sys.argv[2]},indent=2))
 PY
+    fi
     fi
     python scripts/summarize_minimal.py "$seed_root"
   done

@@ -28,7 +28,7 @@ from grace_gc.trainer.baseline import baseline_from_config
 from grace_gc.trainer.cpu_tiny import TinyLoRAActor, TinyTrainConfig, run_tiny_batch
 from grace_gc.trainer.methods import apply_method_defaults, method_spec, start_group_size
 from grace_gc.trainer.state_io import restore_train_state
-from grace_gc.trainer.cost_control import cost_start_counts, ensure_cost_control, observe_batch_cost, restore_cost_control, start_cost_control
+from grace_gc.trainer.cost_control import cost_start_counts, ensure_cost_control, observe_batch_cost, restore_cost_control, start_cost_control, start_count_mode
 from grace_gc.trainer.tiny_engine import make_tiny_engines
 from grace_gc.versions import collect_environment
 
@@ -83,6 +83,8 @@ def resolve_start_counts(cfg: dict[str, Any], spec, n_start: int | None = None) 
 
 def resume_start_counts(cfg: dict[str, Any], spec, state: TrainState) -> tuple[int, int, int]:
     """First resumed batch uses the N that next_n already scheduled."""
+    if start_count_mode(cfg) == "fixed":
+        return resolve_start_counts(cfg, spec, state.n_ref or int(cfg.get("n_start", 8)))
     controller = cfg.get("_cost_controller")
     if controller is not None and controller.enabled and controller.state.get("next_n"):
         return cost_start_counts(cfg, spec, state, resolve_start_counts(cfg, spec, state.n_ref))
@@ -215,7 +217,7 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
             break
         if controller.enabled:
             n_prompts, starts_per, n_start = cost_start_counts(cfg, spec, state, (n_prompts, starts_per, n_start))
-        elif last.get("next_n"):
+        elif start_count_mode(cfg) != "fixed" and last.get("next_n"):
             n_prompts, starts_per, n_start = resolve_start_counts(cfg, spec, n_start=max(1, int(last["next_n"])))
         step_timer = Timer()
         batch = sample_starts(train_recs, n_prompts, starts_per, state.rng)

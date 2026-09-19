@@ -10,7 +10,7 @@ from grace_gc.predictor.features import reward_risk_features
 from grace_gc.predictor.ipw import assign_new_problems, ipw_weights
 from grace_gc.predictor.reservoir import GradientReservoir, ReservoirItem, age_weights
 from grace_gc.predictor.risk import full_space_residual
-from grace_gc.predictor.scale import design_shrink_from_projections
+from grace_gc.predictor.scale import design_shrink_diagnostics, design_shrink_from_projections
 
 
 def prepare_predictor_split(heads, reservoir, rng, basis_fit_only=False, *,
@@ -94,6 +94,9 @@ def _supervision_summary(items, weights, split, current_step):
             counts[it.problem_id] = counts.get(it.problem_id, 0) + 1
         summary[side] = {"n": len(selected), "n_problems": len(counts),
                          "n_nonzero_gradient": int(np.count_nonzero(norms[mask])),
+                         "n_prefix_finished": sum(it.prefix_finished is True for it in selected),
+                         "n_prefix_unfinished": sum(it.prefix_finished is False for it in selected),
+                         "n_prefix_finished_unknown": sum(it.prefix_finished is None for it in selected),
                          "n_singleton_problems": sum(n == 1 for n in counts.values())}
     return summary
 
@@ -163,7 +166,7 @@ def update_predictor_from_reservoir(
         if heads.train_auxiliary:
             rewards = np.array([0. if it.reward is None else float(it.reward) for it in items])
             heads.train_success(feats[fit], rewards[fit], weights[fit], epochs=epochs)
-    gamma = None
+    gamma = gamma_diagnostics = None
     selected = cal if heads.shrink_calibration == "holdout" else fit
     calibration_missing_reward_features_n = 0
     if heads.shrink_calibration == "holdout" and calibration_risk_mode == "reward" and calibration_p is None:
@@ -205,9 +208,12 @@ def update_predictor_from_reservoir(
                     raise ValueError("calibration p dimension does not match calibration rows")
         else:
             candidate_p = p[selected]
-        gamma = design_shrink_from_projections(
-            coords[selected], heads.predict_f(feats[selected], shrink=False), u.T @ u,
-            candidate_p, weights[selected])
+        unshrunk_f = heads.predict_f(feats[selected], shrink=False)
+        gram = u.T @ u
+        gamma = design_shrink_from_projections(coords[selected], unshrunk_f, gram,
+                                               candidate_p, weights[selected])
+        gamma_diagnostics = design_shrink_diagnostics(coords[selected], unshrunk_f, gram,
+                                                       candidate_p, weights[selected])
         if gamma is not None:
             heads.m_shrink = gamma
     e = None
@@ -215,8 +221,7 @@ def update_predictor_from_reservoir(
         hold_items = [it for it, keep in zip(items, hold) if keep]
         e = _residuals(hold_items, heads.predict_f(feats[hold]), u)
         if heads.feature_scaler == "refit" or not heads.risk_scale_fitted:
-            heads.scaler.fit_risk_scale(e)
-            heads.risk_scale_fitted = True
+            heads.risk_scale_fitted = heads.scaler.fit_risk_scale(e)
         risk_loss = heads.train_risk(feats[hold], e, weights[hold], epochs=epochs)
     cost_loss = 0.
     cost_idx = [i for i, it in enumerate(items)
@@ -226,21 +231,25 @@ def update_predictor_from_reservoir(
                                     np.array([items[i].realized_cost for i in cost_idx]),
                                     weights[cost_idx], epochs=epochs)
     if e is not None and heads.train_auxiliary:
-        reward_rows = [(it.reward_feat, residual, w) for it, residual, w in zip(hold_items, e, weights[hold])
-                       if it.reward_feat is not None]
-        if reward_rows:
-            x, y, w = zip(*reward_rows)
-            reward_loss = heads.train_reward_risk(np.stack(x), np.asarray(y), np.asarray(w), epochs=epochs)
+        reward_idx = [i for i, it in enumerate(hold_items) if it.reward_feat is not None]
+        if reward_idx:
+            # Match online/calibration inputs after this update's success fit.
+            # Historical length and baseline remain the labels' own context.
+            x = _current_reward_features(heads, feats[hold][reward_idx],
+                                          [hold_items[i] for i in reward_idx])
+            reward_loss = heads.train_reward_risk(x, e[reward_idx], weights[hold][reward_idx], epochs=epochs)
     heads.seen_problem_ids.update(reservoir.problem_ids())
     return {"coord_loss": coord_loss, "risk_loss": risk_loss, "cost_loss": cost_loss,
             "reward_risk_loss": reward_loss, "n": len(items), "m_shrink": float(heads.m_shrink),
             "coord_kind": heads.coord_kind, "calibration_mode": heads.shrink_calibration,
             "calibration_n": int(selected.sum()), "calibration_gamma": gamma,
+            "calibration_diagnostics": gamma_diagnostics,
             "calibration_p_mean": None if candidate_p is None else float(candidate_p.mean()),
             "calibration_uniform_shrink": float(calibration_uniform_shrink),
             "calibration_missing_cost_n": calibration_missing_cost_n,
             "calibration_unknown_finished_n": calibration_unknown_finished_n,
             "calibration_missing_reward_features_n": calibration_missing_reward_features_n,
             "risk_numerics": heads.risk_diagnostics(feats),
+            "risk_scale": float(heads.scaler.risk_scale), "risk_scale_fitted": bool(heads.risk_scale_fitted),
             "freshness": split.get("freshness"),
             "supervision": _supervision_summary(items, weights, split, current_step)}

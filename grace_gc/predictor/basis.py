@@ -219,11 +219,16 @@ def crossfit_ridge_operator(features, problem_ids, weights=None, ridge_l2=1.0):
 
 
 def refresh_predictable_basis(grads, features, problem_ids, k, basis_id,
-                              weights=None, ridge_l2=1.0) -> tuple[Basis | None, dict]:
+                              weights=None, ridge_l2=1.0,
+                              objective="prediction_energy") -> tuple[Basis | None, dict]:
     """Low-rank conditional-mean variant; caller supplies ONLY fit-side labels.
 
     M = A G is leave-one-problem-out ridge prediction, not in-sample fitted G.
     Maximize sum_i w_i ||U.T M_i||² subject to U.T U=I; no problem-mean removal.
+    Explicit cross_moment instead uses positive eigenvectors of
+    C = (G.T W M + M.T W G)/2, checking held-out target alignment rather than
+    predicted energy alone. Its finite-sample positive spectrum can still be
+    noise; it is not an independent evaluation of the selected basis.
     This is a predictive-signal surrogate, not proof of predictable energy on
     future policies. Hold/calibration labels must never enter this function.
 
@@ -237,15 +242,22 @@ def refresh_predictable_basis(grads, features, problem_ids, k, basis_id,
         raise ValueError("basis gradients must be finite")
     if len(features) != len(g) or len(problem_ids) != len(g):
         raise ValueError("predictable basis rows do not match")
+    if objective not in {"prediction_energy", "cross_moment"}:
+        raise ValueError("predictable basis objective must be prediction_energy or cross_moment")
     w = np.ones(len(g)) if weights is None else np.asarray(weights, dtype=np.float64).reshape(-1)
     operator, available = crossfit_ridge_operator(features, problem_ids, w, ridge_l2)
     metrics = {"variant": "predictable_crossfit", "crossfit_problems": len(set(problem_ids)),
                "prediction_rows": int(available.sum()), "rank": 0,
                "objective": "uncentered weighted energy of leave-one-problem-out ridge predictions",
                "ridge_l2": float(ridge_l2), "gradient_labels": "historical, not recomputed under current policy"}
+    if objective == "cross_moment":
+        metrics.update(variant="predictable_crossfit_signal",
+                       objective="positive spectrum of symmetric weighted held-out G/prediction cross moment")
     if not np.any(available):
         metrics["reason"] = "no_cross_problem_training_rows"
         return None, metrics
+    if objective == "cross_moment":
+        return _cross_moment_basis(g, operator, w * available, k, basis_id, metrics)
     weighted = operator * np.sqrt(w * available)[:, None]
     gram = np.zeros((len(g), len(g)), dtype=np.float64)
     block = 65536
@@ -266,6 +278,60 @@ def refresh_predictable_basis(grads, features, problem_ids, k, basis_id,
     for start in range(0, g.shape[1], block):
         prediction = weighted @ g[:, start:start + block]
         u[start:start + block] = prediction.T @ projected
+    u, _ = np.linalg.qr(u, mode="reduced")
+    metrics["reason"] = "formed"
+    return Basis(pad_basis_cols(u, int(k)), int(basis_id), int(k), rank), metrics
+
+
+def _cross_moment_basis(g, operator, weights, k, basis_id, metrics):
+    """Exact small-n signed eigensystem of G.T B G; never construct D×D C.
+
+    If G G.T = V diag(s²) V.T, E=G.T V/s is an orthonormal row-space basis
+    and E.T C E = diag(s) V.T B V diag(s), B=(W A+A.T W)/2.
+    Gradients and cross moments are uncentered. The relative spectral cutoff
+    is numerical rank only, using the existing squared singular tolerance.
+    """
+    active = weights > 0
+    gram = np.zeros((len(g), len(g)), dtype=np.float64)
+    block = 65536
+    for start in range(0, g.shape[1], block):
+        # Excluded/expired rows must not affect even the numerical row space.
+        rows = g[:, start:start + block] * active[:, None]
+        gram += rows @ rows.T
+    weighted = weights[:, None] * operator
+    b = (weighted + weighted.T) / 2.
+    target_energy = float(np.dot(weights, np.diag(gram)))
+    predicted_energy = float(np.sum((operator @ gram) * weighted))
+    cross_trace = float(np.sum(b * gram))
+    metrics.update(target_energy=target_energy, predicted_energy=predicted_energy,
+                   cross_moment_trace=cross_trace,
+                   oof_residual_energy=max(0., target_energy + predicted_energy - 2. * cross_trace),
+                   positive_eigenvalue_n=0, negative_eigenvalue_n=0,
+                   cross_moment_eigenvalues=[])
+    values, left = np.linalg.eigh(gram)
+    live = values > max(0., float(values.max())) * _SINGULAR_REL ** 2
+    if not np.any(live):
+        metrics["reason"] = "zero_gradient_rank"
+        return None, metrics
+    root = np.sqrt(values[live])
+    left = left[:, live]
+    small = root[:, None] * (left.T @ b @ left) * root[None, :]
+    signal, vectors = np.linalg.eigh((small + small.T) / 2.)
+    tol = float(np.max(np.abs(signal))) * _SINGULAR_REL ** 2
+    positive = np.flatnonzero(signal > tol)[::-1]
+    metrics.update(cross_moment_eigenvalues=signal[::-1].tolist(),
+                   positive_eigenvalue_n=len(positive),
+                   negative_eigenvalue_n=int(np.count_nonzero(signal < -tol)))
+    rank = min(int(k), len(positive))
+    metrics["rank"] = rank
+    if not rank:
+        metrics["reason"] = "no_positive_cross_moment_rank"
+        return None, metrics
+    projected = (left / root) @ vectors[:, positive[:rank]]
+    projected[~active] = 0.
+    u = np.empty((g.shape[1], rank), dtype=np.float64)
+    for start in range(0, g.shape[1], block):
+        u[start:start + block] = g[:, start:start + block].T @ projected
     u, _ = np.linalg.qr(u, mode="reduced")
     metrics["reason"] = "formed"
     return Basis(pad_basis_cols(u, int(k)), int(basis_id), int(k), rank), metrics

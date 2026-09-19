@@ -1,0 +1,13 @@
+# Explicit research candidate; layer after minimal_gpu_deeper.yaml.
+# No GPU benefit is claimed. Keep all four mechanism arms on this SAME recipe.
+# More labels come from mandatory backward, not extra full generations.
+experiment_variant: signal_candidate_20260919
+predictor:
+  audit_s: 1.0
+  fresh_samples_per_problem: 0
+  basis_variant: predictable_crossfit_signal
+baseline:
+  mode: ema
+  prescan: 4
+  prescan_prior_strength: 2.0
+  prescan_prior_mean: 0.5

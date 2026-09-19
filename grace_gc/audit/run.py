@@ -572,6 +572,7 @@ def generate_bundles_gpu(
                 "hash_stage": "loaded_checkpoint_before_audit", "layout": "all_qv_lora_A_B",
             })
         vllm_cfg = dict(cfg.get("vllm") or {})
+        vllm_cfg.setdefault("seed", int(cfg.get("seed", 17)))
         vllm_cfg["max_model_len"] = vllm_needed_max_model_len(cfg, _audit_max_new(cfg))
         llm = build_vllm_engine(str(model_path), vllm_cfg, int(cfg.get("lora", {}).get("rank", 16)))
         if work_dir is not None and getattr(build_vllm_engine, "last", None):

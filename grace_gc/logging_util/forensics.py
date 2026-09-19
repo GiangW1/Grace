@@ -396,6 +396,7 @@ def step_metrics_row(state, last: dict[str, Any], ctx: dict[str, Any], wall_s: f
         "n_completed": last.get("n_completed"),
         "n_stopped": last.get("n_stopped", sum(1 for r in records if r.z < 1.0)),
         "n_audited": last.get("n_audited"),
+        "audit_gradient_source": last.get("audit_gradient_source"),
         "n_prescan": last.get("n_prescan"),
         "mean_p": _mean(r.p for r in records),
         "mean_reward": _mean(r.reward for r in records),
@@ -566,10 +567,15 @@ def persist_training_step(
     health = {"step": int(state.step), "written_at": utc_now(), **step_health(state, last, cfg)}
     health.update(checkpoint_saved=save_now, last_saved_step=ctx["last_saved_step"])
     step_row = step_metrics_row(state, last, ctx, wall_s, health=health)
-    if (cfg.get("cost_control") or {}).get("enabled", False):
+    from grace_gc.trainer.cost_control import start_count_mode
+
+    if start_count_mode(cfg) == "wall":
         step_row["token_proxy_next_n"] = step_row["next_n"]
         step_row["next_n"] = None
         step_row["next_n_source"] = "post_save_cost_control.jsonl"
+    elif start_count_mode(cfg) == "fixed":
+        step_row["next_n"] = int(state.n_ref or n)
+        step_row["next_n_source"] = "fixed_n_ref"
     step_row["checkpoint_sha256"] = checkpoint_sha
     step_row["checkpoint_timings"] = timings
     run.append_jsonl("steps.jsonl", step_row)
