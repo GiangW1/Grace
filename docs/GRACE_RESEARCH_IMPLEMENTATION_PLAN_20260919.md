@@ -311,7 +311,7 @@ vLLM [v0.18.0 数据并行文档](https://docs.vllm.ai/en/v0.18.0/serving/data_p
 
 生成/同步异常会写 `failed_execution.json`，保留失败调用边界、执行尝试、缓存和同步观测，原异常继续抛出；观测写盘失败也不覆盖原异常。已恢复成功的兼容回退不误归因为后续 actor/feature 的失败。固定基底 hash 改用连续数组 buffer，保持原字节协议，避免 `tobytes()` 再创建一整份 U 的临时副本；仍需读取并校验数组。
 
-紧凑历史不能换基或恢复为完整 G。续训必须继续使用固定基底配置；actor-only 的新实验初始化与恢复完整学习状态是两种不同操作，不混称。固定 U 可能随策略漂移变差，仍应观察新题残差和独立审计，不能预设它胜过动态 U。当前实现没有完全离线预测器、多卡训练、额外监督或强制非零 γ。
+紧凑历史不能换基或恢复为完整 G。续训必须继续使用固定基底配置；actor-only 的新实验初始化与恢复完整学习状态是两种不同操作，不混称。固定 U 可能随策略漂移变差，仍应观察新题残差和独立审计，不能预设它胜过动态 U。本批未实现完全离线预测器或多卡训练，也未新增额外生成或强制非零 γ；既有 fresh 监督是否运行由叠加后的配置决定，固定 U overlay 不改变该设置。
 
 服务器单因素对照：在同一套 cost candidate 上分别不加/加入固定 U overlay，使用同 seed 共享初始化；先检查固定步数下的机制与全成本，再用现有 wall 模式/多 seed 汇总评估同物理预算质量。四臂机制脚本可用 `COMMON_CONFIG=configs/experiments/minimal_gpu_fixed_basis.yaml` 比较其既有 recipe；该脚本自行设置各臂 ABLATION_CONFIG，不能用环境 ABLATION_CONFIG 叠加。若要组合 cost candidate 与固定 U 的四臂，只在一份普通 YAML 中合并这两个明确配置，再交给 COMMON_CONFIG；不新增包装框架。
 

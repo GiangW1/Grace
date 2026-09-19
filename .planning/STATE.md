@@ -1,46 +1,31 @@
 ---
 gsd_state_version: '1.0'
-status: phase-complete
-progress:
-  total_phases: 2
-  completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
-  percent: 50
+status: in-progress
 ---
 
 # Project State
 
-## Project Reference
+核对日期：2026-09-19。原两阶段的首轮实现和最小证伪已完成；目前按负结果继续修复与再验证，论文效果尚未成立。项目范围见 [PROJECT.md](PROJECT.md)。
 
-See: .planning/PROJECT.md
+## 代码与发布
 
-**Core value:** 用简单、正确、可运行的代码实现 GRACE，随后做最小证伪。
-**Current focus:** Phase 2 — 服务器最小证伪尚未用现役树重跑。GitHub 默认分支是 `master`。
+- 仓库：[GiangW1/Grace](https://github.com/GiangW1/Grace)，默认分支 `master`。
+- 本地分支：`codex/grace-efficiency-20260919`；本轮功能提交截至 `f20506e`。后续知识收尾仅同步文档和忽略规则。
+- 修复已通过 fork 提交 [PR #2](https://github.com/GiangW1/Grace/pull/2)，核对时为 OPEN、未合并；未观察到 CI 检查结果。不能把 PR 发布当作服务器已部署或实测。
+- 后端为单卡 HF actor + vLLM 两阶段；固定 U 是可选变体，预测头仍在线更新。`n_gpu>1` 继续拒绝。
 
-## Current Position
+## 实验与测试
 
-Phase: 1 of 2 complete（完整实现 GRACE 与实验代码）
-Plan: 4 of 4
-Status: Phase 1 code complete；保真/方差接线在 master
-Last activity: 2026-09-17 — Neyman 等真实 U 与同步头、||G−Uf||²、仿射/ridge/γ/换基对齐、剩余 token ĉ；审查后补同步门、审计就绪、γ 的 IPW、稳定去均值、缺失 logprob、λ 换算、账本不重叠。本机 `252 passed, 17 deselected`。PR #2/#3 的最小 GPU 脚本和 π 计分已并入这份，不再单独合那两个 PR。
+- 最新已复核真实实验为 `minimal-chain-20260918-063159`，源码 `3c03ce9`，四方法均完成训练、评测及审计；[结果复核](../docs/MINIMAL_RESULTS_REVIEW_20260919.md)仍不支持“补全提高实际训练效率”。
+- 本轮修复没有新的 GPU 结果。本机无 GPU，最近 CPU 回归及真实 CUDA 跳过项以 [TEST_STATUS.md](../docs/TEST_STATUS.md) 为准。
+- 9月16/17日实验保留为历史，不混入9月18日链，也不作为当前候选的验证。
 
-Progress: 50% — 代码阶段完成；现役树上的真实 GPU 实验未跑。
+## 下一步
 
-## Accumulated Context
+1. 在单卡服务器验证当前 PR 版本的生成/缓存/同步观测、CUDA 数值、固定 U 恢复和完整成本，再使用现有脚本比较机制与同预算质量。运行方式见 [README](../README.md)。
+2. [实施方案§9](../docs/GRACE_RESEARCH_IMPLEMENTATION_PLAN_20260919.md#9-代码落点与验证)的顺序 1–4 已实现；5–7（条件噪声/基底遗漏/拟合误差与交叉能量、可选 prequential/轻特征、后续多 GPU）尚未实现。已有 realized-G 分解不能替代第5项。
+3. [30项问题清单](../docs/GRACE_ISSUE_CHECKLIST_20260919.md)是问题状态的权威入口；没有新测量时，不把待实测或未闭合事项改成已解决。
 
-### Decisions
+## 现场保留
 
-- GSD 只记录 4 个短计划，不加审批或研究合同。
-- CPU 与 GPU 共用 `grace_gc.core` 数学函数。
-- GPU 缺失时明确 ImportError，不提供假后端。
-
-### Next Work
-
-把当前工作树放到单卡服务器，跑 `scripts/run_minimal_gpu.sh`。看 GRACE 相对 Full-PG / Uniform-CV / GRPO 的质量与成本，不要看停止者比例。不要用 4 卡/8 卡。不要把 2026-09-16 两次 smoke 或那次 16 题链当现役结果。Pilot 仍按 README，在这次最小比较可读之后。
-
-### Notes
-
-- U6/真实两阶段 token 分布待 GPU。
-- 不要把本机 tiny LoRA 数字当成实测。
-- 2026-09-16 两次 smoke：冲突金标硬失败；以及 SFT 训进 `Answer:`+金标+EOS 导致短答交卷。`37fbcb2` 已改为只训推理开头。
+本地 `_minimal_review_*/`、`_smoke_review_*/`、`_runs_results/` 及 `.planning/phases/` 的历史材料保留，不提交、不清场。PR 尚未合并，当前分支和 worktree 仍用于复核。生成记忆未手工修改。

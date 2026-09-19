@@ -1,6 +1,6 @@
 # Requirements: GRACE-GC
 
-**Updated:** 2026-09-17
+**Updated:** 2026-09-19
 
 按用户最新要求：先完成全部核心代码，再运行最小证伪。以下是功能清单，不是实验准入规则；替代此前43项形式化需求。
 
@@ -12,7 +12,7 @@
 - [x] **CODE-02**: 实现全空间 HT 估计器、双流等价形式、p=1 回归和负损失符号；用 NumPy FP64/小模型检查 U1–U4。
 - [x] **CODE-03**: 实现包含 p_min 的续写成本分配与边界处理，返回实际 p 和预算偏差；非法概率或无法计算的输入明确报错。
 - [x] **CODE-04**: 实现 CPU tiny LoRA 自回归训练，涵盖 token-sum、固定 N、RNG 隔离、自然 EOS、零幸存和信息泄漏负例 U5。
-- [x] **CODE-05**: 实现 step 前的完整 q/v LoRA per-sample 梯度审计、独立抽样 s 和完整历史梯度 reservoir。
+- [x] **CODE-05**: 实现 step 前的完整 q/v LoRA per-sample 梯度审计、独立抽样 s 和历史梯度 reservoir；动态 U 保留完整 G，固定 U 候选改存坐标与完整范数，主更新仍使用全空间 G。
 - [x] **CODE-06**: 实现低秩 basis/刷新重投影、前缀特征、坐标头、全空间风险头、Gram 残差与成本头/常数成本选项。
 - [x] **CODE-07**: 实现历史数据和问题级拆分上的 IPW 预测器训练，使用 1/(p*s) 并按当前 basis/预测器重算风险标签。
 - [x] **CODE-08**: 实现批内冻结、历史 baseline、warmup p=1、批后学习与基于历史成本决定下一批固定起步数。
@@ -29,9 +29,11 @@
 
 ### Phase 2 — 最小证伪实验
 
-- [ ] **RUN-01**: 代码完成后，在目标 GPU 上按 README 安装依赖并短跑完整训练链路（当前入口单卡；4 卡未接线）。实际遇到设备/数值错误就定位修复。
-- [ ] **RUN-02**: 用可调的小规模配置运行同前缀审计及核心方法比较，保存所有观测；允许直接使用已有 checkpoint。
-- [ ] **RUN-03**: 汇总梯度误差、解题结果、实际成本及不确定性，判断后续实验方向；无需满足额外自动 Go/No-Go 条件。
+- [x] **RUN-01**: 在目标 GPU 上短跑完整训练链路（9月18日四方法链，单卡；4 卡未接线）。
+- [x] **RUN-02**: 运行小规模同前缀审计及核心方法比较并保存观测（9月18日链；归档明确排除的大文件仍有证据缺口）。
+- [x] **RUN-03**: 汇总梯度误差、解题结果、实际成本及不确定性，判断后续方向（9月19日复核；负结果正常报告，无自动 Go/No-Go）。
+
+以上完成状态限于 `3c03ce9` 的 [9月18日实测与复核](../docs/MINIMAL_RESULTS_REVIEW_20260919.md)，不表示后续修复或论文效果已验证。新候选与未完成项见 [问题清单](../docs/GRACE_ISSUE_CHECKLIST_20260919.md)。
 
 ## 不建设的额外机制
 
@@ -59,7 +61,7 @@
 | CODE-06 | Phase 1 | Code complete |
 | CODE-07 | Phase 1 | Code complete |
 | CODE-08 | Phase 1 | Code complete |
-| CODE-09 | Phase 1 | Wired: vLLM two-phase + HF logprob/backward/LoRA sync; GPU unverified |
+| CODE-09 | Phase 1 | 单卡旧版已实跑；后续修复待 GPU 回归；多卡未接线 |
 | CODE-10 | Phase 1 | CPU reduce/clip done; U6 GPU pending |
 | CODE-11 | Phase 1 | Code complete |
 | CODE-12 | Phase 1 | Code complete |
@@ -69,8 +71,8 @@
 | CODE-16 | Phase 1 | Code complete |
 | CODE-17 | Phase 1 | Code complete |
 | CODE-18 | Phase 1 | Code complete |
-| RUN-01 | Phase 2 | Pending |
-| RUN-02 | Phase 2 | Pending |
-| RUN-03 | Phase 2 | Pending |
+| RUN-01 | Phase 2 | 9月18日单卡链已完成 |
+| RUN-02 | Phase 2 | 9月18日审计与比较已完成；归档缺件另列 |
+| RUN-03 | Phase 2 | 9月19日逐文件复核已完成 |
 
-21项需求均已映射。Phase 1 的 18 项代码已落地；Phase 2 的 3 项实验未跑。GPU 集成测试待服务器。
+21项原始需求均已映射，首轮实现和最小证伪已完成；后续迭代仍在进行。当前 CPU 测试与 GPU 待验证范围见 [TEST_STATUS.md](../docs/TEST_STATUS.md)。

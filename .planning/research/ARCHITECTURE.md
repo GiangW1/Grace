@@ -1,6 +1,6 @@
 # GRACE 简单实现结构
 
-**Updated:** 2026-09-16；职责已按此落地，细节以代码和 README 为准。
+**Updated:** 2026-09-19；职责已按此落地，细节以代码和 [README](../../README.md) 为准。
 
 ## 模块按实际职责拆分
 
@@ -9,7 +9,7 @@
 | core | 估计器、概率分配、RNG与LoRA参数布局；CPU可用 |
 | predictor | reservoir、basis、特征、坐标/风险/成本头、IPW |
 | trainer | CPU小模型及GRACE训练步骤、核心对照、checkpoint |
-| backends | 实际需要的verl/vLLM/FSDP连接代码 |
+| backends | 单卡 HF actor + vLLM 两阶段、LoRA 同步；FSDP 包装与归约参考不代表多卡已接线 |
 | data / evaluation | 数学数据、验证、完整作答评测 |
 | audit | 独立续写、梯度统计与成本方差分析 |
 | scripts / configs | 训练、审计、图表、运行配置与README |

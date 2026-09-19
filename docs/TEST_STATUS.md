@@ -20,6 +20,8 @@
 
 完整回归后仅更新文档。训练/归档CLI帮助、候选配置按实际层叠顺序加载和 `git diff --check` 通过。服务器仍需验证CUDA数值、显存、真实生成批次/缓存、完整费用及同成本质量。代码与命令见 [实施状态§9.1](GRACE_RESEARCH_IMPLEMENTATION_PLAN_20260919.md#91-首批实施状态2026-09-19)。
 
+同日知识收尾仅同步文档与忽略规则，未重跑全量 pytest。另核对仓库 Markdown 的本地文件链接、修改文档的锚点、README Bash 语法和六处手动训练示例的评测题排除参数；训练 CLI 帮助验证该参数有效。历史报告保留的机器绝对路径用于本机原件追溯，在 GitHub 上不能直接打开。
+
 ## 本机上一轮结果（2026-09-19）
 
 ```text
@@ -127,7 +129,7 @@ Git Bash分别对 `run_minimal_gpu.sh`、`run_mechanism_gpu.sh`、`run_matched_c
 命令：`python -m pytest tests -k "not complete_final_expression and not u6_gpu"`。  
 当时 `complete_final_expression` 在 Windows 上会踩 math-verify 的 WinError 6；该路径现已修复并纳入全量测试。`u6_gpu` 要 CUDA。有 stack 时 U6 会跑 FP64 对照。
 
-当时在 master：P0/P1 之后补上审查接线（同步门、审计就绪、γ 的 IPW、稳定去均值、缺失 logprob、λ 换算、账本不重叠）。这是历史记录；当前脚本会另外叠加 `minimal_gpu_repaired.yaml`，尚无该修订的真实GPU结果。
+当时在 master：P0/P1 之后补上审查接线（同步门、审计就绪、γ 的 IPW、稳定去均值、缺失 logprob、λ 换算、账本不重叠）。这是历史记录；后来的 `3c03ce9` 已有 [9月18日真实实验](MINIMAL_RESULTS_REVIEW_20260919.md)。9月19日的后续修复尚无新 GPU 结果，不能把修复前链的实测归到新代码。
 
 ## 如何跑
 

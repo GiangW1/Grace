@@ -2,7 +2,7 @@
 
 ## What This Is
 
-实现《GRACE：ICLR 论文框架 v3》的主方法、核心对照和实验脚本。当前优先把代码完整写好，在本机完成能运行的正确性测试；随后到服务器做最小证伪实验，根据实际结果决定下一步。
+实现《GRACE：ICLR 论文框架 v3》的主方法、核心对照和实验脚本。首轮代码与真实单卡最小实验已完成；当前按实验暴露的问题继续修复和验证，论文的实际效率主张尚未获得支持。当前版本与下一步见 [STATE.md](STATE.md)。
 
 ## Core Value
 
@@ -25,22 +25,23 @@
 
 ### Validated
 
-- [x] GRACE 全空间 HT、续写分配、tiny LoRA 与 CPU 数学测试（本机 pytest 252 passed / 17 deselected，2026-09-17）。
+- [x] GRACE 全空间 HT、续写分配、tiny LoRA 与 CPU 数学测试；最新命令、数量和限制见 [TEST_STATUS.md](../docs/TEST_STATUS.md)。
 - [x] reservoir / basis / 预测器 / IPW / 审计梯度。
 - [x] 八个方法入口、checkpoint、分布式归约顺序的 CPU 参考。
 - [x] 数据分割、DAPO 冲突丢掉、格式 SFT、规则奖励、独立评测、前缀审计、账本、单卡配置与 README 全流程。
 
-GPU 两阶段真实训练与 U6 尚未在服务器验证。没有真实实验结果。
+2026-09-18 已完成四方法的单卡 HF + vLLM 训练、评测和审计，见 [逐文件复核](../docs/MINIMAL_RESULTS_REVIEW_20260919.md)。该链使用修复前的 `3c03ce9`，不能验证后续候选的质量或加速；新代码的真实 GPU 回归和分布式 U6/U7 仍待补。
 
 ### Active
 
 - [x] 实现 GRACE 全空间无偏梯度补全、续写分配和 CPU 参考测试。
 - [x] 实现历史梯度 reservoir、低秩基底、坐标/风险/成本预测器、IPW 与随机审计。
-- [x] 接入 HF actor + vLLM 两阶段 rollout、分布式双流更新与保存恢复（代码已写，待 GPU；`n_gpu>1` 拒绝）。
+- [x] 接入单卡 HF actor + vLLM 两阶段 rollout、双流更新与保存恢复；分布式归约有 CPU 参考，`n_gpu>1` 仍拒绝。
 - [x] 实现核心机制对照及 GRPO、GRPO-short，提供数学数据和独立评测入口。
 - [x] 实现真实成本记录、前缀审计、指标与图表脚本，提供小规模与完整 Pilot 参数。
 - [x] 提供 A100/5090 的运行配置和简短运行说明。
-- [ ] 代码完成后在服务器运行最小证伪，输出原始观测、统计量和局限。
+- [x] 完成首轮真实最小比较并复核观测、统计量和局限。
+- [ ] 验证后续修复与候选：以 [30项问题清单](../docs/GRACE_ISSUE_CHECKLIST_20260919.md) 和其链接的实施方案为准。
 
 ### Out of Scope
 
@@ -52,9 +53,9 @@ GPU 两阶段真实训练与 U6 尚未在服务器验证。没有真实实验结
 ## Context
 
 - 实际原稿：仓库根目录 GRACE_ICLR论文框架_v3.md；用户最初给出的嵌套路径不存在。
-- 原稿 SHA256：20b111105c42f116dbcc488355744bb72c5a90b08b8fdba333591bd63dc9a3e4。原稿保留不变。
+- 原稿内容以 Git 追踪的版本为准；本次收尾未修改论文原稿。
 - 核心实现依据：§4–§6、§8、§13 和附录 B/F/G。
-- GitHub 默认分支是 `master`。`37fbcb2` 只有格式 SFT 只训推理开头；现役保真/方差接线在其后的 master 提交。技术笔记供实现查阅，不要求重跑调研。
+- 仓库为 [GiangW1/Grace](https://github.com/GiangW1/Grace)，默认分支 `master`。当前修复的发布状态见 [STATE.md](STATE.md)，不能把本地已提交等同于已合并或已实测。
 - 本机 Windows 无 GPU；CPU 测试已跑。服务器按 README 全流程单卡起步。
 - 规划硬件为 4×A100，随后两组各 8×RTX5090；现在 `n_gpu>1` 不能启动。
 - GPU-hours 按硬件分别记录，不把5090时间直接叫作 A100-hours。
@@ -83,4 +84,4 @@ GPU 两阶段真实训练与 U6 尚未在服务器验证。没有真实实验结
 随代码更新勾选功能、记录重要方法偏离与已跑测试。已有论文与技术笔记保持可查，实际结果出来后再扩展实验计划。
 
 ---
-*Last updated: 2026-09-17 after grace-fidelity wiring; CPU 252 passed / 17 deselected; no GPU numbers on this tree*
+*Last updated: 2026-09-19；区分首轮实测、后续修复和待验证研究效果。*
