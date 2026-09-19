@@ -17,6 +17,8 @@ class PhaseResult:
     finish_reasons: list[str | None] | None = None
     stop_reasons: list | None = None
     sampling: dict | None = None
+    logprob_sums: list[float | None] | None = None
+    token_logprobs: list[list[float | None]] | None = None
 
 
 def _require_vllm():
@@ -51,6 +53,8 @@ def build_sampling_params(
         "stop": [],
         "repetition_penalty": 1.0,
         "min_p": 0.0,
+        # Behavior log-prob at generate time. Dropped on old vLLM. Not TIS.
+        "logprobs": 1,
     }
     if seed is not None:
         kwargs["seed"] = int(seed)
@@ -65,13 +69,13 @@ def build_sampling_params(
 
 
 def _fit_sampling_params(SamplingParams, kwargs: dict, need_seed: bool) -> tuple[dict, list[str]]:
-    """Keep required fields. Only min_p / repetition_penalty may be dropped."""
+    """Keep required fields. Only min_p / repetition_penalty / logprobs may be dropped."""
     try:
         SamplingParams(**kwargs)
         return dict(kwargs), []
     except TypeError:
         pass
-    optional = ("min_p", "repetition_penalty")
+    optional = ("logprobs", "min_p", "repetition_penalty")
     for drop in optional:
         trial = dict(kwargs)
         if drop not in trial:
@@ -101,6 +105,53 @@ def _fit_sampling_params(SamplingParams, kwargs: dict, need_seed: bool) -> tuple
         ) from exc
 
 
+def _logprob_from_record(rec, tok: int | None) -> float | None:
+    if rec is None:
+        return None
+    if isinstance(rec, dict):
+        item = None
+        if tok is not None:
+            if tok in rec:
+                item = rec[tok]
+            else:
+                for key, val in rec.items():
+                    try:
+                        if int(key) == int(tok):
+                            item = val
+                            break
+                    except (TypeError, ValueError):
+                        continue
+        rec = item
+    if rec is None:
+        return None
+    if isinstance(rec, (int, float, np.floating)):
+        val = float(rec)
+    else:
+        val = getattr(rec, "logprob", None)
+        if val is None:
+            return None
+        val = float(val)
+    if not np.isfinite(val):
+        return None
+    return val
+
+
+def _sum_sampled_logprobs(completion, kept_n: int) -> float | None:
+    values = _sampled_token_logprobs(completion, kept_n)
+    if not values or any(v is None for v in values):
+        return None
+    return float(sum(values))
+
+
+def _sampled_token_logprobs(completion, kept_n: int) -> list[float | None]:
+    raw = getattr(completion, "logprobs", None)
+    if not raw:
+        return [None] * int(kept_n)
+    toks = [int(t) for t in list(getattr(completion, "token_ids", []) or [])]
+    return [_logprob_from_record(raw[i], toks[i]) if i < len(raw) and i < len(toks) else None
+            for i in range(int(kept_n))]
+
+
 def _usable_stop_reason(stop_reason, stop_set: set[int]) -> int | None:
     """vLLM stop_reason is the token id or stop string that actually fired."""
     if stop_reason is None:
@@ -115,12 +166,10 @@ def _usable_stop_reason(stop_reason, stop_set: set[int]) -> int | None:
 def _finish_name(finish_reason) -> str | None:
     if finish_reason is None:
         return None
-    if isinstance(finish_reason, str):
-        return finish_reason.lower()
-    name = getattr(finish_reason, "name", None)
-    if name is not None:
-        return str(name).lower()
-    return str(finish_reason).lower()
+    if not isinstance(finish_reason, str):
+        name = getattr(finish_reason, "name", None)
+        finish_reason = str(name) if name is not None else str(finish_reason)
+    return str(finish_reason).lower().rsplit(".", 1)[-1]
 
 
 def _is_stop_finish(finish_reason) -> bool:
@@ -189,27 +238,6 @@ def _vllm_prompts(prompt_token_ids: list[list[int]]):
         return [{"prompt_token_ids": ids} for ids in prompt_token_ids]
 
 
-def _require_distinct_rollouts(
-    prompt_token_ids: list[list[int]],
-    token_ids: list[list[int]],
-    temperature: float,
-) -> None:
-    """A list SamplingParams API that broadcasts one seed collapses GRPO groups."""
-    if float(temperature) <= 0.0:
-        return
-    groups: dict[tuple[int, ...], list[tuple[int, ...]]] = {}
-    for prompt, full in zip(prompt_token_ids, token_ids):
-        groups.setdefault(tuple(prompt), []).append(tuple(full[len(prompt) :]))
-    for gens in groups.values():
-        if len(gens) < 2:
-            continue
-        if len(set(gens)) == 1:
-            raise ValueError(
-                "vLLM produced identical completions for the same prompt; "
-                "per-request SamplingParams seeds were not applied"
-            )
-
-
 def generate_phase(
     llm,
     prompt_token_ids: list[list[int]],
@@ -223,14 +251,15 @@ def generate_phase(
     """Generate from raw token IDs. Prefix caching reuses KV, not RNG state."""
     _LLM, _SP = _require_vllm()
     prompts = _vllm_prompts(prompt_token_ids)
+    seeds = [int(rng.integers(stream, 0, 2**31 - 1)) for _ in prompt_token_ids]
     param_list = [
         build_sampling_params(
             max_tokens,
             temperature,
-            int(rng.integers(stream, 0, 2**31 - 1)),
+            seed,
             eos_id=eos_id,
         )
-        for _ in prompt_token_ids
+        for seed in seeds
     ]
     kwargs = {"use_tqdm": False}
     if lora_request is not None:
@@ -248,6 +277,8 @@ def generate_phase(
     prompt_lens = []
     finish_reasons = []
     stop_reasons = []
+    logprob_sums: list[float | None] = []
+    token_logprobs = []
     for prompt, out in zip(prompt_token_ids, outputs):
         out_prompt = getattr(out, "prompt_token_ids", None)
         if out_prompt is None:
@@ -271,10 +302,14 @@ def generate_phase(
         token_ids.append(full)
         prompt_lens.append(len(prompt))
         finished.append(ended)
-        finish_reasons.append(None if raw_finish is None else str(raw_finish))
+        finish_reasons.append(_finish_name(raw_finish))
         stop_reasons.append(None if raw_stop is None else raw_stop)
-    _require_distinct_rollouts(prompt_token_ids, token_ids, temperature)
+        logprob_sums.append(_sum_sampled_logprobs(completion, len(gen)))
+        token_logprobs.append(_sampled_token_logprobs(completion, len(gen)))
+    # Independent draws can coincide, especially for short format-SFT answers.
     sampling = getattr(build_sampling_params, "last", None)
+    if sampling is not None:
+        sampling = {**sampling, "request_seeds": seeds}
     return PhaseResult(
         token_ids=token_ids,
         natural_finish=np.asarray(finished, dtype=bool),
@@ -282,6 +317,8 @@ def generate_phase(
         finish_reasons=finish_reasons,
         stop_reasons=stop_reasons,
         sampling=None if sampling is None else dict(sampling),
+        logprob_sums=logprob_sums,
+        token_logprobs=token_logprobs,
     )
 
 

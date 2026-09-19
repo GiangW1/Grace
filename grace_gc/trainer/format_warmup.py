@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from grace_gc.data.format_prompt import format_sft_response
+from grace_gc.data.format_prompt import format_sft_lead
 from grace_gc.data.math_data import MathRecord
 from grace_gc.logging_util.ledger import Timer
 
@@ -32,6 +32,9 @@ def _sft_summary(steps: int, n_examples: int, losses: list[float], skipped: bool
         "skipped": skipped,
         "last_loss": None if not losses else float(losses[-1]),
         "mean_loss": None if not losses else float(sum(losses) / len(losses)),
+        "trained": "reasoning lead",
+        "gold_in_loss": False,
+        "eos_in_loss": False,
     }
 
 
@@ -57,9 +60,9 @@ def run_format_warmup_tiny(actor, records: list[MathRecord], vocab: int, cfg: di
         prompt_lens = []
         for rec in batch:
             prompt = tiny_encode(rec.prompt, vocab, max_prompt)
-            resp = tiny_encode(format_sft_response(rec.answer), vocab, 32)
-            seqs.append(prompt + resp)
-            prompt_lens.append(len(prompt))
+            lead = tiny_encode(format_sft_lead(), vocab, 32)
+            seqs.append(prompt + lead)
+            prompt_lens.append((len(prompt), len(prompt) + len(lead)))
         width = max(len(seq) for seq in seqs)
         ids = torch.full((len(seqs), width), int(actor.eos_id), dtype=torch.long)
         for i, seq in enumerate(seqs):
@@ -67,14 +70,13 @@ def run_format_warmup_tiny(actor, records: list[MathRecord], vocab: int, cfg: di
         logits, _h = actor.forward(ids)
         loss = None
         ntok = 0
-        for i, plen in enumerate(prompt_lens):
-            slen = len(seqs[i])
-            if plen >= slen:
+        for i, (p0, p1) in enumerate(prompt_lens):
+            if p1 <= p0:
                 continue
-            start_logit = max(plen - 1, 0)
-            part = F.cross_entropy(logits[i, start_logit : slen - 1], ids[i, start_logit + 1 : slen], reduction="sum")
+            start_logit = max(p0 - 1, 0)
+            part = F.cross_entropy(logits[i, start_logit : p1 - 1], ids[i, start_logit + 1 : p1], reduction="sum")
             loss = part if loss is None else loss + part
-            ntok += slen - plen
+            ntok += p1 - p0
         if loss is None or ntok <= 0:
             continue
         loss = loss / ntok
@@ -83,23 +85,28 @@ def run_format_warmup_tiny(actor, records: list[MathRecord], vocab: int, cfg: di
         opt.step()
         losses.append(float(loss.detach().cpu()))
     summary = _sft_summary(steps, n, losses)
+    summary["n_presentations"] = steps * bs
+    summary["n_unique_examples_used"] = min(steps * bs, n)
+    summary["problem_ids_used"] = [rec.problem_id for rec in records[:min(steps * bs, n)]]
     if ledger is not None:
         ledger.add("format_warmup", timer.elapsed(), **{k: v for k, v in summary.items() if k != "skipped"})
     return summary
 
 
-def _encode_sft_pair(tokenizer, rec: MathRecord, max_prompt: int) -> tuple[list[int], list[int]]:
-    from grace_gc.data.tokenize import encode_prompt_hf_detail, _as_id_list
+def _encode_sft_ids(tokenizer, text: str) -> list[int]:
+    from grace_gc.data.tokenize import _as_id_list
+
+    return list(_as_id_list(tokenizer(text, add_special_tokens=False)))
+
+
+def _encode_sft_pair(tokenizer, rec: MathRecord, max_prompt: int) -> tuple[list[int], list[int], int]:
+    from grace_gc.data.tokenize import encode_prompt_hf_detail
 
     prompt_ids, _meta = encode_prompt_hf_detail(tokenizer, rec.prompt, max_prompt, rec.messages)
-    raw = tokenizer(format_sft_response(rec.answer), add_special_tokens=False)
-    resp_ids = _as_id_list(raw["input_ids"] if isinstance(raw, dict) else raw)
-    eos = getattr(tokenizer, "eos_token_id", None)
-    if eos is not None:
-        resp_ids = list(resp_ids) + [int(eos)]
+    resp_ids = _encode_sft_ids(tokenizer, format_sft_lead())
     if not resp_ids:
         raise ValueError("format warmup produced an empty response")
-    return list(prompt_ids), list(resp_ids)
+    return list(prompt_ids), resp_ids, len(resp_ids)
 
 
 def run_format_warmup_hf(actor, tokenizer, records: list[MathRecord], cfg: dict[str, Any], ledger=None) -> dict[str, Any]:
@@ -110,7 +117,7 @@ def run_format_warmup_hf(actor, tokenizer, records: list[MathRecord], cfg: dict[
     import torch
     import torch.nn.functional as F
 
-    from grace_gc.backends.hf_actor import trainable_params
+    from grace_gc.backends.hf_actor import actor_compute_context, trainable_params
 
     pad_id = getattr(tokenizer, "pad_token_id", None)
     if pad_id is None:
@@ -127,20 +134,23 @@ def run_format_warmup_hf(actor, tokenizer, records: list[MathRecord], cfg: dict[
         start = (step * bs) % n
         batch = [records[(start + i) % n] for i in range(bs)]
         pairs = [_encode_sft_pair(tokenizer, rec, max_prompt) for rec in batch]
-        width = max(len(prompt) + len(resp) for prompt, resp in pairs)
+        width = max(len(prompt) + len(resp) for prompt, resp, _n_train in pairs)
         ids = torch.full((bs, width), pad_id, dtype=torch.long)
         labels = torch.full((bs, width), -100, dtype=torch.long)
         attn = torch.zeros((bs, width), dtype=torch.long)
-        for i, (prompt, resp) in enumerate(pairs):
+        for i, (prompt, resp, n_train) in enumerate(pairs):
             seq = prompt + resp
             ids[i, : len(seq)] = torch.as_tensor(seq, dtype=torch.long)
-            labels[i, len(prompt) : len(seq)] = torch.as_tensor(resp, dtype=torch.long)
+            trained = resp[:n_train]
+            if trained:
+                labels[i, len(prompt) : len(prompt) + n_train] = torch.as_tensor(trained, dtype=torch.long)
             attn[i, : len(seq)] = 1
         ids = ids.to(device)
         labels = labels.to(device)
         attn = attn.to(device)
-        out = actor(input_ids=ids, attention_mask=attn)
-        logits = out.logits[:, :-1].contiguous()
+        with actor_compute_context(actor):
+            out = actor(input_ids=ids, attention_mask=attn, use_cache=False)
+        logits = out.logits[:, :-1].float().contiguous()
         tgt = labels[:, 1:].contiguous()
         loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), tgt.reshape(-1), ignore_index=-100)
         opt.zero_grad()
@@ -148,6 +158,9 @@ def run_format_warmup_hf(actor, tokenizer, records: list[MathRecord], cfg: dict[
         opt.step()
         losses.append(float(loss.detach().cpu()))
     summary = _sft_summary(steps, n, losses)
+    summary["n_presentations"] = steps * bs
+    summary["n_unique_examples_used"] = min(steps * bs, n)
+    summary["problem_ids_used"] = [rec.problem_id for rec in records[:min(steps * bs, n)]]
     if ledger is not None:
         ledger.add("format_warmup", timer.elapsed(), **{k: v for k, v in summary.items() if k != "skipped"})
     return summary

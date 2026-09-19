@@ -1,0 +1,4 @@
+# Explicit p=1 mechanism control; retain predictor/supervision overhead.
+experiment_variant: grace_full_completion
+allocation:
+  beta: 1.0

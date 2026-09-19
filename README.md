@@ -8,7 +8,9 @@ Qwen3-4B-Base 上的 GRACE 训练、评测和前缀审计。本机先做 CPU 检
 
 ## 全流程
 
-顺序：**环境 → 资源 → 绑卡/tmux → smoke Full-PG → Pilot Full-PG → Pilot GRACE → 其余对照**。先看 Full-PG 会不会学，再跑 GRACE。不要一上来就用 `grace` 做第一份 GPU 作业。
+顺序：**环境 → 资源 → 绑卡/tmux → smoke Full-PG → 最小比较 → Pilot Full-PG → Pilot GRACE → 其余对照**。先看 Full-PG 会不会学，再跑 GRACE。不要一上来就用 `grace` 做第一份 GPU 作业。
+
+GitHub 默认分支是 `master`。clone 后确认 `git log -1` 含保真接线，不要停在只训推理开头的 `37fbcb2`。
 
 5090 把下面所有 `configs/hardware/a100_1.yaml` 换成 `configs/hardware/rtx5090_1.yaml`。两种卡分别记时，不要折成 A100-hours。
 
@@ -16,8 +18,10 @@ Qwen3-4B-Base 上的 GRACE 训练、评测和前缀审计。本机先做 CPU 检
 
 ```bash
 pip install -e ".[cpu,dev]"
-python -m pytest tests
+python -m pytest tests -q -o addopts=''
 ```
+
+Windows 的 math-verify 超时路径已有隔离进程回归；需要 CUDA 的测试在没有 GPU 时跳过。
 
 ### B. 服务器环境
 
@@ -46,7 +50,7 @@ python scripts/fetch_assets.py --root data
 test -d "$MODEL" && test -f "$TRAIN_DATA" && test -f "$EVAL_DATA" && echo ok
 ```
 
-官方 DAPO parquet 可直接加载。同一题面金标冲突的整组丢掉，写入 `data_conflicts.json`（大约 12 组），不会硬失败。MATH-500 套与 DAPO 相同的 `Answer:` 指令。`format_warmup` 是共享格式 SFT（LoRA 上教 `Answer:`），不是 `predictor.warmup_steps`。
+官方 DAPO parquet 可直接加载。同一题面金标冲突的整组丢掉，写入 `data_conflicts.json`（大约 12 组），不会硬失败。MATH-500 套与 DAPO 相同的 `Answer:` 指令。`format_warmup` 是共享格式 SFT：只训推理开头，不训 `Answer:`、金标和 EOS。它不是 `predictor.warmup_steps`。最后一行格式靠 DAPO 指令。
 
 ### D. 绑卡和会话
 
@@ -97,6 +101,41 @@ python scripts/audit.py --generate \
 
 看 `run.log` 里有没有 `phase=prescan` / `phase=prefix` / `phase=continue_done` / `step N`。第一份适配器叫 `lora/step-2`，那是 vLLM adapter id（首次 sync），**不是**已经训完 2 步。`health.json` 里 `lora_A_grad_zero_expected` 在 B≈0 时可以为真（PEFT ΔW=B·A）。`all_reward_zero` 且 `n_baseline_zero>0` 时，`baseline_collapsed_with_zero_reward` 为真，优势会是 0。审计里 `Var(R)=0` 时 ρ 是 NaN，这是公式，不是崩了。
 
+### E2. 最小比较（现役工作树）
+
+修复后的比较默认使用 **3 个 seed（17/23/41）、4 个方法、每方法 40 步、128 道评测题×4 次、16 道审计题**，依次在单卡运行。每个 seed 只做一次 256 步 reasoning-lead 格式 SFT，然后四方法加载同一份 actor，各自重新建立优化器和预测器。它仍是最小比较，不是 Pilot；工作量比原来的单 seed、16 题链明显增加，尚无新 GPU 耗时预测。
+
+```bash
+export CUDA_VISIBLE_DEVICES=1  # 按实际可用卡号设置
+bash scripts/run_minimal_gpu.sh runs/minimal-repaired
+```
+
+默认方法为 `full_pg grace uniform_cv grpo`；只运行一个 seed 可设置 `SEEDS=17`，结果会保留实际范围。脚本叠加 [第一轮修复配置](configs/experiments/minimal_gpu_repaired.yaml) 和 [第二轮方法配置](configs/experiments/minimal_gpu_deeper.yaml)，旧 `minimal_gpu.yaml` 保留。新默认包括按题交叉拟合建基、监督年龄窗口、当前策略额外采样、独立校准、β=.75、每步4题和实际成本反馈，均是明确的方法/实验变体，尚未证明能提高质量。HF 使用 BF16 运算并保留 FP32 可训练参数和优化器状态；更新前核对所有完成响应及停止者已观测前缀的原行为 token 分数，缺失保持缺失。
+
+每个 seed 目录的 `comparison.json` 保存各方法质量、实际成本和三类审计；根目录的 `seeds_comparison.json` 按训练 seed 汇总。原多决策点审计、`audit-training`（t=512、horizon=2048、baseline=4）和新的 `batch-audit` 分开。批审计固定题集与N、全空间计算梯度方差，再复制checkpoint优化器在CPU上比较clip/Adam更新；它会生成全部续写并付费，不能当作实际省算。GRPO目标不同，批HT审计标为不适用。共同权重、seed和评测协议不匹配时不输出配对收益。
+
+按共同实测墙钟预算比较：
+
+```bash
+bash scripts/run_matched_cost_gpu.sh runs/minimal-matched-wall
+```
+
+每个seed先运行Full-PG参考40步，再将其实际训练时长作为另外三方法的预算，按真实终点保存和评测。批次边界可能超额，报告保留实际耗时、真实步数和停止原因；不会把预算相同当作耗时严格相等。`RUN_WALL_SECONDS` 可显式给共同预算，`MAX_STEPS` 默认10000是步数上限。共享SFT、评测与审计成本另列。
+
+`ABLATION_CONFIG=configs/experiments/baseline_prescan16.yaml` 提供baseline样本量对照；跨配置对照可设置 `SHARED_INIT_CHAIN=原链根目录` 复用每个seed的共同actor，并显式使用相同墙钟预算。`EXPERIMENT_CONFIG=configs/experiments/minimal_gpu_repaired.yaml` 可关闭第二轮覆盖，保留第一轮变体。
+
+附件评审吸收的独立对照同样通过`ABLATION_CONFIG`使用：`grace_full_completion.yaml`（全组件p=1）、`grace_no_cv.yaml`（只关闭补全，保留风险模型及辅助开销）、`allocation_uniform_shrink.yaml`（向同预计成本uniform收缩一半）、`baseline_fixed.yaml`（固定b=.5并跳过预扫）、`baseline_smoothed.yaml`（独立预扫加入先验平滑），均位于`configs/experiments/`。这些候选不会自动叠加，尚无GPU收益结论。GRPO/GRPO-short已移除不参与其组均值目标的prescan；批审计增加原始梯度、clip后梯度和Adam步的配对方向/误差，多前缀审计增加全空间基底遗漏与坐标预测误差分解。取舍和命令见[修复说明第6节](docs/GRACE_REMEDIATION_20260918.md#6-grace_reviewmd-的取舍与实现)。
+
+评估质量和实际成本，停止者比例不表示加速。40 步比较不代表 equal-compute；新结果不能覆盖 2026-09-17 的负结果，2026-09-16 也不是现役结果。完整修复与待验证事项见 [修复说明](docs/GRACE_REMEDIATION_20260918.md)。
+
+作业结束后保留完整检查点归档：
+
+```bash
+python scripts/archive_run.py runs/minimal-repaired runs/minimal-repaired.tar.gz --include-checkpoints
+```
+
+脚本若因同名重跑更换根目录，使用控制台打印的实际 `root`。不加 `--include-checkpoints` 时默认排除大于20 MiB的文件，排除项仍记录哈希；哈希不能替代被排除的权重。
+
 ### F. Pilot：先 Full-PG 30 步
 
 ```bash
@@ -140,7 +179,7 @@ python scripts/audit.py --generate \
 
 ### G. Pilot：再 GRACE 30 步
 
-GRACE 的 warmup 是 20 步，`--num-steps` 必须大于 20。评测/审计必须用**该方法自己的** `checkpoint.npz`。
+GRACE 的 warmup 是20步；只有超过暖身阶段才会观察到停止分配。短运行正常保存并报告是否启用分配。评测/审计使用**该方法自己的** `checkpoint.npz`。
 
 ```bash
 export CUDA_VISIBLE_DEVICES=0
@@ -186,7 +225,9 @@ python scripts/audit.py --bundles runs/audit-fullpg-seed17/audit_bundles.jsonl -
 | `lora/step-2` 在第 1 步前就出现 | adapter id，首次 sync；不是 `state.step` |
 | `phase=prescan` 很久没新日志 | 未见过的题各抽 4 条满长样本写 baseline；现在会打心跳 |
 | `data_conflicts.json` | 官方 DAPO 冲突题面已丢掉 |
-| `format_warmup.json` | 共享格式 SFT，默认 Pilot 256 步、smoke 32 步 |
+| `format_warmup.json` | 共享格式 SFT：只训推理开头，不训 `Answer:`/金标/EOS。`mean_response_tokens` 经常 <16 是交卷 |
+| `n_continued` / `n_prefix_finished` | 续写条数；整批 0 说明决策点前已 EOS |
+| 审计 `decision_grid_unobserved` | 该 t 没有存活前缀；不是 yaml 删了 64/128 |
 | `baseline_collapsed_with_zero_reward` | 全零奖励且 b=0，优势为 0 |
 | `lora_A_grad_zero_expected` | B≈0 时 A 梯度应为 0 |
 | 审计 ρ 为 NaN | 该子集 `Var(R)=0`，按公式就是 NaN |
@@ -263,7 +304,7 @@ python -c "import torch, vllm, transformers, peft, math_verify; print('torch', t
 
 ```bash
 pip install -e ".[cpu,dev]"
-python -m pytest tests
+python -m pytest tests -k "not complete_final_expression and not u6_gpu"
 ```
 
 ## 2. 准备模型和数据
@@ -301,7 +342,7 @@ export EVAL_DATA=$(find "$PWD/data/math500" \( -name '*.parquet' -o -name '*.jso
 - 训练文件是官方 DAPO 的 JSONL 或 parquet。`prompt` 可以是对话列表，答案读 `reward_model.ground_truth`。官方 parquet 可直接加载；同一题面金标冲突的整组会丢掉，并写入 `data_conflicts.json`（大约 12 组）。
 - 评测必须是单独的 MATH-500，字段用 `problem`/`prompt` 和 `answer`。不要把 DAPO 再切 10% 当考卷。MATH-500 会套上与 DAPO 相同的 `Answer:` 格式指令。
 - 未标记且够大的 DAPO 会按 seed 17 切出校准 256、审计 240，其余训练。缺金标会报错。
-- `format_warmup` 是论文要求的共享格式 SFT（LoRA 上教 `Answer:`），不是预测器的 `predictor.warmup_steps`。默认 256 步；续训会跳过。
+- `format_warmup` 是论文要求的共享格式 SFT：只训推理开头，不训 `Answer:`、金标和 EOS。默认 256 步；续训会跳过。看 `mean_response_tokens`：经常小于 16 是交卷，不是学会了。
 
 检查路径存在再往下：
 
@@ -467,7 +508,7 @@ python scripts/train.py \
 | `data_splits.json` / `data_conflicts.json` / `format_warmup.json` / `tokenizer.json` / `vllm_engine.json` / `sampling.json` | 切分、丢掉的冲突题、格式 SFT、tokenizer stop、实际引擎参数 |
 | `logprob_probe.jsonl` | 同序列 HF vs vLLM logprob（不可用则记原因） |
 | `trajectories.jsonl` | 每条起步：p/Z/f/r̂/ĉ/优势/长度/结束原因/答案/token |
-| `compute_ledger.json` / `compute_ledger.jsonl` | 按步、按阶段的墙钟 |
+| `compute_ledger.json` / `compute_ledger.jsonl` | 按步、按阶段的墙钟；`summary` 总量只计 `train`/`eval`/`audit` 外壳，不把 `phase_*` 和 `train_step` 再加一遍 |
 | `checkpoint.npz` / `checkpoints/step_k.npz` | 最新与逐步快照 |
 | `eval_summary.json` / `eval_per_problem.jsonl` | MATH-500 的 avg@k、答案、截断、token |
 | `audit_summary.json` / `audit_bundles.jsonl` | ρ、ELF、方差×成本、前缀/后缀文本 |
@@ -494,6 +535,7 @@ python scripts/plot.py --summary runs/eval-grace-seed17/eval_summary.json --out 
 | `configs/default.yaml` | 论文默认超参 |
 | `configs/experiments/smoke.yaml` | 服务器短跑 |
 | `configs/experiments/minimal.yaml` | 本机 CPU 冒烟 |
+| `configs/experiments/minimal_gpu.yaml` | 单卡 16 题比较；经 `scripts/run_minimal_gpu.sh` 与 default 合并 |
 | `configs/experiments/pilot.yaml` | Pilot 规模 |
 | `configs/hardware/a100_1.yaml` | 单卡 A100（先用这个） |
 | `configs/hardware/rtx5090_1.yaml` | 单卡 5090 |

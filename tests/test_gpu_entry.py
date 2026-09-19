@@ -129,6 +129,7 @@ def test_length_finish_short_of_budget_is_truncated():
         name = "LENGTH"
 
     assert generated_was_truncated(100, 4096, False, _Length()) is True
+    assert generated_was_truncated(100, 4096, False, "FinishReason.LENGTH") is True
 
 
 def test_qwen_chat_stop_ids_include_im_end_and_endoftext():
@@ -318,7 +319,7 @@ def test_generate_phase_rejects_missing_prompt_ids(monkeypatch):
         vllm_mod.generate_phase(_LLM(), [[1, 2]], 4, 1.0, 2, IsolatedRNG.create(0), "token")
 
 
-def test_generate_phase_rejects_collapsed_same_prompt_seeds(monkeypatch):
+def test_generate_phase_keeps_identical_answers_with_independent_seeds(monkeypatch):
     from types import SimpleNamespace
 
     import grace_gc.backends.vllm_two_phase as vllm_mod
@@ -330,6 +331,7 @@ def test_generate_phase_rejects_collapsed_same_prompt_seeds(monkeypatch):
 
     class _LLM:
         def generate(self, prompts, sampling_params=None, **kwargs):
+            assert len({sp.kwargs["seed"] for sp in sampling_params}) == 2
             same = list(range(10, 18))
             return [
                 SimpleNamespace(
@@ -344,8 +346,9 @@ def test_generate_phase_rejects_collapsed_same_prompt_seeds(monkeypatch):
 
     monkeypatch.setattr(vllm_mod, "_require_vllm", lambda: (_LLM, _SP))
     monkeypatch.setattr(vllm_mod, "_vllm_prompts", lambda ids: ids)
-    with pytest.raises(ValueError, match="per-request"):
-        vllm_mod.generate_phase(_LLM(), [[1, 2], [1, 2]], 8, 1.0, 2, IsolatedRNG.create(0), "token")
+    result = vllm_mod.generate_phase(_LLM(), [[1, 2], [1, 2]], 8, 1.0, 2, IsolatedRNG.create(0), "token")
+    assert result.token_ids[0] == result.token_ids[1]
+    assert len(set(result.sampling["request_seeds"])) == 2
 
 
 def test_generate_phase_accepts_distinct_same_prompt_rollouts(monkeypatch):
@@ -607,7 +610,50 @@ def test_build_vllm_engine_leaves_room_for_hf_actor(monkeypatch):
     assert custom.kwargs["max_model_len"] == 8192
 
 
-def test_eval_vllm_rejects_collapsed_avg_at_4(monkeypatch):
+def test_vllm_registers_worker_shutdown(monkeypatch):
+    from types import SimpleNamespace
+
+    import grace_gc.backends.verl_trainer as vt
+    import grace_gc.backends.vllm_two_phase as vllm_mod
+
+    callbacks = []
+    events = []
+    core = SimpleNamespace(shutdown=lambda: events.append("shutdown"))
+    llm = SimpleNamespace(
+        llm_engine=SimpleNamespace(engine_core=core),
+        collective_rpc=lambda callback: events.append(callback),
+    )
+    monkeypatch.setattr(vllm_mod, "_require_vllm", lambda: (lambda **kwargs: llm, None))
+    monkeypatch.setattr(vt.atexit, "register", lambda fn, *args: callbacks.append((fn, args)))
+
+    assert vt.build_vllm_engine("org/model", {}, 16) is llm
+    assert not events
+    assert len(callbacks) == 1
+    callback, args = callbacks[0]
+    callback(*args)
+    assert events == ["grace_destroy_process_groups", "shutdown"]
+
+
+def test_vllm_shutdown_still_stops_core_if_rpc_fails():
+    from types import SimpleNamespace
+
+    from grace_gc.backends.verl_trainer import _shutdown_vllm_engine
+
+    closed = []
+
+    def broken_rpc(callback):
+        raise RuntimeError("worker failed")
+
+    llm = SimpleNamespace(
+        llm_engine=SimpleNamespace(engine_core=SimpleNamespace(shutdown=lambda: closed.append(True))),
+        collective_rpc=broken_rpc,
+    )
+    with pytest.raises(RuntimeError, match="worker failed"):
+        _shutdown_vllm_engine(llm)
+    assert closed == [True]
+
+
+def test_eval_vllm_keeps_identical_answers_with_independent_seeds(monkeypatch):
     from types import SimpleNamespace
 
     import grace_gc.backends.vllm_two_phase as vllm_mod
@@ -618,8 +664,11 @@ def test_eval_vllm_rejects_collapsed_avg_at_4(monkeypatch):
         def __init__(self, **kwargs):
             self.kwargs = kwargs
 
+    seeds = []
+
     class _LLM:
         def generate(self, prompts, sampling_params=None, **kwargs):
+            seeds.append(sampling_params.kwargs["seed"])
             return [
                 SimpleNamespace(
                     prompt_token_ids=[1, 2],
@@ -637,8 +686,10 @@ def test_eval_vllm_rejects_collapsed_avg_at_4(monkeypatch):
     monkeypatch.setattr(tok, "decode_hf", lambda tokenizer, gen: "same")
     monkeypatch.setattr(tok, "collect_stop_token_ids", lambda tokenizer: [2])
     recs = [MathRecord(problem_id="a", prompt="1+1", answer="2")]
-    with pytest.raises(ValueError, match="per-request"):
-        generate.generate_answers_vllm(recs, object(), _LLM(), 4, 8, 0.6, 0.95, 1)
+    items = generate.generate_answers_vllm(recs, object(), _LLM(), 4, 8, 0.6, 0.95, 1)
+    assert items[0].answers == ["same"] * 4
+    assert seeds == [1, 2, 3, 4]
+    assert items[0].sample_seeds == seeds
 
 
 def test_eval_vllm_accepts_distinct_avg_at_4(monkeypatch):
@@ -690,10 +741,38 @@ def test_eval_writes_lora_before_starting_vllm():
     assert src.index("del actor") < src.index("llm = build_vllm_engine")
     assert src.index("apply_lora_request") < src.index("generate_answers_vllm")
     assert "max_model_len" in src
-    assert "max(have, 5120, need)" in src
-    assert src.index("prompt_max_tokens") < src.index("llm = build_vllm_engine")
-    gen = inspect.getsource(generate.generate_answers_vllm)
-    assert "_require_distinct_rollouts" in gen
+    assert src.index("vllm_needed_max_model_len") < src.index("llm = build_vllm_engine")
+    assert "prompt_max_tokens" in src
+
+
+def test_vllm_needed_max_model_len_has_slack():
+    from grace_gc.backends.verl_trainer import vllm_needed_max_model_len
+
+    assert vllm_needed_max_model_len({"prompt_max_tokens": 1024, "eval": {"max_new_tokens": 4096}}) == 5184
+    assert vllm_needed_max_model_len({"vllm": {"max_model_len": 8192}}, 4096) == 8192
+
+
+def test_ensure_bf16_casts_ignored_dtype():
+    torch = pytest.importorskip("torch")
+    from torch import nn
+
+    from grace_gc.backends.verl_trainer import _ensure_bf16
+
+    lin = nn.Linear(2, 2).to(dtype=torch.float32)
+    out = _ensure_bf16(lin)
+    assert next(out.parameters()).dtype == torch.bfloat16
+
+
+def test_logprob_probe_does_not_tail_align():
+    import inspect
+
+    from grace_gc.backends import logprob_probe
+
+    src = inspect.getsource(logprob_probe.vllm_prompt_logprobs)
+    assert "extra[key] = 1" in src
+    cmp = inspect.getsource(logprob_probe.compare_hf_vllm_logprob)
+    assert "vllm[-len(hf)" not in cmp
+    assert "misaligned" in cmp
 
 
 def test_logprob_forward_skips_hidden_states():

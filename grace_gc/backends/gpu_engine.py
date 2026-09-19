@@ -48,6 +48,10 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
             engines.last_rollout = {
                 "prefix_finish_reasons": list(phase.finish_reasons or []),
                 "prefix_stop_reasons": list(phase.stop_reasons or []),
+                "prefix_logprob_sums": list(phase.logprob_sums or []),
+                "prefix_token_logprobs": list(phase.token_logprobs or []),
+                "prefix_request_seeds": (phase.sampling or {}).get("request_seeds", []),
+                "has_generate_logprobs": True,
                 "sampling": phase.sampling,
             }
         return phase.token_ids, phase.natural_finish
@@ -68,23 +72,40 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
         engines = box.get("engines")
         if engines is not None:
             roll = dict(engines.last_rollout or {})
-            finish_map = {}
-            stop_map = {}
+            finish_map = dict(roll.get("continue_finish_reasons") or {})
+            stop_map = dict(roll.get("continue_stop_reasons") or {})
+            logprob_map = dict(roll.get("continue_logprob_sums") or {})
+            token_lp_map = dict(roll.get("continue_token_logprobs") or {})
+            seed_map = dict(roll.get("continue_request_seeds") or {})
             if phase is not None:
                 for j, i in enumerate(idx):
                     if phase.finish_reasons:
                         finish_map[i] = phase.finish_reasons[j]
                     if phase.stop_reasons:
                         stop_map[i] = phase.stop_reasons[j]
+                    if phase.logprob_sums:
+                        logprob_map[i] = phase.logprob_sums[j]
+                    if phase.token_logprobs:
+                        token_lp_map[i] = phase.token_logprobs[j]
+                    request_seeds = (phase.sampling or {}).get("request_seeds") or []
+                    if j < len(request_seeds):
+                        seed_map[i] = request_seeds[j]
                 if phase.sampling is not None:
                     roll["sampling"] = phase.sampling
             roll["continue_finish_reasons"] = finish_map
             roll["continue_stop_reasons"] = stop_map
+            roll["continue_logprob_sums"] = logprob_map
+            roll["continue_token_logprobs"] = token_lp_map
+            roll["continue_request_seeds"] = seed_map
+            roll["has_generate_logprobs"] = True
             engines.last_rollout = roll
         return out
 
     def features(prefixes, prompt_lens, baselines):
-        return prefix_feature_bundle(actor, prefixes, prompt_lens, baselines, pad_id, eos_id=eos_id)
+        pcfg = cfg.get("predictor") or {}
+        return prefix_feature_bundle(actor, prefixes, prompt_lens, baselines, pad_id, eos_id=eos_id,
+                                     feature_mode=pcfg.get("feature_mode", "legacy"),
+                                     batch_size=int(pcfg.get("feature_batch_size", 1)))
 
     def lp_sums(full_ids, prompt_lens, chosen):
         return logprob_sums(actor, full_ids, prompt_lens, chosen, pad_id, eos_id=eos_id)

@@ -38,3 +38,12 @@ def test_zero_cost_and_zero_risk():
 def test_illegal_pmin():
     with pytest.raises(ValueError):
         allocate_continuation(np.array([1.0]), np.array([1.0]), beta=0.5, p_min=0.0)
+
+
+def test_risk_scale_does_not_change_p():
+    risk = np.array([4.0, 1.0, 0.25, 2.0])
+    cost = np.array([1.0, 2.0, 1.0, 0.5])
+    a = allocate_continuation(risk, cost, beta=0.5, p_min=0.2)
+    b = allocate_continuation(50.0 * risk, cost, beta=0.5, p_min=0.2)
+    np.testing.assert_allclose(a.p, b.p, atol=1e-10)
+    np.testing.assert_allclose(b.lam, 50.0 * a.lam, rtol=1e-8)

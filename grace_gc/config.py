@@ -80,17 +80,6 @@ def validate_config(cfg: dict[str, Any]) -> dict[str, Any]:
     return cfg
 
 
-def require_training_leaves_warmup(cfg: dict[str, Any]) -> None:
-    """Named HT methods must actually leave warmup during a training run."""
-    method = str(cfg.get("method", "grace")).replace("-", "_").lower()
-    steps = int(cfg.get("num_steps", 1))
-    warmup = int((cfg.get("predictor") or {}).get("warmup_steps", 0))
-    if method not in {"full_pg", "grpo", "grpo_short"} and steps <= warmup and not cfg.get("resume"):
-        raise ValueError(
-            f"num_steps={steps} never leaves warmup_steps={warmup}; {method} HT is not computed"
-        )
-
-
 def default_config() -> dict[str, Any]:
     return {
         "method": "grace",
@@ -117,6 +106,11 @@ def default_config() -> dict[str, Any]:
             "reservoir_size": 512,
             "refresh_every": 32,
             "constant_cost": True,
+            "coord_kind": "mlp",
+            "ridge_l2": 1.0,
+            "use_affine": True,
+            "shrink_m": True,
+            "align_basis": True,
         },
         "lora": {"rank": 16, "alpha": 32.0, "dropout": 0.0, "targets": ["q_proj", "v_proj"]},
         "optim": {"lr": 1e-4, "betas": [0.9, 0.99], "weight_decay": 0.0, "grad_clip": 1.0},

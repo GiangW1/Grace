@@ -306,6 +306,12 @@ def test_natural_eos_at_budget_is_not_truncated():
     assert _traj_natural_finish(False, [1, 2, 3, 4], 9, generated=2, requested=8) is True
     assert _traj_natural_finish(False, [1, 2, 3, 4], 9, generated=8, requested=8) is False
     assert _traj_natural_finish(False, [1, 2], 9, generated=0, requested=8) is True
+    assert _traj_natural_finish(False, [1, 2, 3, 4], 9, generated=2, requested=8, finish_reason="length") is False
+    assert _traj_natural_finish(False, [1, 2, 3, 4], 9, generated=2, requested=8, finish_reason="stop") is True
+    assert _traj_natural_finish(False, [1, 2, 3, 4], 9, generated=2, requested=8, finish_reason="FinishReason.LENGTH") is False
+    assert _length_truncated([1, 2, 3, 4], 2, 8, False, 9, finish_reason="length") is True
+    assert _length_truncated([1, 2, 3, 9], 2, 8, True, 9, finish_reason="stop") is False
+    assert _length_truncated([1, 2, 3, 4], 2, 8, False, 9, finish_reason="FinishReason.LENGTH") is True
 
 
 def test_unknown_split_raises(tmp_path: Path):
@@ -407,7 +413,10 @@ def test_t_l_uses_detect_half_not_report():
     assert out["rho_l_curve"][0] < out["rho_l_detect_curve"][0]
     assert out["t_L"] == t_learn(np.asarray(out["rho_l_detect_ucb_curve"]), times, 0.2)
     assert out["t_L_point"] == t_learn(np.asarray(out["rho_l_detect_curve"]), times, 0.2)
-    assert out["t_L"] == pytest.approx(16.0)
+    # One problem has no between-problem standard error; retain point detection
+    # without presenting it as a confidence bound.
+    assert out["t_L"] is None
+    assert out["t_L_point"] == pytest.approx(16.0)
     report_t_l = t_learn(np.asarray(out["rho_l_curve"]), times, 0.2)
     assert report_t_l == pytest.approx(8.0)
 
@@ -578,10 +587,15 @@ def test_prompt_var_uses_earliest_prefix_per_path():
 
 
 def test_audit_jsonl_keeps_answer_emitted():
-    from grace_gc.audit.run import run_audit
+    from grace_gc.audit.prefix_audit import PrefixBundle, bundle_from_dict, bundle_to_dict
+    import json
 
-    src = __import__("inspect").getsource(run_audit)
-    assert '"answer_emitted": bool(b.answer_emitted)' in src
+    bundle = PrefixBundle("p", 4, np.array([1.]), np.ones((1, 2)), answer_emitted=True,
+                          gold="1", baseline=.5, continuation_records=[{"reward": 1., "seed": 17}])
+    restored = bundle_from_dict(json.loads(json.dumps(bundle_to_dict(bundle))))
+    assert restored.answer_emitted is True
+    assert restored.gold == "1" and restored.baseline == .5
+    assert restored.continuation_records == [{"reward": 1., "seed": 17}]
 
 
 def test_independent_pass_rate_uses_eval_stream():
@@ -654,6 +668,101 @@ def test_audit_selected_continuation_none_raises():
         )
 
 
+def test_audit_uses_each_continuation_finish_reason(monkeypatch):
+    pytest.importorskip("torch")
+
+    from grace_gc.audit import run as audit_run
+    from grace_gc.audit.run import _bundles_from_engines
+    from grace_gc.core.layout import collect_lora_layout
+    from grace_gc.data.math_data import MathRecord
+    from grace_gc.trainer.cpu_tiny import TinyLoRAActor
+    from grace_gc.trainer.tiny_engine import make_tiny_engines
+
+    seen = []
+
+    def capture_truncated(full_ids, prompt_len, max_new, finished, eos_id, finish_reason=None):
+        seen.append(finish_reason)
+        return False
+
+    monkeypatch.setattr(audit_run, "_length_truncated", capture_truncated)
+
+    actor = TinyLoRAActor()
+    engines = make_tiny_engines(actor, actor.vocab)
+    engines.generate_prefix = lambda prompts, max_new, rng, stream: (
+        [list(p) + [1, 2] for p in prompts],
+        np.zeros(len(prompts), dtype=bool),
+    )
+    reasons = iter(["stop", "length"])
+
+    def cont(prefixes, selected, max_new, rng):
+        reason = next(reasons)
+        engines.last_rollout = {"continue_finish_reasons": {0: reason}}
+        return [list(prefixes[0]) + [3, 4]]
+
+    engines.continue_selected = cont
+    rec = MathRecord("p", "q add two", "1")
+
+    def encode(_rec, n):
+        return [[1, 2]] * n, ["p"] * n, ["1"] * n
+
+    _bundles_from_engines(
+        [rec],
+        engines,
+        collect_lora_layout(actor.named_lora_params()),
+        n_prefixes=1,
+        n_cont=2,
+        decision=2,
+        max_new=8,
+        seed=0,
+        encode_fn=encode,
+    )
+    assert seen[-2:] == ["stop", "length"]
+
+
+def test_audit_finished_prefix_ignores_stale_continue_finish(monkeypatch):
+    pytest.importorskip("torch")
+
+    from grace_gc.audit import run as audit_run
+    from grace_gc.audit.run import _bundles_from_engines
+    from grace_gc.core.layout import collect_lora_layout
+    from grace_gc.data.math_data import MathRecord
+    from grace_gc.trainer.cpu_tiny import TinyLoRAActor
+    from grace_gc.trainer.tiny_engine import make_tiny_engines
+
+    seen = []
+
+    def capture_truncated(full_ids, prompt_len, max_new, finished, eos_id, finish_reason=None):
+        seen.append(finish_reason)
+        return False
+
+    monkeypatch.setattr(audit_run, "_length_truncated", capture_truncated)
+
+    actor = TinyLoRAActor()
+    engines = make_tiny_engines(actor, actor.vocab)
+    engines.last_rollout = {"continue_finish_reasons": {0: "length"}}
+    engines.generate_prefix = lambda prompts, max_new, rng, stream: (
+        [list(p) + [1, actor.eos_id] for p in prompts],
+        np.ones(len(prompts), dtype=bool),
+    )
+    rec = MathRecord("p", "q add two", "1")
+
+    def encode(_rec, n):
+        return [[1, 2]] * n, ["p"] * n, ["1"] * n
+
+    _bundles_from_engines(
+        [rec],
+        engines,
+        collect_lora_layout(actor.named_lora_params()),
+        n_prefixes=1,
+        n_cont=2,
+        decision=2,
+        max_new=8,
+        seed=0,
+        encode_fn=encode,
+    )
+    assert seen[-1] is None
+
+
 def test_prescan_sets_baseline_to_sample_mean():
     pytest.importorskip("torch")
     import torch
@@ -686,10 +795,12 @@ def test_prescan_sets_baseline_to_sample_mean():
         reservoir=GradientReservoir(capacity=4),
     )
     _ = torch
+    token_before = dict(state.rng.counters)
     assert state.baseline.get("a") == pytest.approx(0.5)
     n = prescan_unseen_baselines(engines, state, [[1, 2], [1, 2]], ["a", "a"], ["1", "1"], 8, 2)
     assert n == 1
     assert calls == [(2, 8, "token")]
+    assert state.rng.counters == token_before
     assert state.baseline.values["a"] == pytest.approx(1.0)
     assert prescan_unseen_baselines(engines, state, [[1, 2]], ["a"], ["1"], 8, 2) == 0
     assert calls == [(2, 8, "token")]
@@ -1082,7 +1193,12 @@ def test_frozen_predictor_changes_actual_variance_cost():
     out_low = audit_bundles([low], np.eye(2, 1), {"beta": 0.5, "p_min": 0.2}, np.random.default_rng(0))
     assert "frozen_predictor" in str(out_high["variance_cost_note"])
     assert out_high["variance_cost"]["actual_p_var"] != out_high["variance_cost_oracle"]["actual_p_var"]
-    assert out_high["variance_cost"]["actual_p_cost"] != out_low["variance_cost"]["actual_p_cost"]
+    from grace_gc.core.allocation import allocate_continuation
+
+    # One prefix can only hit β. Different r_hat change p only in a mixed set.
+    mixed = allocate_continuation(np.array([8.0, 0.05]), np.ones(2), beta=0.5, p_min=0.2)
+    assert mixed.p[0] > mixed.p[1]
+    _ = out_low
 
 
 def test_resume_start_counts_uses_scheduled_n():
@@ -1184,6 +1300,10 @@ def test_audit_prefix_at_t_is_nested():
     assert _keep_prefix_at_t(pref2, 2, 2, fin2)
     assert not _keep_prefix_at_t(pref8, 2, 8, fin8)
     assert fin3 and _keep_prefix_at_t(pref3, 2, 3, fin3)
+    truncated = [1, 2, 10, 11]
+    pref_short, fin_short = _prefix_at_t(truncated, 2, 8, False, 99)
+    assert not fin_short
+    assert _keep_prefix_at_t(pref_short, 2, 8, fin_short)
 
 
 def test_variance_cost_uses_actual_prefix_tokens():

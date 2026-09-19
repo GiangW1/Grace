@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from grace_gc.audit.prefix_audit import PrefixBundle, audit_bundles
+from grace_gc.audit.prefix_audit import audit_bundles, bundle_from_dict
 from grace_gc.logging_util.run_dir import RunDirectory, default_run_dir, resolve_run_dir, utc_now
 from grace_gc.trainer.loop import build_run_config
 
@@ -29,6 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--checkpoint", default=None)
     parser.add_argument("--model-path", dest="model_path", default=None)
     parser.add_argument("--backend", default=None, help="cpu_tiny or gpu_verl; default keeps YAML")
+    parser.add_argument("--method", default=None)
     parser.add_argument("--split", default="audit", help="split_records bucket used with --generate")
     parser.add_argument("--run-dir", dest="run_dir", default=None, help="default: runs/audit-UTC")
     args = parser.parse_args(argv)
@@ -43,6 +44,8 @@ def main(argv: list[str] | None = None) -> int:
         overrides["data_path"] = args.data_path
     if args.backend:
         overrides["backend"] = args.backend
+    if args.method:
+        overrides["method"] = args.method
     cfg = build_run_config(args.config, overrides)
     if args.generate:
         from grace_gc.audit.run import run_audit
@@ -68,26 +71,7 @@ def main(argv: list[str] | None = None) -> int:
         if not line.strip():
             continue
         raw = json.loads(line)
-        g = np.asarray(raw["grads"], dtype=np.float64)
-        bundles.append(
-            PrefixBundle(
-                problem_id=str(raw["problem_id"]),
-                t=int(raw.get("t", 0)),
-                rewards=np.asarray(raw["rewards"], dtype=np.float64),
-                grads=g,
-                coords=None if raw.get("coords") is None else np.asarray(raw["coords"], dtype=np.float64),
-                path_id=raw.get("path_id"),
-                suffix_cost=None
-                if raw.get("suffix_cost") is None
-                else np.asarray(raw["suffix_cost"], dtype=np.float64),
-                m_pred=None if raw.get("m_pred") is None else np.asarray(raw["m_pred"], dtype=np.float64),
-                r_hat=None if raw.get("r_hat") is None else float(raw["r_hat"]),
-                c_hat=None if raw.get("c_hat") is None else float(raw["c_hat"]),
-                finished=bool(raw.get("finished", False)),
-                prefix_tokens=None if raw.get("prefix_tokens") is None else int(raw["prefix_tokens"]),
-                answer_emitted=bool(raw.get("answer_emitted", False)),
-            )
-        )
+        bundles.append(bundle_from_dict(raw))
     if not bundles:
         requested = args.run_dir or str(default_run_dir("audit"))
         run_dir = resolve_run_dir(requested)
@@ -113,6 +97,8 @@ def main(argv: list[str] | None = None) -> int:
     alloc = cfg.get("allocation", {})
     analysis.setdefault("beta", alloc.get("beta", 0.5))
     analysis.setdefault("p_min", alloc.get("p_min", 0.2))
+    analysis.setdefault("uniform_shrink", alloc.get("uniform_shrink", 0.0))
+    analysis.setdefault("control_variate", (cfg.get("predictor") or {}).get("control_variate", True))
     analysis.setdefault("method", cfg.get("method", "grace"))
     if cfg.get("max_new_tokens") is not None:
         analysis.setdefault("max_new_tokens", int(cfg["max_new_tokens"]))

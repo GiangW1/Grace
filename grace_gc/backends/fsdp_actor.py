@@ -47,7 +47,7 @@ def maybe_wrap_fsdp(module, n_gpu: int, **kwargs):
 
 def token_sum_logprob(logits, token_ids, prompt_lens, valid_lens=None, eos_id=None):
     torch = _require_torch()
-    logp = torch.log_softmax(logits[:, :-1], dim=-1)
+    logp = torch.log_softmax(logits[:, :-1].float(), dim=-1)
     target = token_ids[:, 1:]
     token_lp = logp.gather(-1, target.unsqueeze(-1)).squeeze(-1)
     mask = torch.zeros_like(token_lp)

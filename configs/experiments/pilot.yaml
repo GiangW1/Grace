@@ -25,6 +25,7 @@ audit:
   n_prefixes: 16
   decision_grid: [64, 128, 256, 384, 512, 768, 1024, 1536]
   n_continuations: 16
+  max_new_tokens: 4096
   jl_dim: 4096
 hardware:
   name: a100

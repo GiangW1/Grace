@@ -1,6 +1,37 @@
+import json
 from pathlib import Path
 
 import pytest
+
+
+def test_format_warmup_accepts_hf_batch_encoding():
+    transformers = pytest.importorskip("transformers")
+    from grace_gc.data.math_data import MathRecord
+    from grace_gc.trainer.format_warmup import _encode_sft_pair
+
+    class Tokenizer:
+        eos_token_id = 9
+        chat_template = None
+
+        def __call__(self, text, **kwargs):
+            from grace_gc.data.format_prompt import format_sft_lead
+
+            raw = str(text)
+            table = {
+                format_sft_lead(): [1, 2],
+                "2": [8],
+                "1+1": [4, 5, 6],
+            }
+            ids = table.get(raw, [4, 5, 6])
+            return transformers.BatchEncoding({"input_ids": ids, "attention_mask": [1] * len(ids)})
+
+    prompt, response, n_train = _encode_sft_pair(Tokenizer(), MathRecord("1", "1+1", "2"), 2)
+    assert prompt == [4, 5]
+    assert response == [1, 2]
+    assert n_train == 2
+    assert 7 not in response
+    assert 8 not in response
+    assert 9 not in response
 
 
 def test_format_warmup_tiny_moves_lora_b(tmp_path: Path):
@@ -42,4 +73,7 @@ def test_format_warmup_tiny_moves_lora_b(tmp_path: Path):
     )
     out = run_training(cfg, tmp_path / "fw")
     assert out["run_status"] == "complete"
-    assert (tmp_path / "fw" / "format_warmup.json").is_file()
+    payload = json.loads((tmp_path / "fw" / "format_warmup.json").read_text(encoding="utf-8"))
+    assert payload["trained"] == "reasoning lead"
+    assert payload["gold_in_loss"] is False
+    assert payload["eos_in_loss"] is False

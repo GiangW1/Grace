@@ -1,0 +1,6 @@
+# Additional frozen diagnostic matching the training horizon and baseline size.
+# The original multi-t audit is retained as a separate stage.
+audit:
+  decision_grid: [512]
+  max_new_tokens: 2048
+  n_baseline: 4

@@ -65,4 +65,4 @@
 | 1. 完整实现 GRACE 与实验代码 | 4/4 | Complete | 2026-09-15 |
 | 2. 运行最小证伪实验 | 0/TBD | Not started | - |
 
-Phase 1 代码已落地。本机 `pytest tests`（2026-09-16）：199 passed, 1 skipped（U6 GPU）。真实实验尚未在本机复跑到可引用；服务器按 README 全流程先 smoke Full-PG。
+Phase 1 代码已落地。本机（2026-09-17）：`pytest tests -k "not complete_final_expression and not u6_gpu"` → 252 passed, 17 deselected。现役工作树的 GPU 实验未跑到可引用；2026-09-16 两次 smoke 和那次 16 题链都不能当 Phase 2。下一步是服务器上跑 `scripts/run_minimal_gpu.sh`。

@@ -58,8 +58,18 @@ def _snapshot(repo_id: str, repo_type: str, dest: Path) -> Path:
 
 
 def _first_file(root: Path, suffixes: tuple[str, ...]) -> Path | None:
-    hits = sorted(p for p in root.rglob("*") if p.is_file() and p.suffix.lower() in suffixes)
-    return hits[0] if hits else None
+    """Prefer parquet, then jsonl, then json. A root metadata .json must not win."""
+    for suffix in suffixes:
+        hits = sorted(
+            p for p in root.rglob("*")
+            if p.is_file()
+            and p.suffix.lower() == suffix
+            and p.name != "download_meta.json"
+            and not any(part.startswith(".") for part in p.relative_to(root).parts)
+        )
+        if hits:
+            return hits[0]
+    return None
 
 
 def main(argv: list[str] | None = None) -> int:

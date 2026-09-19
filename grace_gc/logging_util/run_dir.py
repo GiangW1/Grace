@@ -3,11 +3,31 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+
+def atomic_write_text(path: str | Path, text: str) -> Path:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                         prefix=f".{path.name}.", suffix=".tmp", delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    return path
 
 
 def utc_stamp() -> str:
@@ -29,6 +49,9 @@ def has_run_artifacts(root: str | Path) -> bool:
         "audit_summary.json",
         "trajectories.jsonl",
         "run_meta.json",
+        "checkpoints.json",
+        "compute_ledger.json",
+        "persistence.jsonl",
     )
     return any((root / name).is_file() for name in names)
 
@@ -67,12 +90,12 @@ class RunDirectory:
 
     def write_json(self, name: str, payload: Any) -> Path:
         path = self.root / name
-        path.write_text(json.dumps(payload, indent=2, default=_json_default), encoding="utf-8")
+        atomic_write_text(path, json.dumps(payload, indent=2, default=_json_default))
         return path
 
     def write_yaml(self, name: str, payload: Any) -> Path:
         path = self.root / name
-        path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+        atomic_write_text(path, yaml.safe_dump(payload, sort_keys=False))
         return path
 
     def write_jsonl(self, name: str, rows: list[dict[str, Any]], append: bool = False) -> Path:

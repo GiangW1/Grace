@@ -1,12 +1,12 @@
 # 最小证伪：代码完成后直接用小配置运行
 
-**当前状态：** 训练/评测/审计脚本已在仓库；本机 CPU 可跑；真实 GPU 实验未跑。
-**顺序：** 按 README 全流程：单卡 smoke Full-PG → Pilot Full-PG → Pilot GRACE。完整 4 卡尚未接线。
+**当前状态：** 训练/评测/审计脚本已在仓库；本机 CPU 可跑；现役工作树上的真实 GPU 实验未跑。
+**顺序：** 当前分支先单卡 `scripts/run_minimal_gpu.sh`（Full-PG / GRACE / Uniform-CV / GRPO）。论文规模仍按 README：smoke Full-PG → Pilot Full-PG → Pilot GRACE。完整 4 卡尚未接线。
 
 ## 简单使用方式
 
 1. 指定模型或 checkpoint、数据路径、方法、seed 和少量规模参数。
-2. 用短跑检查数据到更新的完整链路，观察 Full-PG/GRPO 是否学习。
+2. 用短跑检查数据到更新的完整链路，观察 Full-PG/GRPO 是否学习。Smoke 先看 `mean_response_tokens` 是否经常 <16、审计是否观测到 64/128、`n_continued` 是否整批为 0。2026-09-16 两次服务器 smoke 不能当 Phase 2。
 3. 对同一前缀独立续写，计算完整梯度不确定性和答案不确定性；与 GRACE/核心对照比较。
 4. 输出真实梯度误差、成功率、运行时间、可省计算及可计算的区间，再决定是否扩大规模。
 

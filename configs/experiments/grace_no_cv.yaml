@@ -1,0 +1,4 @@
+# Disable only the actor's CV correction. Keep learned risk and auxiliary work.
+experiment_variant: grace_no_cv
+predictor:
+  control_variate: false

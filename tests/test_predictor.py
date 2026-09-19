@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from grace_gc.predictor.basis import refresh_basis, reproject
+from grace_gc.predictor.basis import refresh_basis, reproject, should_refresh_basis
 from grace_gc.predictor.ipw import assign_new_problems, ipw_weights, split_by_problem
 from grace_gc.predictor.reservoir import GradientReservoir, ReservoirItem
 from grace_gc.predictor.risk import full_space_residual, risk_nll
@@ -53,6 +53,10 @@ def test_full_space_residual_keeps_gram():
     e = full_space_residual(g, f, u)
     m = u @ f
     assert e == pytest.approx(np.sum((g - m) ** 2), abs=1e-12)
+    coords = g @ u
+    gram = u.T @ u
+    expanded = np.sum(g * g) - 2.0 * np.sum(f * coords) + np.sum(f * (f @ gram))
+    assert e == pytest.approx(expanded, abs=1e-12)
 
 
 def test_risk_nll_rejects_nonpositive():
@@ -143,6 +147,14 @@ def test_evicted_fit_items_do_not_train_coord_on_hold():
     assert out["coord_loss"] is None
     assert out["risk_loss"] is not None
     assert torch.equal(before, heads.coord[0].weight)
+
+
+def test_first_basis_refresh_does_not_wait_for_periodic():
+    assert should_refresh_basis(7, 8, 31, 0, 32) is False
+    assert should_refresh_basis(8, 8, 3, 0, 32) is True
+    assert should_refresh_basis(8, 8, 31, 1, 32) is True
+    assert should_refresh_basis(8, 8, 10, 1, 32) is False
+    assert should_refresh_basis(8, 8, 31, 1, 0) is False
 
 
 def test_basis_refresh_and_reservoir():

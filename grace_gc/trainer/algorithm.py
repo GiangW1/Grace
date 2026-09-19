@@ -14,7 +14,8 @@ from grace_gc.predictor.reservoir import GradientReservoir, ReservoirItem
 from grace_gc.predictor.risk import full_space_residual
 from grace_gc.data.reward import extract_answer
 from grace_gc.logging_util.ledger import Timer
-from grace_gc.predictor.update import update_predictor_from_reservoir
+from grace_gc.predictor.basis import align_basis, refresh_basis, should_refresh_basis
+from grace_gc.predictor.update import diagnose_frozen_predictor, prepare_predictor_split, update_predictor_from_reservoir
 from grace_gc.trainer.actor_update import (
     apply_correction_clip_step,
     audit_one,
@@ -28,9 +29,13 @@ from grace_gc.trainer.grace_step import (
     StartRecord,
     answer_first_token,
     batch_token_costs,
+    control_variate_coordinates,
     decide_continuation,
     finish_reason,
+    incremental_token_costs,
+    maybe_mark_predictor_synced,
     next_start_count,
+    neyman_ready,
 )
 from grace_gc.trainer.methods import MethodSpec
 
@@ -48,6 +53,8 @@ class StepEngines:
     decode: Callable | None = None
     eos_id: int | list[int] | None = None
     last_rollout: dict | None = None
+    before_update: Callable | None = None
+    last_prescan: list | None = None
 
 
 @dataclass
@@ -60,9 +67,62 @@ class TrainState:
     predictor: PredictorHeads | None
     reservoir: GradientReservoir
     basis_id: int = 0
+    predictor_synced_basis_id: int = -1
+    prescan_rng: IsolatedRNG | None = None
     n_ref: int = 0
     history_costs: list[float] = field(default_factory=list)
     step: int = 0
+    cost_control: dict = field(default_factory=dict)
+
+
+def ensure_prescan_rng(state: TrainState) -> IsolatedRNG:
+    """Prescan uses its own IsolatedRNG so it does not consume the actor token stream."""
+    if state.prescan_rng is None:
+        state.prescan_rng = IsolatedRNG.create(int(state.rng.seed) + 1)
+    return state.prescan_rng
+
+
+def _scalar_float(value) -> float:
+    if hasattr(value, "detach"):
+        value = value.detach()
+    if hasattr(value, "cpu"):
+        value = value.cpu()
+    if hasattr(value, "item"):
+        return float(value.item())
+    return float(value)
+
+
+def _rollout_logprob_sum(engines: StepEngines, i: int, z: float) -> float | None:
+    roll = getattr(engines, "last_rollout", None) or {}
+    prefix_lps = list(roll.get("prefix_logprob_sums") or [])
+    cont = roll.get("continue_logprob_sums") or {}
+    pref = prefix_lps[i] if i < len(prefix_lps) else None
+    if float(z) >= 1.0 and i in cont:
+        suf = cont[i]
+        if pref is None or suf is None:
+            return None
+        return float(pref) + float(suf)
+    if pref is None:
+        return None
+    return float(pref)
+
+
+def _rollout_token_logprobs(engines: StepEngines, i: int, z: float):
+    roll = engines.last_rollout or {}
+    prefix = roll.get("prefix_token_logprobs") or []
+    if i >= len(prefix):
+        return None
+    values = list(prefix[i])
+    if z >= 1.0:
+        values += list((roll.get("continue_token_logprobs") or {}).get(i, []))
+    return values
+
+
+def _rollout_request_seeds(engines: StepEngines, i: int):
+    roll = engines.last_rollout or {}
+    prefix = roll.get("prefix_request_seeds") or []
+    return {"prefix": prefix[i] if i < len(prefix) else None,
+            "continuation": (roll.get("continue_request_seeds") or {}).get(i)}
 
 
 def _reward_features(q_hat: float, length: float, baseline: float | None = None):
@@ -79,11 +139,15 @@ def _length_truncated(
     max_new: int,
     finished: bool,
     eos_id: int | list[int] | None,
+    finish_reason=None,
 ) -> bool:
     """True only for length hits; natural EOS at the budget is not truncation."""
+    from grace_gc.backends.vllm_two_phase import _is_length_finish, _is_stop_finish
     from grace_gc.data.tokenize import is_stop_token
 
-    if finished:
+    if _is_length_finish(finish_reason):
+        return True
+    if _is_stop_finish(finish_reason) or finished:
         return False
     if len(full_ids) < int(prompt_len) + int(max_new):
         return False
@@ -98,10 +162,16 @@ def _traj_natural_finish(
     eos_id,
     generated: int | None = None,
     requested: int | None = None,
+    finish_reason=None,
 ) -> bool:
-    """EOS on the prefix, on the continuation, or a short continue after vLLM omitted the stop id."""
+    """EOS on the prefix or continuation. vLLM length is not a natural stop."""
+    from grace_gc.backends.vllm_two_phase import _is_length_finish, _is_stop_finish
     from grace_gc.data.tokenize import is_stop_token
 
+    if _is_length_finish(finish_reason):
+        return False
+    if _is_stop_finish(finish_reason):
+        return True
     if prefix_finished:
         return True
     if not full_ids:
@@ -160,36 +230,52 @@ def prescan_unseen_baselines(
     golds: list[str],
     max_new: int,
     n_prescan: int,
+    batch: bool = False,
 ) -> int:
-    """Paper §6.3: unseen problems get a 4-sample pass rate, not the 0.5 default."""
-    if n_prescan <= 0:
+    """Independent full samples for unseen problems; retain their source evidence."""
+    engines.last_prescan = []
+    if n_prescan <= 0 or state.spec.objective == "grpo" or not state.baseline.uses_prescan:
         return 0
-    done = 0
-    seen: set[str] = set()
+    unseen = []
+    seen = set(state.baseline.values)
     for i, pid in enumerate(problem_ids):
-        if pid in state.baseline.values or pid in seen:
-            continue
-        seen.add(pid)
-        prompts = [list(prompt_ids[i])] * int(n_prescan)
-        fulls, finished = engines.generate_prefix(prompts, int(max_new), state.rng, "token")
+        if pid not in seen:
+            unseen.append(i)
+            seen.add(pid)
+    groups = [unseen] if batch and unseen else [[i] for i in unseen]
+    for group in groups:
+        source = [i for i in group for _ in range(int(n_prescan))]
+        prompts = [list(prompt_ids[i]) for i in source]
+        fulls, finished = engines.generate_prefix(prompts, int(max_new), ensure_prescan_rng(state), "token")
         finished = np.asarray(finished, dtype=bool).reshape(-1)
-        if len(fulls) != int(n_prescan) or finished.shape[0] != int(n_prescan):
-            raise ValueError(
-                f"prescan generate_prefix returned {len(fulls)} sequences for {n_prescan} samples"
-            )
-        rewards = []
-        plen = len(prompt_ids[i])
-        for j, full in enumerate(fulls):
+        if len(fulls) != len(prompts) or len(finished) != len(prompts):
+            raise ValueError("prescan generate_prefix returned the wrong number of samples")
+        roll = getattr(engines, "last_rollout", None) or {}
+        reasons = list(roll.get("prefix_finish_reasons") or [])
+        seeds = (roll.get("sampling") or {}).get("request_seeds") or []
+        rewards = {i: [] for i in group}
+        for j, (i, full) in enumerate(zip(source, fulls)):
             if full is None:
                 raise ValueError("prescan generate_prefix returned no sequence")
-            resp = full[plen:]
-            text = engines.decode(resp) if engines.decode else ""
-            truncated = _length_truncated(full, plen, int(max_new), bool(finished[j]), engines.eos_id)
+            plen = len(prompt_ids[i])
+            text = engines.decode(full[plen:]) if engines.decode else ""
+            fr = reasons[j] if j < len(reasons) else None
+            truncated = _length_truncated(full, plen, int(max_new), bool(finished[j]), engines.eos_id, finish_reason=fr)
             scored = engines.reward_fn(full, golds[i], truncated=truncated, text=text)
-            rewards.append(0.0 if scored is None else float(scored))
-        state.baseline.values[pid] = float(np.mean(rewards)) if rewards else 0.5
-        done += 1
-    return done
+            reward = 0.0 if scored is None else float(scored)
+            rewards[i].append(reward)
+            engines.last_prescan.append({
+                "problem_id": problem_ids[i], "gold": golds[i], "text": text,
+                "reward": reward, "truncated": truncated, "finish_reason": fr,
+                "prompt_token_ids": list(prompt_ids[i]), "full_token_ids": list(full),
+                "request_seed": seeds[j] if j < len(seeds) else None,
+            })
+        for i, values in rewards.items():
+            state.baseline.initialize_from_prescan(problem_ids[i], values)
+        for row in engines.last_prescan[-len(source):]:
+            row["baseline_after_prescan"] = state.baseline.get(row["problem_id"])
+            row["baseline_configuration"] = state.baseline.configuration()
+    return len(unseen)
 
 
 def continuation_remainings(prefixes, prompt_lens, finished, max_new: int) -> np.ndarray:
@@ -227,9 +313,22 @@ def run_algorithm1_step(
         state.n_ref = n
     alloc = cfg.get("allocation", {})
     pred_cfg = cfg.get("predictor", {})
+    from grace_gc.versions import sha256_array, sha256_mapping, sha256_named
+
+    behavior_context = {
+        "snapshot_sha": sha256_named(engines.named_lora()),
+        "basis_sha": sha256_array(state.u),
+        "predictor_sha": None if state.predictor is None else sha256_mapping(state.predictor),
+        "rng_counters": dict(state.rng.counters),
+        "timing": "before_rollout_and_update",
+    }
+    new_audit_items = []
     warmup = state.step < int(pred_cfg.get("warmup_steps", 0))
     audit_s = float(pred_cfg.get("audit_s", 0.125))
     n_prescan = int((cfg.get("baseline") or {}).get("prescan", 0) or 0)
+    if state.spec.objective == "grpo" or not state.baseline.uses_prescan:
+        n_prescan = 0
+    control_variate_enabled = bool(pred_cfg.get("control_variate", True))
     timer = Timer()
     if n_prescan > 0:
         _gpu_progress(
@@ -238,7 +337,8 @@ def run_algorithm1_step(
             f"(unseen problems, {n_prescan} full samples each)",
         )
     n_prescanned = prescan_unseen_baselines(
-        engines, state, prompt_ids, problem_ids, golds, max_new, n_prescan
+        engines, state, prompt_ids, problem_ids, golds, max_new, n_prescan,
+        batch=bool((cfg.get("baseline") or {}).get("batch_prescan", False)),
     )
     timings = {"prescan": timer.lap()}
     if n_prescanned:
@@ -266,13 +366,16 @@ def run_algorithm1_step(
         feat = np.zeros((n, max(k, 1)), dtype=np.float64)
         cost_feat = None
 
+    remainings = continuation_remainings(prefixes, prompt_lens, finished, max_new)
     if state.predictor is not None and not warmup and state.spec.use_predictor:
         pred = state.predictor.forward_numpy(feat, cost_feat)
         f, r_hat, c_hat = pred.f, pred.r_hat, pred.c_hat
+        if state.predictor.constant_cost:
+            c_hat = incremental_token_costs(remainings, finished)
     else:
         f = _pad_features(feat, k)
         r_hat = np.ones(n, dtype=np.float64)
-        c_hat = np.ones(n, dtype=np.float64)
+        c_hat = incremental_token_costs(remainings, finished)
     lengths = [float(max(len(prefixes[i]) - int(prompt_lens[i]), 1)) for i in range(n)]
     q_hat_out = None
     if state.spec.risk_mode == "reward" and state.predictor is not None and not warmup:
@@ -291,6 +394,9 @@ def run_algorithm1_step(
         )
     timings["prefix"] = timer.lap()
 
+    basis_at_allocate = int(state.basis_id)
+    synced_at_allocate = int(state.predictor_synced_basis_id)
+    basis_ready = (not state.spec.use_allocation) or neyman_ready(basis_at_allocate, synced_at_allocate)
     p, deviation = decide_continuation(
         state.spec,
         r_hat,
@@ -300,18 +406,20 @@ def run_algorithm1_step(
         float(alloc.get("p_min", 0.2)),
         warmup,
         iters=int(alloc.get("bisection_iters", 20)),
+        basis_ready=basis_ready,
+        uniform_shrink=float(alloc.get("uniform_shrink", 0.0)),
     )
-    if warmup or state.spec.name in {"full_pg", "grpo", "grpo_short"}:
+    force_complete = warmup or not basis_ready or state.spec.name in {"full_pg", "grpo", "grpo_short"}
+    if force_complete:
         z = np.ones(n, dtype=np.float64)
     else:
         z = state.rng.bernoulli("selection", p)
     z[finished] = 1.0
     p[finished] = 1.0
-    f = np.asarray(f, dtype=np.float64)
+    f = control_variate_coordinates(f, enabled=control_variate_enabled)
     f[finished] = 0.0
     timings["allocate"] = timer.lap()
 
-    remainings = continuation_remainings(prefixes, prompt_lens, finished, max_new)
     selected = (z >= 1.0) & (~finished) & (remainings > 0)
     full_ids: list[list[int] | None] = [None] * n
     for rem in sorted({int(remainings[i]) for i in range(n) if selected[i]}):
@@ -351,16 +459,23 @@ def run_algorithm1_step(
         text = engines.decode(resp) if engines.decode else ""
         texts.append(text)
         gen_cont = max(len(full_ids[i]) - len(prefixes[i]), 0)
+        vllm_fr = _rollout_finish(engines, i, float(z[i]))
         traj_fin = _traj_natural_finish(
             bool(finished[i]),
             full_ids[i],
             engines.eos_id,
             generated=None if finished[i] else gen_cont,
             requested=None if finished[i] else int(remainings[i]),
+            finish_reason=vllm_fr,
         )
         traj_finished.append(traj_fin)
         truncated = _length_truncated(
-            full_ids[i], int(prompt_lens[i]), max_new, traj_fin, engines.eos_id
+            full_ids[i],
+            int(prompt_lens[i]),
+            max_new,
+            traj_fin,
+            engines.eos_id,
+            finish_reason=vllm_fr,
         )
         truncated_flags.append(truncated)
         extracted = extract_answer(text)
@@ -436,17 +551,28 @@ def run_algorithm1_step(
             thinking_closed=_meta_at(prompt_meta, i, "thinking_closed"),
             vllm_finish_reason=_rollout_finish(engines, i, float(z[i])),
             vllm_stop_reason=_rollout_stop(engines, i, float(z[i])),
+            rollout_logprob_sum=_rollout_logprob_sum(engines, i, float(z[i])),
+            rollout_token_logprobs=_rollout_token_logprobs(engines, i, float(z[i])),
+            request_seeds=_rollout_request_seeds(engines, i),
         )
+        if rec.rollout_logprob_sum is None and rec.z >= 1.0 and full_ids[i] is not None:
+            roll = getattr(engines, "last_rollout", None) or {}
+            if not roll.get("has_generate_logprobs"):
+                rec.rollout_logprob_sum = _scalar_float(
+                    engines.logprob_one(full_ids[i], int(prompt_lens[i]))
+                )
         if state.spec.use_predictor and rec.z >= 1.0 and rec.reward is not None and audit_draw[i] >= 1.0:
-            scalar = adv[i] * engines.logprob_one(full_ids[i], int(prompt_lens[i]))
-            rec.g = audit_one(scalar, params, [nm for nm, _p in named], state.layout)
+            if float(adv[i]) == 0.0:
+                rec.g = np.zeros(state.layout.dim, dtype=np.float64)
+            else:
+                scalar = adv[i] * engines.logprob_one(full_ids[i], int(prompt_lens[i]))
+                rec.g = audit_one(scalar, params, [nm for nm, _p in named], state.layout)
             rec.audited = True
             rec.g_norm_sq = float(np.dot(rec.g, rec.g))
             audited += 1
             realized = None if full_ids[i] is None else float(max(len(full_ids[i]) - len(prefixes[i]), 1))
             cf = None if cost_feat is None else np.asarray(cost_feat[i], dtype=np.float64)
-            state.reservoir.add(
-                ReservoirItem(
+            item = ReservoirItem(
                     problem_id=rec.problem_id,
                     g=rec.g,
                     p=rec.p,
@@ -457,11 +583,36 @@ def run_algorithm1_step(
                     cost_feat=cf,
                     realized_cost=realized,
                     reward_feat=np.asarray(reward_feats[i], dtype=np.float64),
+                    observed_step=state.step + 1,
+                    remaining_cost=float(max(remainings[i], 1)),
+                    prefix_finished=bool(finished[i]),
                 )
-            )
+            state.reservoir.add(item)
+            new_audit_items.append(item)
         records.append(rec)
     restore_grads(params, saved)
     timings["audit"] = timer.lap()
+
+    from grace_gc.trainer.supervision import collect_fresh_supervision
+
+    fresh_items, fresh_rows, fresh_metrics = collect_fresh_supervision(
+        engines, state, prompt_ids, problem_ids, golds, cfg,
+    )
+    for item in fresh_items:
+        state.reservoir.add(item)
+    new_audit_items.extend(fresh_items)
+    for row in fresh_rows:
+        row["behavior_context"] = behavior_context
+    timings["fresh_supervision"] = timer.lap()
+
+    logprob_probe = None if engines.before_update is None else engines.before_update(records)
+    frozen_predictor = (None if state.predictor is None else
+                        diagnose_frozen_predictor(state.predictor, new_audit_items, state.u,
+                                                  risk_mode=state.spec.risk_mode))
+    if frozen_predictor is not None:
+        frozen_predictor["used_in_actor_update"] = bool(state.spec.use_ht_correction and not warmup and control_variate_enabled)
+        frozen_predictor["basis_id"] = int(state.basis_id)
+    timings["behavior_probe"] = timer.lap()
 
     update_stats: dict[str, Any] = {}
     packed, clipped = apply_correction_clip_step(
@@ -474,60 +625,146 @@ def run_algorithm1_step(
         n,
         optimizer,
         clip=float(cfg.get("optim", {}).get("grad_clip", 1.0)),
-        use_correction=state.spec.use_ht_correction and state.spec.use_predictor and not warmup,
+        use_correction=state.spec.use_ht_correction and state.spec.use_predictor and not warmup and control_variate_enabled,
         stats=update_stats,
+        log_geometry=bool((cfg.get("optim") or {}).get("log_update_geometry", False)),
     )
     _ = packed
     _ = torch
     timings["update"] = timer.lap()
 
-    batch_rewards: dict[str, list[float]] = {}
+    batch_rewards: dict[str, list] = {}
+    batch_probabilities: dict[str, list[float]] = {}
     for rec in records:
-        if rec.reward is None:
-            continue
-        batch_rewards.setdefault(rec.problem_id, []).append(float(rec.reward))
-    for pid, rs in batch_rewards.items():
-        state.baseline.update_mean(pid, rs)
+        batch_rewards.setdefault(rec.problem_id, []).append(rec.reward)
+        batch_probabilities.setdefault(rec.problem_id, []).append(float(rec.p))
+    if state.spec.objective != "grpo":
+        for pid, rs in batch_rewards.items():
+            state.baseline.update_ht_mean(pid, rs, batch_probabilities[pid])
 
-    u_frozen = np.asarray(state.u, dtype=np.float64).copy()
+    # Basis refresh assigns a new array; retaining the frozen reference avoids
+    # another D-by-k copy without allowing this batch's correction to change.
+    u_frozen = state.u
     pred_metrics = {"coord_loss": None, "risk_loss": None}
+    basis_rank = None
+    basis_changed = False
     if state.spec.use_predictor and state.predictor is not None and len(state.reservoir.items) >= 2:
-        if audited and state.reservoir.items:
-            g_mat = state.reservoir.recent_matrix()
-            if g_mat.shape[0] >= k and (state.step + 1) % int(pred_cfg.get("refresh_every", 32)) == 0:
-                from grace_gc.predictor.basis import refresh_basis
+        variant = str(pred_cfg.get("basis_variant", "pca"))
+        if variant not in {"pca", "predictable_crossfit"}:
+            raise ValueError("basis_variant must be pca or predictable_crossfit")
+        split = prepare_predictor_split(
+            state.predictor, state.reservoir, state.rng.generator("predictor"),
+            basis_fit_only=bool(pred_cfg.get("basis_fit_only", False)) or variant == "predictable_crossfit",
+            current_step=state.step + 1, max_age_steps=pred_cfg.get("max_age_steps"),
+            age_half_life=pred_cfg.get("age_half_life"),
+            missing_step_policy=pred_cfg.get("missing_step_policy", "exclude"),
+        )
+        basis_mask = split["fit"] if variant == "predictable_crossfit" else split["basis"]
+        basis_items = [it for it, keep in zip(state.reservoir.items, basis_mask) if keep]
+        basis_metrics = {"variant": variant, "refreshed": False}
+        if should_refresh_basis(
+            len(basis_items),
+            min(k, len(basis_items)) if variant == "predictable_crossfit" else k,
+            state.step,
+            state.basis_id,
+            int(pred_cfg.get("refresh_every", 32)),
+            warmup_steps=int(pred_cfg.get("warmup_steps", 0)),
+            refresh_after_warmup=bool(pred_cfg.get("refresh_after_warmup", False)),
+        ):
+            from grace_gc.predictor.ipw import ipw_weights
 
-                basis = refresh_basis(
-                    g_mat,
-                    k=k,
-                    basis_id=state.basis_id + 1,
-                    seed=state.step,
-                    problem_ids=state.reservoir.problem_ids(),
+            basis_weights = split["age_weight"][basis_mask].copy()
+            if pred_cfg.get("basis_ipw", False):
+                basis_weights *= ipw_weights(np.array([it.p for it in basis_items]), np.array([it.s for it in basis_items]))
+            basis_args = dict(grads=np.stack([it.g for it in basis_items]), k=k,
+                              basis_id=state.basis_id + 1,
+                              problem_ids=[it.problem_id for it in basis_items], weights=basis_weights)
+            if variant == "predictable_crossfit":
+                from grace_gc.predictor.basis import refresh_predictable_basis
+
+                basis, details = refresh_predictable_basis(
+                    **basis_args, features=np.stack([it.features for it in basis_items]),
+                    ridge_l2=float(pred_cfg.get("basis_ridge_l2", pred_cfg.get("ridge_l2", 1.))),
                 )
-                state.u = basis.u
+                basis_metrics.update(details)
+            else:
+                basis = refresh_basis(**basis_args, seed=state.step,
+                                      solver=str(pred_cfg.get("basis_solver", "auto")),
+                                      center=str(pred_cfg.get("basis_center", "problem")))
+            if basis is not None:
+                u_new = basis.u
+                if int(state.basis_id) > 0 and bool(pred_cfg.get("align_basis", True)):
+                    u_new = align_basis(u_new, state.u)
+                state.u = u_new
+                if int(state.basis_id) != int(basis.basis_id):
+                    basis_changed = True
                 state.basis_id = basis.basis_id
+                basis_rank = int(basis.rank)
+                basis_metrics["refreshed"] = True
+                state.reservoir.stamp_basis_id(state.basis_id)
         pred_metrics = update_predictor_from_reservoir(
             state.predictor,
             state.reservoir,
             state.u,
             state.rng.generator("predictor"),
             epochs=int(pred_cfg.get("epochs", 2)),
+            current_step=state.step + 1,
+            split=split,
+            calibration_beta=float(alloc.get("beta", .5)),
+            calibration_p_min=float(alloc.get("p_min", .2)),
+            calibration_p=(np.array([1. if it.prefix_finished else max(float(alloc.get("beta", .5)), float(alloc.get("p_min", .2)))
+                                     for it in state.reservoir.items]) if not state.spec.use_allocation else None),
+            calibration_risk_mode=state.spec.risk_mode,
+            calibration_uniform_shrink=float(alloc.get("uniform_shrink", 0.0)),
         )
+        pred_metrics["frozen_new_problems"] = frozen_predictor
+        pred_metrics["basis"] = basis_metrics
+        maybe_mark_predictor_synced(state, pred_metrics, basis_changed)
+
+    pred_metrics["fresh_supervision"] = fresh_metrics
 
     timings["predictor"] = timer.lap()
     used, full = batch_token_costs(prompt_lens, prefixes, finished, z, max_new)
     ratio = 1.0 if full <= 0.0 else used / full
+    actual_response = [
+        float(rec.response_tokens) for rec in records if float(rec.z) >= 1.0
+    ]
+    mean_actual_response_tokens = float(np.mean(actual_response)) if actual_response else 0.0
     state.history_costs.append(ratio)
     state.step += 1
-    group = int(getattr(state.spec, "starts_per_prompt", 0) or 0)
-    if group <= 0:
-        group = max(1, n // max(1, len(set(problem_ids))))
+    from grace_gc.trainer.methods import start_group_size
+
+    group = start_group_size(state.spec, int(cfg.get("n_prompts", 4)), state.n_ref or n)
     next_n = next_start_count(state.history_costs, state.n_ref or n, c_full=1.0, group=group)
+    prefix_done = np.asarray(finished, dtype=bool).reshape(-1)
+    n_continued = int(
+        sum(
+            1
+            for i in range(n)
+            if full_ids[i] is not None and len(full_ids[i]) > len(prefixes[i])
+        )
+    )
     return {
         "records": records,
+        "behavior_context": behavior_context,
+        "logprob_probe": logprob_probe,
+        "prescan_records": engines.last_prescan or [],
+        "supervision_records": fresh_rows,
+        "n_problems": len(set(problem_ids)),
         "n": n,
         "n_completed": int(z.sum()),
         "n_stopped": int((z < 1.0).sum()),
+        "n_prefix_finished": int(prefix_done.sum()),
+        "n_eligible": int(((~prefix_done) & (remainings > 0)).sum()),
+        "n_continued": n_continued,
+        "mean_suffix_tokens": float(
+            np.mean(
+                [
+                    0 if full_ids[i] is None else max(len(full_ids[i]) - len(prefixes[i]), 0)
+                    for i in range(n)
+                ]
+            )
+        ),
         "p": p,
         "z": z,
         "deviation": deviation,
@@ -541,10 +778,24 @@ def run_algorithm1_step(
         "n_prescan": n_prescanned,
         "token_cost_used": float(used),
         "token_cost_full": float(full),
+        "token_cost_proxy_used": float(used),
+        "token_cost_proxy_full": float(full),
+        "token_cost_proxy_ratio": float(ratio),
+        "mean_actual_response_tokens": mean_actual_response_tokens,
+        "allocation_ready": bool((not warmup) and basis_ready and state.spec.use_allocation),
+        "allocation_uniform_shrink": float(alloc.get("uniform_shrink", 0.0)),
+        "control_variate_enabled": control_variate_enabled,
+        "control_variate_used": bool(state.spec.use_ht_correction and state.spec.use_predictor and not warmup and control_variate_enabled),
+        "baseline_configuration": state.baseline.configuration(),
+        "basis_id_at_allocate": basis_at_allocate,
+        "predictor_synced_basis_id": int(state.predictor_synced_basis_id),
+        "basis_rank": basis_rank,
         "timings": timings,
         "u_frozen": u_frozen,
         "grad_norm": update_stats.get("grad_norm"),
         "grad_norm_preclip": update_stats.get("grad_norm_preclip"),
+        "parameter_update_norm": update_stats.get("parameter_update_norm"),
+        "update_ascent_cosine": update_stats.get("update_ascent_cosine"),
         "sampling": (getattr(engines, "last_rollout", None) or {}).get("sampling"),
         "residual_mean": None
         if not any(r.g is not None for r in records)

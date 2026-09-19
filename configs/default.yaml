@@ -32,6 +32,11 @@ predictor:
   reservoir_size: 512
   refresh_every: 32
   constant_cost: true
+  coord_kind: mlp
+  ridge_l2: 1.0
+  use_affine: true
+  shrink_m: true
+  align_basis: true
 lora:
   rank: 16
   alpha: 32.0

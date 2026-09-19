@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import fields
 import json
 from pathlib import Path
 import sys
@@ -22,6 +23,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--data-path", dest="data_path", default=None)
     parser.add_argument("--generate", action="store_true")
     parser.add_argument("--backend", default=None, help="cpu_tiny or gpu_verl; default keeps YAML")
+    parser.add_argument("--method", default=None)
     parser.add_argument("--config", action="append", default=[])
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--model-path", dest="model_path", default=None)
@@ -40,6 +42,8 @@ def main(argv: list[str] | None = None) -> int:
         overrides = {"data_path": args.data_path, "eval_split": args.split}
         if args.backend:
             overrides["backend"] = args.backend
+        if args.method:
+            overrides["method"] = args.method
         if args.seed is not None:
             overrides["seed"] = args.seed
         if args.model_path:
@@ -68,14 +72,8 @@ def main(argv: list[str] | None = None) -> int:
         if not line.strip():
             continue
         raw = json.loads(line)
-        items.append(
-            EvalItem(
-                problem_id=str(raw["problem_id"]),
-                gold=str(raw["gold"]),
-                answers=list(raw["answers"]),
-                truncated=list(raw.get("truncated", [False] * len(raw["answers"]))),
-            )
-        )
+        raw.setdefault("truncated", [False] * len(raw["answers"]))
+        items.append(EvalItem(**{f.name: raw[f.name] for f in fields(EvalItem) if f.name in raw}))
     k = args.k
     if k is None and args.config:
         from grace_gc.trainer.loop import build_run_config
@@ -96,6 +94,9 @@ def main(argv: list[str] | None = None) -> int:
     result["started"] = started
     result["finished"] = utc_now()
     result["run_dir"] = str(run.root)
+    from grace_gc.versions import sha256_file
+
+    result["answers_source"] = {"path": str(path.resolve()), "sha256": sha256_file(path)}
     run.write_json("eval_summary.json", result)
     print(result["n_problems"], result["avg"], result["pass_at_k"], result["parse_rate"], result["truncate_rate"])
     print("run_dir", result["run_dir"])

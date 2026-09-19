@@ -1,0 +1,7 @@
+# Independent prescan only: add two pseudo-observations with prior mean 0.5.
+# No current actor-update rewards enter their own baseline.
+experiment_variant: baseline_smoothed_prescan
+baseline:
+  mode: ema
+  prescan_prior_strength: 2.0
+  prescan_prior_mean: 0.5

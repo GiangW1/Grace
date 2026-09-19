@@ -16,16 +16,16 @@ progress:
 See: .planning/PROJECT.md
 
 **Core value:** 用简单、正确、可运行的代码实现 GRACE，随后做最小证伪。
-**Current focus:** Phase 2 — 服务器最小证伪（尚未开始）。最后一次推送是 GitHub `master`（712c9e6）；现役工作树还有未提交改动。
+**Current focus:** Phase 2 — 服务器最小证伪尚未用现役树重跑。GitHub 默认分支是 `master`。
 
 ## Current Position
 
 Phase: 1 of 2 complete（完整实现 GRACE 与实验代码）
 Plan: 4 of 4
-Status: Phase 1 code complete
-Last activity: 2026-09-16 — 官方 DAPO 冲突丢掉、共享格式 SFT、奖励 `\text{}`/`\pi` 归一、GPU 阶段心跳与 startup.json、health 记 baseline/A-vs-B、README 全流程。本机 pytest 199 passed / 1 skipped。未提交。
+Status: Phase 1 code complete；保真/方差接线在 master
+Last activity: 2026-09-17 — Neyman 等真实 U 与同步头、||G−Uf||²、仿射/ridge/γ/换基对齐、剩余 token ĉ；审查后补同步门、审计就绪、γ 的 IPW、稳定去均值、缺失 logprob、λ 换算、账本不重叠。本机 `252 passed, 17 deselected`。PR #2/#3 的最小 GPU 脚本和 π 计分已并入这份，不再单独合那两个 PR。
 
-Progress: 50% — 代码阶段完成；真实 GPU 实验未跑。
+Progress: 50% — 代码阶段完成；现役树上的真实 GPU 实验未跑。
 
 ## Accumulated Context
 
@@ -37,10 +37,10 @@ Progress: 50% — 代码阶段完成；真实 GPU 实验未跑。
 
 ### Next Work
 
-按 README 全流程在目标 GPU 上单卡起步（`a100_1.yaml` 或 `rtx5090_1.yaml`）：先 smoke Full-PG，再 Pilot Full-PG，再 GRACE。不要用 4 卡/8 卡配置。RUN-01 到 RUN-03 仍未跑。
+把当前工作树放到单卡服务器，跑 `scripts/run_minimal_gpu.sh`。看 GRACE 相对 Full-PG / Uniform-CV / GRPO 的质量与成本，不要看停止者比例。不要用 4 卡/8 卡。不要把 2026-09-16 两次 smoke 或那次 16 题链当现役结果。Pilot 仍按 README，在这次最小比较可读之后。
 
 ### Notes
 
 - U6/真实两阶段 token 分布待 GPU。
 - 不要把本机 tiny LoRA 数字当成实测。
-- 2026-09-16 服务器 smoke 产物不能当 Phase 2 结果：当时官方 parquet 会因冲突金标硬失败，且 Base+ChatML 无格式 SFT。代码已改，需按 README 全流程重跑。
+- 2026-09-16 两次 smoke：冲突金标硬失败；以及 SFT 训进 `Answer:`+金标+EOS 导致短答交卷。`37fbcb2` 已改为只训推理开头。

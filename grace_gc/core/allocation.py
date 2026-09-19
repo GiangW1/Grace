@@ -43,13 +43,19 @@ def allocate_continuation(
     p_min: float,
     finished: np.ndarray | None = None,
     iters: int = 20,
+    uniform_shrink: float = 0.0,
 ) -> AllocationResult:
     """Solve λ so that E[p c] / E[c] ≈ β on unfinished prefixes.
 
     Natural finishes are excluded and forced to p=1. Empty eligible sets
-    return p=1 everywhere. Reports realized expected-budget deviation.
+    return p=1 everywhere. Optional shrinkage mixes with a uniform probability
+    at the same achieved expected cost, preserving solver budget deviations.
+    Lambda describes the original Neyman allocation before this mixture.
     """
     _validate_probs(p_min, beta)
+    uniform_shrink = float(uniform_shrink)
+    if not np.isfinite(uniform_shrink) or not 0.0 <= uniform_shrink <= 1.0:
+        raise ValueError("uniform_shrink must be finite and in [0, 1]")
     risk = np.asarray(risk, dtype=np.float64).reshape(-1)
     cost = np.asarray(cost, dtype=np.float64).reshape(-1)
     if risk.shape[0] != cost.shape[0]:
@@ -76,8 +82,13 @@ def allocate_continuation(
             n_eligible=0,
         )
 
-    r = np.maximum(risk[eligible], 0.0)
+    r_raw = np.maximum(risk[eligible], 0.0)
     c = cost[eligible]
+    # Solve on r / mean(r) so a global risk scale does not move p.
+    scale = float(np.mean(r_raw))
+    if not np.isfinite(scale) or scale <= 0.0:
+        scale = 1.0
+    r = r_raw / scale
     c_sum = float(np.sum(np.maximum(c, 0.0)))
     target = beta * c_sum
 
@@ -101,12 +112,18 @@ def allocate_continuation(
             lam = np.sqrt(lo * hi)
 
     p_elig = _clipped_p(r, c, lam, p_min)
+    if uniform_shrink:
+        # Matching the achieved cost also handles clipping, all-zero risks and
+        # finite bisection error without silently changing the budget.
+        uniform = float(np.dot(p_elig, np.maximum(c, 0.0)) / c_sum) if c_sum > 0.0 else 1.0
+        uniform = float(np.clip(uniform, p_min, 1.0))
+        p_elig = (1.0 - uniform_shrink) * p_elig + uniform_shrink * uniform
     p[eligible] = p_elig
     expected = float(np.sum(p_elig * np.maximum(c, 0.0)))
     deviation = expected - target
     return AllocationResult(
         p=p,
-        lam=float(lam),
+        lam=float(lam * scale),
         budget_target=target,
         budget_expected=expected,
         budget_deviation=deviation,

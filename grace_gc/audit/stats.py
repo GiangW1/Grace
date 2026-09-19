@@ -67,14 +67,14 @@ def t_learn(rho_curve: np.ndarray, times: np.ndarray, eps: float) -> float | Non
 
 
 def rho_ucb(vals, z: float = 1.96) -> float:
-    """Upper bound of the problem-level mean. One problem keeps the point estimate."""
+    """Normal-approximation upper bound; unavailable without between-problem SE."""
     vals = np.asarray(vals, dtype=np.float64)
     vals = vals[np.isfinite(vals)]
     if vals.size == 0:
         return float("nan")
     mean = float(np.mean(vals))
     if vals.size < 2:
-        return mean
+        return float("nan")
     return mean + float(z) * float(np.std(vals, ddof=1) / np.sqrt(vals.size))
 
 
@@ -116,7 +116,10 @@ def lag_index(
     horizon = float(length) if length is not None and float(length) > 0 else float(np.max(t))
     if horizon <= 0.0:
         return float("nan")
-    return float(np.trapz(a - b, t / horizon))
+    integrate = getattr(np, "trapezoid", None)
+    if integrate is None:
+        integrate = np.trapz
+    return float(integrate(a - b, t / horizon))
 
 
 def plc(tokens_after_tl: float, backward_after_tl: float, total_cost: float) -> float:

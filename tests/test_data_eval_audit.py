@@ -7,7 +7,13 @@ import pytest
 from grace_gc.audit.prefix_audit import PrefixBundle, audit_bundles
 from grace_gc.audit.stats import elf, lag_index, plc
 from grace_gc.data.math_data import MathRecord, load_math_records, records_for_split, split_records
-from grace_gc.data.reward import extract_boxed, first_parseable_index, rule_reward
+from grace_gc.data.reward import (
+    _gold_has_pi_constant,
+    _plain_pi_to_latex,
+    extract_boxed,
+    first_parseable_index,
+    rule_reward,
+)
 from grace_gc.evaluation.eval_full import EvalItem, evaluate_items
 from grace_gc.evaluation.metrics import pass_at_k, time_to_target, wilson_interval
 
@@ -307,6 +313,29 @@ def test_reward_and_parse_position():
     assert rule_reward("The girl is Alice.", r"\text{Evelyn}") == 0.0
 
 
+def test_plain_pi_rewrite_when_gold_has_constant(monkeypatch):
+    monkeypatch.setattr("grace_gc.data.reward.math_verify_fns", lambda: None)
+    assert _gold_has_pi_constant(r"\frac{\pi}{2}")
+    assert not _gold_has_pi_constant("p i")
+    assert _plain_pi_to_latex("(3, pi/2)") == r"(3, \pi/2)"
+    assert _plain_pi_to_latex("2pi") == r"2\pi"
+    assert _plain_pi_to_latex("3pi/2") == r"3\pi/2"
+    assert _plain_pi_to_latex("pine") == "pine"
+    assert _plain_pi_to_latex("api") == "api"
+    assert _plain_pi_to_latex(r"\pi") == r"\pi"
+    assert _plain_pi_to_latex("p*i") == "p*i"
+    assert rule_reward("Answer: (3, pi/2)", r"\left(3,\frac{\pi}{2}\right)") == 1.0
+    assert rule_reward("Answer: 2pi", r"2\pi") == 1.0
+    assert rule_reward("Answer: 3pi/2", r"3\pi/2") == 1.0
+    assert rule_reward("Answer: (3, \u03c0/2)", r"\left(3,\frac{\pi}{2}\right)") == 1.0
+    assert rule_reward("Answer: pi", r"\pi") == 1.0
+    assert rule_reward("Answer: pine", r"\pi") == 0.0
+    assert rule_reward("Answer: p*i", r"\pi") == 0.0
+    assert rule_reward("Answer: (3, pi/3)", r"\left(3,\frac{\pi}{2}\right)") == 0.0
+    assert rule_reward("Answer: 3", r"\left(3,\frac{\pi}{2}\right)") == 0.0
+    assert rule_reward("Answer: pi", "p-q") == 0.0
+
+
 def test_rule_reward_verifies_extracted_pred(monkeypatch):
     calls = []
 
@@ -315,15 +344,41 @@ def test_rule_reward_verifies_extracted_pred(monkeypatch):
 
     def verify(gold, pred):
         calls.append(pred)
-        return pred == "1/2"
+        return pred == r"\boxed{0.5}"
 
     monkeypatch.setattr("grace_gc.data.reward.math_verify_fns", lambda: (parse, verify))
-    looping = r"\boxed{1/2} " + ("x" * 80)
+    looping = r"\boxed{0.5} " + ("x" * 80)
     assert rule_reward(looping, r"\frac{1}{2}") == 1.0
-    assert calls[0] == "1/2"
+    assert calls[0] == r"\boxed{0.5}"
 
 
-def test_rule_reward_none_pred_still_tries_verify(monkeypatch):
+@pytest.mark.parametrize(
+    "text,gold,expected",
+    [
+        ("Answer: 3", r"\left(3,\frac{\pi}{2}\right)", 0.0),
+        (r"Answer: (3,\pi/2)", r"\left(3,\frac{\pi}{2}\right)", 1.0),
+        ("Answer: (3, pi/2)", r"\left(3,\frac{\pi}{2}\right)", 1.0),
+        ("Answer: (3, pi/3)", r"\left(3,\frac{\pi}{2}\right)", 0.0),
+        ("Answer: (3, \u03c0/2)", r"\left(3,\frac{\pi}{2}\right)", 1.0),
+        ("Answer: pi", r"\pi", 1.0),
+        ("Answer: 2pi", r"2\pi", 1.0),
+        ("Answer: 3pi/2", r"3\pi/2", 1.0),
+        (r"Answer: p*i", r"\pi", 0.0),
+        ("Answer: pine", r"\pi", 0.0),
+        ("Answer: q-p", "p-q", 0.0),
+        ("Answer: -q+p", "p-q", 1.0),
+        ("Answer: 0.5", r"\frac{1}{2}", 1.0),
+        ("I considered 42.\nAnswer: 41", "42", 0.0),
+        ("I considered Evelyn.\nAnswer: Alice", r"\text{Evelyn}", 0.0),
+        (r"Answer: 3\text{ cm}", r"5\text{ cm}", 0.0),
+    ],
+)
+def test_reward_checks_complete_final_expression(text, gold, expected):
+    pytest.importorskip("math_verify")
+    assert rule_reward(text, gold) == expected
+
+
+def test_rule_reward_none_pred_does_not_scan_prose(monkeypatch):
     def parse(value):
         return str(value)
 
@@ -331,7 +386,52 @@ def test_rule_reward_none_pred_still_tries_verify(monkeypatch):
         return "42" in pred and "42" in gold
 
     monkeypatch.setattr("grace_gc.data.reward.math_verify_fns", lambda: (parse, verify))
-    assert rule_reward("the value is 42.", "42") == 1.0
+    assert rule_reward("the value is 42.", "42") == 0.0
+    assert rule_reward("The girl is Evelyn.", r"\text{Evelyn}") == 1.0
+
+
+def test_format_sft_trains_last_line_not_immediate_answer():
+    from grace_gc.data.format_prompt import format_sft_answer_prefix, format_sft_lead, format_sft_response, format_sft_text
+
+    lead = format_sft_lead()
+    tail = format_sft_response("61")
+    text = format_sft_text("61")
+    assert lead.strip()
+    assert not lead.lstrip().startswith("Answer:")
+    assert tail == "Answer: 61"
+    assert text.startswith(lead)
+    assert text.endswith(tail)
+    assert "Answer:" not in lead
+    assert (lead + format_sft_answer_prefix()).startswith(lead)
+
+
+def test_answer_already_emitted_ignores_process_boxed():
+    from grace_gc.data.reward import answer_already_emitted
+
+    assert answer_already_emitted("work \\boxed{27} more steps") is False
+    assert answer_already_emitted("the answer is 10\nnow continue") is False
+    assert answer_already_emitted("work\nAnswer: 343/27") is True
+    assert answer_already_emitted("done \\boxed{27}") is True
+
+
+def test_extract_prefers_later_answer_line():
+    from grace_gc.data.reward import extract_answer
+
+    assert extract_answer("work \\boxed{27} more\nAnswer: 343/27") == "343/27"
+    assert extract_answer("Answer: 3\n\\boxed{(3,\\pi/2)}") == r"(3,\pi/2)"
+    assert extract_answer("the answer is 90") == "90"
+    assert extract_answer("Final Answer:\n90") == "90"
+
+
+def test_normalize_degree_unit_and_frac():
+    from grace_gc.data.reward import normalize_answer
+
+    assert normalize_answer(r"90^\circ") == "90"
+    assert normalize_answer(r"90^{\circ}") == "90"
+    assert normalize_answer(r"\frac{14}{3}") == "14/3"
+    assert rule_reward("Answer: 90", r"90^\circ") == 1.0
+    assert rule_reward(r"Answer: 5", r"5\text{ cm}") == 1.0
+    assert rule_reward(r"Answer: 3\text{ cm}", r"5\text{ cm}") == 0.0
 
 
 def test_solve_instruction_and_math500_flag():
@@ -468,6 +568,7 @@ def test_lora_and_baseline_health_fields():
         advantage=0.0,
         g=None,
         audited=False,
+        baseline_b=0.0,
     )
     state = type(
         "S",
@@ -485,3 +586,54 @@ def test_lora_and_baseline_health_fields():
     assert out["n_baseline"] == 2
     assert out["n_baseline_zero"] == 1
     assert out["baseline_collapsed_with_zero_reward"] is True
+    rec.baseline_b = 0.5
+    later = step_health(state, {"records": [rec]})
+    assert later["n_baseline_zero"] == 1
+    assert later["baseline_collapsed_with_zero_reward"] is False
+
+    stopped = StartRecord(
+        problem_id="s",
+        finished=False,
+        p=0.2,
+        z=0.0,
+        f=np.zeros(1),
+        r_hat=1.0,
+        c_hat=1.0,
+        reward=None,
+        advantage=None,
+        g=None,
+        audited=False,
+        response_tokens=0,
+    )
+    long_done = StartRecord(
+        problem_id="c",
+        finished=True,
+        p=1.0,
+        z=1.0,
+        f=np.zeros(1),
+        r_hat=1.0,
+        c_hat=1.0,
+        reward=1.0,
+        advantage=0.5,
+        g=None,
+        audited=False,
+        response_tokens=40,
+    )
+    short_done = StartRecord(
+        problem_id="q",
+        finished=True,
+        p=1.0,
+        z=1.0,
+        f=np.zeros(1),
+        r_hat=1.0,
+        c_hat=1.0,
+        reward=0.0,
+        advantage=-0.5,
+        g=None,
+        audited=False,
+        response_tokens=5,
+    )
+    ignored = step_health(state, {"records": [stopped, long_done]})
+    assert ignored["n_short_response"] == 0
+    counted = step_health(state, {"records": [stopped, short_done]})
+    assert counted["n_short_response"] == 1

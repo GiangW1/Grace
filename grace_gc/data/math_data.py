@@ -22,11 +22,38 @@ class MathRecord:
 
 
 def _normalize(text: str) -> str:
-    return re.sub(r"\s+", " ", text.strip().lower())
+    # Mathematical variables are case-sensitive (A and a can denote different values).
+    return re.sub(r"\s+", " ", text.strip())
 
 
 def _hash_text(text: str) -> str:
     return hashlib.sha256(_normalize(text).encode("utf-8")).hexdigest()
+
+
+def select_records(records: list[MathRecord], n: int, selection: str = "first", seed: int = 17) -> list[MathRecord]:
+    """A common, method-independent subset; seeded selection ignores input order."""
+    if n < 0:
+        raise ValueError("n_problems must be non-negative")
+    if selection not in {"first", "seeded"}:
+        raise ValueError(f"unknown data selection {selection!r}")
+    ordered = list(records)
+    if selection == "seeded":
+        import numpy as np
+
+        ordered.sort(key=lambda rec: rec.problem_id)
+        order = np.random.default_rng(int(seed)).permutation(len(ordered))
+        ordered = [ordered[int(i)] for i in order]
+    return ordered[:n] if n else ordered
+
+
+def selection_manifest(records: list[MathRecord], selection: str, seed: int) -> dict:
+    rows = [{"problem_id": r.problem_id, "prompt_sha256": _hash_text(r.prompt),
+             "gold_sha256": hashlib.sha256(str(r.answer).encode("utf-8")).hexdigest()}
+            for r in records]
+    return {"selection": selection, "selection_seed": int(seed), "n_problems": len(rows),
+            "prompt_normalization": "whitespace_v2_case_sensitive", "problems": rows,
+            "ordered_records_sha256": hashlib.sha256(
+                json.dumps(rows, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()}
 
 
 def _as_rows(value):
@@ -261,6 +288,7 @@ def load_math_records(path: str | Path) -> list[MathRecord]:
             continue
         out.append(seen[key])
     report = {
+        "prompt_normalization": "whitespace_v2_case_sensitive",
         "path": str(path),
         "n_raw": n_raw,
         "n_kept": len(out),

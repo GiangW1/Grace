@@ -1,0 +1,39 @@
+# Explicit September 18 revision; old September 17 config remains reproducible.
+# These are method/measurement choices to test, not a claim of improved reward.
+n_prompts: 4
+n_start: 16
+checkpoint_every: 5
+lora:
+  compute_dtype: bfloat16
+vllm:
+  lora_dtype: bfloat16
+baseline:
+  batch_prescan: true
+predictor:
+  refresh_after_warmup: true
+  basis_solver: auto
+  basis_center: problem
+  basis_ipw: true
+  basis_fit_only: true
+  feature_scaler: fixed
+  feature_mode: legacy
+  feature_batch_size: 1
+  shrink_calibration: holdout
+  calibration_fraction: 0.2
+  ridge_weight_normalization: mean
+  reservoir_size: 128
+allocation:
+  beta: 0.75
+diagnostics:
+  probe_tokens: 0  # complete response of one sampled trajectory, before update
+optim:
+  log_update_geometry: true
+eval:
+  selection: seeded
+  selection_seed: 20260918
+  n_problems: 128
+  sample_batch_size: 4
+audit:
+  selection: seeded
+  selection_seed: 20260918
+  n_problems: 16

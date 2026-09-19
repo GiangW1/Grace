@@ -1,0 +1,24 @@
+# Explicit follow-up variant. Layer after minimal_gpu_repaired.yaml.
+# These changes are testable hypotheses, not measured improvements.
+predictor:
+  basis_variant: predictable_crossfit
+  basis_ridge_l2: 1.0
+  max_age_steps: 12
+  age_half_life: 6
+  missing_step_policy: exclude
+  fresh_samples_per_problem: 1
+  fresh_every: 4
+cost_control:
+  enabled: true
+  ema_alpha: 0.3
+  max_n: 64
+diagnostics:
+  probe_tokens: 0
+  probe_sequences: 0
+  probe_stopped_prefixes: true
+batch_audit:
+  replicates: 8
+  n_prompts: 4
+  starts_per_prompt: 4
+  baseline_mode: prescan
+  prescan_samples: 4
