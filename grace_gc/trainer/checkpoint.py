@@ -142,7 +142,18 @@ def save_checkpoint(path: str | Path, payload: dict[str, Any]) -> dict[str, floa
     temporary = None
     try:
         stored, stats = _compact_gradients(payload)
-        stored, basis_artifact = _externalize_fixed_basis(path.parent, stored)
+        stored = dict(stored)
+        offline = stored.pop("_offline_predictor_source", None)
+        if offline is not None:
+            from grace_gc.predictor.offline import copy_predictor
+            reference = copy_predictor(offline, path.parent)
+            stored = {**stored, "predictor": None,
+                      "basis": {key: value for key, value in stored["basis"].items() if key != "u"},
+                      "offline_predictor": reference}
+            stats["offline_predictor"] = reference
+            basis_artifact = None
+        else:
+            stored, basis_artifact = _externalize_fixed_basis(path.parent, stored)
         if basis_artifact is not None:
             stats["basis_artifact"] = basis_artifact
         with tempfile.NamedTemporaryFile(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False) as stream:
@@ -159,7 +170,8 @@ def save_checkpoint(path: str | Path, payload: dict[str, Any]) -> dict[str, floa
             "checkpoint_bytes": path.stat().st_size, "checkpoint_compression_level": 1}
 
 
-def copy_checkpoint(source: str | Path, target: str | Path, *, basis_artifact: str | None = None) -> dict[str, float]:
+def copy_checkpoint(source: str | Path, target: str | Path, *, basis_artifact: str | None = None,
+                    offline_predictor: dict | None = None) -> dict[str, float]:
     """Reuse compressed bytes when publishing latest, without a second dump."""
     source, target = Path(source), Path(target)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -168,6 +180,9 @@ def copy_checkpoint(source: str | Path, target: str | Path, *, basis_artifact: s
     try:
         if basis_artifact is not None:
             _copy_basis_artifact(source.parent, target.parent, basis_artifact)
+        if offline_predictor is not None:
+            from grace_gc.predictor.offline import copy_predictor
+            copy_predictor({**offline_predictor, "path": str(source.parent/offline_predictor["path"])}, target.parent)
         with tempfile.NamedTemporaryFile(dir=target.parent, prefix=f".{target.name}.", suffix=".tmp", delete=False) as stream:
             temporary = Path(stream.name)
             with source.open("rb") as original:
@@ -191,6 +206,16 @@ def load_checkpoint(path: str | Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("checkpoint payload is not a mapping")
     basis = payload.get("basis")
+    if payload.get("offline_predictor") is not None:
+        from grace_gc.predictor.offline import read_predictor
+        reference = payload["offline_predictor"]
+        if Path(reference["path"]).name != reference["path"]:
+            raise ValueError("offline predictor reference must be a basename")
+        source = path.parent/reference["path"]
+        body = read_predictor(source, reference["sha256"])
+        payload["predictor"] = body["predictor"]
+        basis["u"] = body["u"]
+        payload["_offline_predictor_source"] = {**reference, "path": str(source.resolve())}
     if isinstance(basis, dict) and "u_artifact" in basis:
         basis["u"] = _load_basis_artifact(path.parent, basis["u_artifact"])
     reservoir = payload.get("reservoir")

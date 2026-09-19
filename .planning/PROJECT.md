@@ -36,7 +36,7 @@
 
 - [x] 实现 GRACE 全空间无偏梯度补全、续写分配和 CPU 参考测试。
 - [x] 实现历史梯度 reservoir、低秩基底、坐标/风险/成本预测器、IPW 与随机审计。
-- [x] 接入单卡 HF actor + vLLM 两阶段 rollout、双流更新与保存恢复；分布式归约有 CPU 参考，`n_gpu>1` 仍拒绝。
+- [x] 接入 HF actor + vLLM 两阶段 rollout、双流更新与保存恢复；新增独立离线预测器和单 actor＋多 rollout worker 对照。actor 分布式归约仅有 CPU 参考；多 rollout 路径待 GPU 验证。
 - [x] 实现核心机制对照及 GRPO、GRPO-short，提供数学数据和独立评测入口。
 - [x] 实现真实成本记录、前缀审计、指标与图表脚本，提供小规模与完整 Pilot 参数。
 - [x] 提供 A100/5090 的运行配置和简短运行说明。
@@ -57,7 +57,7 @@
 - 核心实现依据：§4–§6、§8、§13 和附录 B/F/G。
 - 仓库为 [GiangW1/Grace](https://github.com/GiangW1/Grace)，默认分支 `master`。当前修复的发布状态见 [STATE.md](STATE.md)，不能把本地已提交等同于已合并或已实测。
 - 本机 Windows 无 GPU；CPU 测试已跑。服务器按 README 全流程单卡起步。
-- 规划硬件为 4×A100，随后两组各 8×RTX5090；现在 `n_gpu>1` 不能启动。
+- 规划硬件为 4×A100，随后两组各 8×RTX5090；多卡训练入口要求 `rollout.workers=n_gpu-1`、TP=1，不支持多卡 actor。
 - GPU-hours 按硬件分别记录，不把5090时间直接叫作 A100-hours。
 
 ## 必须实现正确的数学内容

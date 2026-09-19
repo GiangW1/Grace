@@ -188,6 +188,8 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
         engines = make_tiny_engines(actor, actor.vocab)
         n_prompts, starts_per, n_start = resume_start_counts(cfg, spec, state)
         record_effective_config(run, cfg, state, opt)
+    from grace_gc.predictor.offline import attach_predictor
+    attach_predictor(state, cfg, run)
     steps = int(cfg.get("num_steps", 1))
     if ledger is None:
         ledger = ComputeLedger(n_gpu=0, hardware="cpu")
@@ -266,7 +268,7 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
         "cost_control": cost,
         "allocation_ready_last_batch": bool(last.get("allocation_ready", False)),
         "allocation_ready_steps_this_session": allocation_steps,
-        "post_warmup_steps": max(0, state.step - int((cfg.get("predictor") or {}).get("warmup_steps", 0))),
+        "post_warmup_steps": state.step if state.offline_predictor else max(0, state.step - int((cfg.get("predictor") or {}).get("warmup_steps", 0))),
         "step": state.step,
         "actor_moved": True,
         "n_audited": last.get("n_audited", 0),

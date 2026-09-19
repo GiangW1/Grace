@@ -268,6 +268,42 @@ def _execution_metadata(execution: dict | None, requested_batch_size: int) -> di
     return execution
 
 
+def generate_with_params(llm, prompts, param_list, kwargs, execution):
+    def generate_batch(batch, params):
+        call = {"batch_size": len(batch), "status": "running"}
+        execution["generate_calls"].append(call)
+        execution["num_generate_calls"] += 1
+        started = perf_counter()
+        try:
+            result = llm.generate(batch, sampling_params=params, **kwargs)
+        except Exception as exc:
+            call.update(status="failed", error_type=type(exc).__name__, error=str(exc))
+            execution["failed_generate_batches"] += 1
+            raise
+        else:
+            call["status"] = "returned"
+            execution["successful_generate_batches"] += 1
+            execution["successful_batch_sizes"].append(len(batch))
+            return result
+        finally:
+            call["wall_seconds"] = perf_counter() - started
+            if hasattr(llm, "last_execution"):
+                call["worker_execution"] = llm.last_execution
+            execution["wall_seconds"] += call["wall_seconds"]
+
+    try:
+        outputs = generate_batch(prompts, param_list)
+    except TypeError as exc:
+        if not _sampling_list_rejected(exc):
+            raise
+        execution["serial_fallback"] = True
+        execution["serial_fallback_reason"] = str(exc)
+        outputs = []
+        for prompt, params in zip(prompts, param_list):
+            outputs.extend(generate_batch([prompt], params))
+    return outputs
+
+
 def generate_phase(
     llm,
     prompt_token_ids: list[list[int]],
@@ -298,36 +334,7 @@ def generate_phase(
     if lora_request is not None:
         kwargs["lora_request"] = lora_request
 
-    def generate_batch(batch, params):
-        call = {"batch_size": len(batch), "status": "running"}
-        execution["generate_calls"].append(call)
-        execution["num_generate_calls"] += 1
-        started = perf_counter()
-        try:
-            result = llm.generate(batch, sampling_params=params, **kwargs)
-        except Exception as exc:
-            call.update(status="failed", error_type=type(exc).__name__, error=str(exc))
-            execution["failed_generate_batches"] += 1
-            raise
-        else:
-            call["status"] = "returned"
-            execution["successful_generate_batches"] += 1
-            execution["successful_batch_sizes"].append(len(batch))
-            return result
-        finally:
-            call["wall_seconds"] = perf_counter() - started
-            execution["wall_seconds"] += call["wall_seconds"]
-
-    try:
-        outputs = generate_batch(prompts, param_list)
-    except TypeError as exc:
-        if not _sampling_list_rejected(exc):
-            raise
-        execution["serial_fallback"] = True
-        execution["serial_fallback_reason"] = str(exc)
-        outputs = []
-        for prompt, params in zip(prompts, param_list):
-            outputs.extend(generate_batch([prompt], params))
+    outputs = generate_with_params(llm, prompts, param_list, kwargs, execution)
     if len(outputs) != len(prompt_token_ids):
         raise ValueError(f"vLLM returned {len(outputs)} outputs for {len(prompt_token_ids)} prompts")
     token_ids = []

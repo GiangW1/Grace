@@ -73,6 +73,7 @@ class TrainState:
     history_costs: list[float] = field(default_factory=list)
     step: int = 0
     cost_control: dict = field(default_factory=dict)
+    offline_predictor: dict | None = None
 
 
 def ensure_prescan_rng(state: TrainState) -> IsolatedRNG:
@@ -322,13 +323,14 @@ def run_algorithm1_step(
 
     behavior_context = {
         "snapshot_sha": sha256_named(engines.named_lora()),
-        "basis_sha": sha256_array(state.u),
+        "basis_sha": (state.offline_predictor or {}).get('basis_sha') or sha256_array(state.u),
         "predictor_sha": None if state.predictor is None else sha256_mapping(state.predictor),
         "rng_counters": dict(state.rng.counters),
         "timing": "before_rollout_and_update",
     }
     new_audit_items = []
-    warmup = state.step < int(pred_cfg.get("warmup_steps", 0))
+    frozen = state.offline_predictor is not None
+    warmup = not frozen and state.step < int(pred_cfg.get("warmup_steps", 0))
     audit_s = float(pred_cfg.get("audit_s", 0.125))
     n_prescan = int((cfg.get("baseline") or {}).get("prescan", 0) or 0)
     if state.spec.objective == "grpo" or not state.baseline.uses_prescan:
@@ -513,7 +515,7 @@ def run_algorithm1_step(
     chosen = z >= 1.0
     audit_draw = (
         state.rng.bernoulli("audit", np.full(n, audit_s))
-        if state.spec.use_predictor
+        if state.spec.use_predictor and not frozen
         else np.zeros(n, dtype=np.float64)
     )
     loss, audited_gradients = real_stream_backward_and_audit(
@@ -609,7 +611,7 @@ def run_algorithm1_step(
 
     from grace_gc.trainer.supervision import collect_fresh_supervision
 
-    fresh_items, fresh_rows, fresh_metrics = collect_fresh_supervision(
+    fresh_items, fresh_rows, fresh_metrics = ([], [], {"n": 0, "generated_tokens": 0}) if frozen else collect_fresh_supervision(
         engines, state, prompt_ids, problem_ids, golds, cfg,
     )
     for item in fresh_items:
@@ -620,7 +622,7 @@ def run_algorithm1_step(
     timings["fresh_supervision"] = timer.lap()
 
     logprob_probe = None if engines.before_update is None else engines.before_update(records)
-    frozen_predictor = (None if state.predictor is None else
+    frozen_predictor = (None if state.predictor is None or frozen else
                         diagnose_frozen_predictor(state.predictor, new_audit_items, state.u,
                                                   risk_mode=state.spec.risk_mode, basis_id=state.basis_id))
     if frozen_predictor is not None:
@@ -662,7 +664,7 @@ def run_algorithm1_step(
     pred_metrics = {"coord_loss": None, "risk_loss": None}
     basis_rank = None
     basis_changed = False
-    if state.spec.use_predictor and state.predictor is not None and len(state.reservoir.items) >= 2:
+    if not frozen and state.spec.use_predictor and state.predictor is not None and len(state.reservoir.items) >= 2:
         variant = str(pred_cfg.get("basis_variant", "pca"))
         if variant not in {"pca", "predictable_crossfit", "predictable_crossfit_signal"}:
             raise ValueError("basis_variant must be pca, predictable_crossfit or predictable_crossfit_signal")
@@ -798,6 +800,7 @@ def run_algorithm1_step(
         "next_n": next_n,
         "texts": texts,
         "predictor": pred_metrics,
+        "predictor_frozen": frozen,
         "warmup": warmup,
         "n_prescan": n_prescanned,
         "token_cost_used": float(used),

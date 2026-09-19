@@ -2,7 +2,15 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
-## 本机最近一次结果（2026-09-19）
+## 离线预测器与多卡 rollout 对照（2026-09-19，本轮）
+
+最终全量 CPU/替身回归：`745 passed, 1 skipped in 91.68s`，命令 `D:\Anaconda\python.exe -m pytest tests -q -o addopts='' --tb=short`。1项真实 CUDA 测试因本机无 GPU 跳过；requests 有既有依赖版本警告。
+
+本轮覆盖完全离线权重/scaler/γ冻结、无 fresh/审计监督、p=1 与 Full-PG 相同 actor 更新、共享 actor 不变、calib 题隔离与 ChatML 保留、部署 beta 校准、artifact 校验及迁移恢复/归档。多卡侧使用 CPU 替身验证真实 spawn/Pipe 通信、并发分片、请求顺序/seed、兼容回退、同步失败、缺失输出、GPU入口资源清理；真实 Bash 包装器验证离线参数和评测配置传递、用户输入不被 setup 默认值覆盖。
+
+补充了重复 seed、TP 设备账本、CPU 不记录虚构 GPU 用量、方法特征/风险协议校验；三个新增测试文件先单独得到 `24 passed in 11.85s`，随后完成上面的最终全量回归。CLI 帮助、Bash 语法、单卡/四卡配置加载与 `git diff --check` 已检查；README、新实施文档和 STATE 的23个本地文件链接均存在。没有 GPU 性能、显存、质量或 LAG 成功证据。实现及服务器四组命令见 [离线并行对照](OFFLINE_PARALLEL_CONTROL_20260919.md)。
+
+## 此前在线固定 U 回归（2026-09-19）
 
 ```text
 721 passed, 1 skipped in 80.39s

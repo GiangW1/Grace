@@ -112,7 +112,7 @@ def allocation_ready_from_checkpoint(spec: MethodSpec, payload: dict | None, cfg
         return True
     raw = payload or {}
     warmup = int(((cfg or {}).get("predictor") or {}).get("warmup_steps", 0) or 0)
-    if int(raw.get("step", 0) or 0) < warmup:
+    if not raw.get("offline_predictor") and int(raw.get("step", 0) or 0) < warmup:
         return False
     basis = raw.get("basis") or {}
     return neyman_ready(int(basis.get("basis_id", 0) or 0), int(basis.get("predictor_synced_basis_id", -1)))

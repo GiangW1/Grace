@@ -16,7 +16,7 @@
 - [x] **CODE-06**: 实现低秩 basis/刷新重投影、前缀特征、坐标头、全空间风险头、Gram 残差与成本头/常数成本选项。
 - [x] **CODE-07**: 实现历史数据和问题级拆分上的 IPW 预测器训练，使用 1/(p*s) 并按当前 basis/预测器重算风险标签。
 - [x] **CODE-08**: 实现批内冻结、历史 baseline、warmup p=1、批后学习与基于历史成本决定下一批固定起步数。
-- [x] **CODE-09**: 实现真实两阶段 rollout（配置名 `gpu_verl`，实现是 HF actor + vLLM，不是 verl PPO）：相同快照、原始 token IDs、只续写被选者、明确 RNG/缓存处理；避免占位后端。FSDP 包装已写，`n_gpu>1` 仍拒绝。
+- [x] **CODE-09**: 实现真实两阶段 rollout（配置名 `gpu_verl`，实现是 HF actor + vLLM，不是 verl PPO）：相同快照、原始 token IDs、只续写被选者、明确 RNG/缓存处理。新增一张 actor 卡＋n_gpu−1 个 rollout worker，待 GPU 验证；actor allreduce 未接入。
 - [x] **CODE-10**: 实现分布式固定全局 N、完整参数布局、负预测校正、AMP/归约/clip 顺序，以及 FP64 对照和 U6/U7 测试入口。
 - [x] **CODE-11**: 保存和恢复 actor、optimizer、预测器、baseline、basis/reservoir 与 RNG 等实际续训状态。
 - [x] **CODE-12**: 实现 Full-PG、Uniform-HT、Uniform-CV、Reward-CV、Prompt-CV、GRACE；提供独立实用轨道 GRPO、GRPO-short 配置。
@@ -25,7 +25,7 @@
 - [x] **CODE-15**: 实现独立完整作答评测：论文数学基准配置、avg/pass@k、解析/截断率、time-to-target 和真实验证的困难题首次成功 HVD。
 - [x] **CODE-16**: 实现可调规模的同前缀独立续写审计、全空间/JL 核对、正交补诊断、rho_L/rho_A、t_L/t_A、ELF/LAG/PLC 与区间统计。
 - [x] **CODE-17**: 实现审计的独立拟合/评估划分，以及 Oracle/实际预测器在实际受限 p 下的方差成本计算；不把理论闭式写成实验开关。
-- [x] **CODE-18**: 提供最小实验、完整 Pilot 参数、单卡 A100/5090 启动配置与 README 全流程（先 smoke Full-PG，再 Pilot）；4×A100/8×5090 yaml 保留但 `n_gpu>1` 会拒绝。记录已跑测试、未跑项目和必要实现差异，结果不足照常输出。
+- [x] **CODE-18**: 提供最小实验、完整 Pilot 参数、单卡 A100/5090 配置与 README 全流程；另有离线预测器四组对照和 `a100_rollout_4.yaml`。旧多卡配置须补齐 worker 布局，不能当作多卡 actor 训练。记录已跑测试、未跑项目和必要实现差异，结果不足照常输出。
 
 ### Phase 2 — 最小证伪实验
 

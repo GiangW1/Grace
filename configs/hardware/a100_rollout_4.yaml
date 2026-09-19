@@ -1,10 +1,12 @@
-# Single actor + colocated vLLM. Multi-card rollout uses a100_rollout_4.yaml.
+# One HF actor GPU and three independent single-GPU vLLM workers.
 hardware:
   name: a100
-  n_gpu: 1
+  n_gpu: 4
   gpu_memory_gb: 80
+rollout:
+  workers: 3
 vllm:
   tensor_parallel: 1
-  dtype: bfloat16
   gpu_memory_utilization: 0.5
+  dtype: bfloat16
 backend: gpu_verl

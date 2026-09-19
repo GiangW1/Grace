@@ -10,9 +10,9 @@ status: in-progress
 ## 代码与发布
 
 - 仓库：[GiangW1/Grace](https://github.com/GiangW1/Grace)，默认分支 `master`。
-- 本地分支：`codex/grace-efficiency-20260919`；本轮功能提交截至 `f20506e`。后续知识收尾仅同步文档和忽略规则。
+- 本地分支：`codex/grace-efficiency-20260919`；`f20506e` 为在线固定 U 功能，`f1aa568` 为此前知识收尾。本轮追加离线预测器及多卡 rollout 对照，详见 [实施记录](../docs/OFFLINE_PARALLEL_CONTROL_20260919.md)。
 - 修复已通过 fork 提交 [PR #2](https://github.com/GiangW1/Grace/pull/2)，核对时为 OPEN、未合并；未观察到 CI 检查结果。不能把 PR 发布当作服务器已部署或实测。
-- 后端为单卡 HF actor + vLLM 两阶段；固定 U 是可选变体，预测头仍在线更新。`n_gpu>1` 继续拒绝。
+- 后端为 HF actor + vLLM 两阶段；原在线固定 U 变体保留。新增完全冻结预测器、单 actor＋n_gpu−1 个 rollout worker，要求 TP=1。未实现多卡 actor。
 
 ## 实验与测试
 
@@ -23,7 +23,7 @@ status: in-progress
 ## 下一步
 
 1. 在单卡服务器验证当前 PR 版本的生成/缓存/同步观测、CUDA 数值、固定 U 恢复和完整成本，再使用现有脚本比较机制与同预算质量。运行方式见 [README](../README.md)。
-2. [实施方案§9](../docs/GRACE_RESEARCH_IMPLEMENTATION_PLAN_20260919.md#9-代码落点与验证)的顺序 1–4 已实现；5–7（条件噪声/基底遗漏/拟合误差与交叉能量、可选 prequential/轻特征、后续多 GPU）尚未实现。已有 realized-G 分解不能替代第5项。
+2. [实施方案§9](../docs/GRACE_RESEARCH_IMPLEMENTATION_PLAN_20260919.md#9-代码落点与验证)的顺序 1–4 已实现；第7项已有多 rollout worker 代码、CPU 通信与接线回归，待服务器跑四组对照。第5–6项（三项误差分解/交叉能量、prequential/轻特征）仍未实现。已有 realized-G 分解不能替代第5项。
 3. [30项问题清单](../docs/GRACE_ISSUE_CHECKLIST_20260919.md)是问题状态的权威入口；没有新测量时，不把待实测或未闭合事项改成已解决。
 
 ## 现场保留

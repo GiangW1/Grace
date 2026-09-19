@@ -167,14 +167,27 @@ def build_vllm_engine(model_path: str, cfg: dict[str, Any], lora_rank: int):
 
 
 def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None = None) -> dict[str, Any]:
+    resources = {}
+    try:
+        return _train(cfg, run, ledger, resources)
+    finally:
+        pool = resources.get("pool")
+        if pool is not None:
+            pool.close()
+
+
+def _train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None, resources) -> dict[str, Any]:
     start_cost_control(cfg, Timer())
     n_gpu = int(cfg.get("hardware", {}).get("n_gpu", 1))
-    if n_gpu > 1:
-        raise RuntimeError(
-            "n_gpu>1 needs a real distributed reduce that is not wired. "
-            "Set hardware.n_gpu=1 until FSDP allreduce writes .grad once."
-        )
+    from grace_gc.backends.rollout_pool import RolloutPool, validate_layout
+    try:
+        workers = validate_layout(cfg)
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
     versions = require_gpu_stack()
+    if workers:
+        import torch
+        torch.cuda.set_device(0)
     cfg = apply_method_defaults(cfg)
     spec = method_spec(cfg.get("method", "grace"))
     if spec.max_new_tokens:
@@ -224,7 +237,7 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
     if ledger is None:
         ledger = ComputeLedger(n_gpu=max(n_gpu, 1), hardware=str(cfg.get("hardware", {}).get("name", "gpu")))
     actor = load_lora_actor(str(model_path), cfg.get("lora", {}))
-    actor = maybe_wrap_fsdp(actor, n_gpu)
+    actor = maybe_wrap_fsdp(actor, 1)
     from grace_gc.trainer.initialization import initialize_actor
 
     initial_actor = initialize_actor(actor, cfg, run)
@@ -235,8 +248,13 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
     vllm_cfg = dict(cfg.get("vllm") or {})
     vllm_cfg.setdefault("seed", int(cfg.get("seed", 17)))
     vllm_cfg["max_model_len"] = vllm_needed_max_model_len(cfg)
-    llm = build_vllm_engine(str(model_path), vllm_cfg, int(cfg.get("lora", {}).get("rank", 16)))
-    if getattr(build_vllm_engine, "last", None):
+    if workers:
+        llm = RolloutPool.launch(str(model_path), vllm_cfg, int(cfg.get("lora", {}).get("rank", 16)), n_gpu)
+        resources["pool"] = llm
+        run.write_json("vllm_engine.json", llm.metadata)
+    else:
+        llm = build_vllm_engine(str(model_path), vllm_cfg, int(cfg.get("lora", {}).get("rank", 16)))
+    if not workers and getattr(build_vllm_engine, "last", None):
         run.write_json("vllm_engine.json", build_vllm_engine.last)
     engines, extra = make_gpu_engines(actor, llm, tokenizer, cfg, Path(run.root) / "lora")
     def observed_call(phase, step, action):
@@ -361,6 +379,8 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         )
         n_prompts, starts_per, n_start = resume_start_counts(cfg, spec, state)
 
+    from grace_gc.predictor.offline import attach_predictor
+    attach_predictor(state, cfg, run)
     run.write_json(
         "startup.json",
         {
@@ -466,7 +486,7 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         "cost_control": cost,
         "allocation_ready_last_batch": bool(last.get("allocation_ready", False)),
         "allocation_ready_steps_this_session": allocation_steps,
-        "post_warmup_steps": max(0, state.step - int((cfg.get("predictor") or {}).get("warmup_steps", 0))),
+        "post_warmup_steps": state.step if state.offline_predictor else max(0, state.step - int((cfg.get("predictor") or {}).get("warmup_steps", 0))),
         "step": state.step,
         "status": "gpu_loop_ran",
         "checkpoint": str(Path(run.root) / "checkpoint.npz"),

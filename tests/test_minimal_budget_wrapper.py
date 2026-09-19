@@ -25,6 +25,9 @@ def test_budget_wrapper_evaluates_published_cutoff_and_deduplicates_final(tmp_pa
         shutil.copyfile(root/"configs"/relative, path)
     hardware = tmp_path/"configs/hardware/custom.yaml"; hardware.parent.mkdir()
     hardware.write_text("hardware:\n  name: synthetic-5090\n  n_gpu: 1\n", encoding="utf-8")
+    setup = tmp_path/'runs/setup'
+    setup.mkdir(parents=True)
+    (setup/'fetch-assets.exports').write_text('export MODEL=wrong-model TRAIN_DATA=wrong-train EVAL_DATA=wrong-eval CUDA_VISIBLE_DEVICES=9\n')
     # The wrapper's real pytest preflight runs a small existing CPU test file.
     # This avoids recursively executing this shell test or mocking pytest itself.
     (tmp_path/"tests").mkdir()
@@ -36,9 +39,15 @@ import yaml
 from grace_gc.config import merge_configs
 p=argparse.ArgumentParser()
 p.add_argument('--config',action='append',default=[])
-for name in ('run-dir','method','backend','model-path','data-path','eval-data-path','init-checkpoint','checkpoint','seed','num-steps','run-wall-seconds','target-step-seconds'):
+for name in ('run-dir','method','backend','model-path','data-path','eval-data-path','init-checkpoint','checkpoint','seed','num-steps','run-wall-seconds','target-step-seconds','offline-predictor'):
     p.add_argument('--'+name)
 a,extra=p.parse_known_args()
+assert a.model_path == 'synthetic-model' and os.environ['CUDA_VISIBLE_DEVICES'] == '2'
+assert os.environ['TRAIN_DATA'] == 'train.jsonl' and os.environ['EVAL_DATA'] == 'eval.jsonl'
+if Path(__file__).name == 'train.py' and a.method == 'grace':
+    assert a.offline_predictor == 'synthetic-predictor.npz'
+else:
+    assert a.offline_predictor is None
 cfg={}
 for path in a.config:
     cfg=merge_configs(cfg,yaml.safe_load(Path(path).read_text()))
@@ -90,7 +99,8 @@ print('run_dir',run)
            "GIT_DIR": subprocess.check_output([git, "rev-parse", "--absolute-git-dir"], cwd=root, text=True).strip(),
            "SEEDS": "17", "MODEL": "synthetic-model", "TRAIN_DATA": "train.jsonl", "EVAL_DATA": "eval.jsonl",
            "HARDWARE_CONFIG": "configs/hardware/custom.yaml", "COMPARISON_MODE": "wall", "RUN_WALL_SECONDS": "30",
-           "POST_TRAIN_STAGES": "eval", "MAX_STEPS": "10000"}
+           "POST_TRAIN_STAGES": "eval", "MAX_STEPS": "10000", 'CUDA_VISIBLE_DEVICES':'2',
+           'OFFLINE_PREDICTOR':'synthetic-predictor.npz', 'POST_HARDWARE_CONFIG':'configs/hardware/custom.yaml'}
     for name in ("SHARED_INIT_CHAIN", "COMMON_CONFIG", "ABLATION_CONFIG", "EXPERIMENT_CONFIG", "EVAL_STEPS"):
         env.pop(name, None)
     if selection:

@@ -172,6 +172,8 @@ def _sync(actor, adapter_dir: Path, extra: dict[str, Any]):
             raise
         finally:
             detail["timings"][name] = perf_counter() - started
+            if hasattr(extra.get("llm"), "last_execution") and name != "adapter_save":
+                detail.setdefault("workers", {})[name] = extra["llm"].last_execution
 
     prev_id = int(extra["lora_id"]) if extra.get("lora_request") is not None else None
     extra["lora_id"] = int(extra["lora_id"]) + 1

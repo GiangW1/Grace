@@ -98,6 +98,10 @@ def effective_run_config(cfg: dict[str, Any], state: TrainState, optimizer) -> d
                       for name, value in vars(pred).items() if name.startswith("opt_") and value is not None}
         loaded["optimizer_learning_rates"] = optimizers
         result["predictor"] = {**result.get("predictor", {}), **loaded}
+    if state.offline_predictor is not None:
+        result["predictor"].update(frozen=True, warmup_steps=0, audit_s=0.0,
+                                   fresh_samples_per_problem=0)
+        result["offline_predictor"] = dict(state.offline_predictor)
     return result
 
 
@@ -134,7 +138,7 @@ def dump_train_state(path, state: TrainState, actor_named, optimizer, actor_full
             "u": state.u,
             "basis_id": state.basis_id,
             "predictor_synced_basis_id": state.predictor_synced_basis_id,
-            "fixed": state.reservoir.fixed_basis_id is not None,
+            "fixed": state.offline_predictor is not None or state.reservoir.fixed_basis_id is not None,
         },
         "prescan_rng": None if state.prescan_rng is None else state.prescan_rng.state_dict(),
         "reservoir": state.reservoir.state_dict(),
@@ -150,6 +154,8 @@ def dump_train_state(path, state: TrainState, actor_named, optimizer, actor_full
     }
     if extra:
         payload.update(extra)
+    if state.offline_predictor is not None:
+        payload["_offline_predictor_source"] = state.offline_predictor
     timings = {"state_extract_wall_seconds": time.perf_counter() - started,
                "state_extract_cpu_seconds": time.process_time() - cpu}
     timings.update(save_checkpoint(path, payload))
@@ -233,6 +239,7 @@ def restore_train_state(path, actor, optimizer, in_dim: int, k: int, spec_name: 
         step=int(payload.get("step", 0)),
         n_ref=int(payload.get("n_ref", 0)),
         cost_control=dict(payload.get("cost_control") or {}),
+        offline_predictor=payload.get("_offline_predictor_source"),
     )
     restore_global_rng_state(payload.get("global_rng"))
     return state

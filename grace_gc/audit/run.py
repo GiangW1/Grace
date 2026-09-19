@@ -753,7 +753,7 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
                 "seed": seed, "audit_manifest": manifest,
             }
             analysis["allocation_ready"] = allocation_ready_from_checkpoint(spec, payload, cfg)
-            analysis["warmup"] = int(payload.get("step", 0)) < int((cfg.get("predictor") or {}).get("warmup_steps", 0))
+            analysis["warmup"] = not payload.get("offline_predictor") and int(payload.get("step", 0)) < int((cfg.get("predictor") or {}).get("warmup_steps", 0))
             if cfg.get("audit", {}).get("jl_dim"):
                 analysis["jl_dim"] = int(cfg["audit"]["jl_dim"])
             result = audit_bundles(bundles, u, analysis, rng)

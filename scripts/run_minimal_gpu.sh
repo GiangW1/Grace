@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
-# Sequential single-GPU comparison with one shared SFT actor per training seed.
+# Sequential method comparison with one shared SFT actor per training seed.
 set -eo pipefail
 cd "$(dirname "$0")/.."
+model_arg="${MODEL:-}"; train_arg="${TRAIN_DATA:-}"; eval_arg="${EVAL_DATA:-}"; devices_arg="${CUDA_VISIBLE_DEVICES:-}"
 if [[ -f runs/setup/env.sh ]]; then source runs/setup/env.sh; fi
 if [[ -f runs/setup/fetch-assets.exports ]]; then source runs/setup/fetch-assets.exports; fi
+# Explicit experiment inputs take precedence over setup defaults.
+if [[ -n "$model_arg" ]]; then export MODEL="$model_arg"; fi
+if [[ -n "$train_arg" ]]; then export TRAIN_DATA="$train_arg"; fi
+if [[ -n "$eval_arg" ]]; then export EVAL_DATA="$eval_arg"; fi
+if [[ -n "$devices_arg" ]]; then export CUDA_VISIBLE_DEVICES="$devices_arg"; fi
 : "${MODEL:?set MODEL to the local model path}"
 : "${TRAIN_DATA:?set TRAIN_DATA to the training data}"
 : "${EVAL_DATA:?set EVAL_DATA to the evaluation data}"
@@ -31,7 +37,9 @@ export OMP_NUM_THREADS="${OMP_NUM_THREADS:-8}"
 export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-8}"
 export MKL_NUM_THREADS="${MKL_NUM_THREADS:-8}"
 git log -1 --oneline
-python -m pytest tests | tee "$experiment_root/logs/tests.log"
+if [[ "${RUN_TESTS:-1}" != 0 ]]; then
+  python -m pytest tests | tee "$experiment_root/logs/tests.log"
+fi
 read -r -a seeds <<< "${SEEDS:-17 23 41}"
 python - "$experiment_root" "${SEEDS:-17 23 41}" "$comparison_mode" "${methods[@]}" <<'PY'
 import json, sys
@@ -70,6 +78,8 @@ for seed in "${seeds[@]}"; do
     --config "${HARDWARE_CONFIG:-configs/hardware/a100_1.yaml}" --backend gpu_verl --model-path "$MODEL" --seed "$seed")
   if [[ -n "${COMMON_CONFIG:-}" ]]; then common+=(--config "$COMMON_CONFIG"); fi
   if [[ -n "${ABLATION_CONFIG:-}" ]]; then common+=(--config "$ABLATION_CONFIG"); fi
+  post_common=("${common[@]}")
+  if [[ -n "${POST_HARDWARE_CONFIG:-}" ]]; then post_common+=(--config "$POST_HARDWARE_CONFIG"); fi
   init_args=()
   if [[ -n "${SHARED_INIT_CHAIN:-}" ]]; then
     shared_checkpoint=$(python - "$SHARED_INIT_CHAIN/seed-$seed" <<'PY'
@@ -107,6 +117,9 @@ PY
       steps="${MAX_STEPS:-10000}"
     fi
     if [[ -n "$target_step" ]]; then budget_args+=(--target-step-seconds "$target_step"); fi
+    if [[ "$method" == grace && -n "${OFFLINE_PREDICTOR:-}" ]]; then
+      budget_args+=(--offline-predictor "$OFFLINE_PREDICTOR")
+    fi
     measured_python "$method/train" scripts/train.py "${common[@]}" --method "$method" --data-path "$TRAIN_DATA" --eval-data-path "$EVAL_DATA" \
       --config configs/experiments/minimal_gpu_train_memory.yaml \
       --init-checkpoint "$init_run/checkpoints/step_0.npz" \
@@ -146,7 +159,7 @@ PY
     final_evaluated=false
     for step in "${eval_steps[@]}"; do
       if [[ ! -f "$train_run/checkpoints/step_$step.npz" ]]; then continue; fi
-      measured_python "$method/eval-$step" scripts/evaluate.py --generate "${common[@]}" --method "$method" --data-path "$EVAL_DATA" \
+      measured_python "$method/eval-$step" scripts/evaluate.py --generate "${post_common[@]}" --method "$method" --data-path "$EVAL_DATA" \
         --checkpoint "$train_run/checkpoints/step_$step.npz" \
         --run-dir "$seed_root/$method/eval-$step" | tee "$seed_root/logs/$method-eval-$step.stdout"
       record_stage "$method" "eval-$step" "$seed_root/logs/$method-eval-$step.stdout"
@@ -156,7 +169,7 @@ PY
       fi
     done
     if [[ "$final_evaluated" != true ]]; then
-      measured_python "$method/eval-final" scripts/evaluate.py --generate "${common[@]}" --method "$method" --data-path "$EVAL_DATA" \
+      measured_python "$method/eval-final" scripts/evaluate.py --generate "${post_common[@]}" --method "$method" --data-path "$EVAL_DATA" \
         --checkpoint "$train_run/checkpoint.npz" --run-dir "$seed_root/$method/eval-final" \
         | tee "$seed_root/logs/$method-eval-final.stdout"
       record_stage "$method" eval-final "$seed_root/logs/$method-eval-final.stdout"
@@ -166,7 +179,7 @@ PY
     for stage in audit audit-training; do
       audit_extra=()
       if [[ "$stage" == audit-training ]]; then audit_extra=(--config configs/experiments/minimal_gpu_audit_training.yaml); fi
-      measured_python "$method/$stage" scripts/audit.py --generate "${common[@]}" --method "$method" --data-path "$TRAIN_DATA" \
+      measured_python "$method/$stage" scripts/audit.py --generate "${post_common[@]}" --method "$method" --data-path "$TRAIN_DATA" \
         --config configs/experiments/minimal_gpu_audit.yaml "${audit_extra[@]}" \
         --checkpoint "$train_run/checkpoint.npz" --run-dir "$seed_root/$method/$stage" \
         | tee "$seed_root/logs/$method-$stage.stdout"
@@ -175,7 +188,7 @@ PY
     fi
     if [[ " $post_train_stages " == *" batch-audit "* ]]; then
     if [[ "$method" != grpo && "$method" != grpo_short ]]; then
-      measured_python "$method/batch-audit" scripts/audit_batch.py --generate "${common[@]}" --method "$method" --data-path "$TRAIN_DATA" \
+      measured_python "$method/batch-audit" scripts/audit_batch.py --generate "${post_common[@]}" --method "$method" --data-path "$TRAIN_DATA" \
         --config configs/experiments/minimal_gpu_train_memory.yaml \
         --checkpoint "$train_run/checkpoint.npz" --run-dir "$seed_root/$method/batch-audit" \
         | tee "$seed_root/logs/$method-batch-audit.stdout"

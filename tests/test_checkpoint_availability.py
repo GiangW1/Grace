@@ -20,8 +20,9 @@ def test_available_cost_is_after_publish_not_checkpoint_embedded_clock(tmp_path,
         clock["now"] += 4
         return {}
 
-    def copy(source, target, *, basis_artifact=None):
+    def copy(source, target, *, basis_artifact=None, offline_predictor=None):
         assert basis_artifact is None
+        assert offline_predictor is None
         target.write_bytes(source.read_bytes())
         clock["now"] += 2
         return {}

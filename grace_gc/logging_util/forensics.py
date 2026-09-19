@@ -83,7 +83,7 @@ def step_context(run: RunDirectory, cfg: dict[str, Any], state, last: dict[str, 
         "rng_counters": dict(getattr(state.rng, "counters", {})),
         "rng_counters_before_rollout": (last.get("behavior_context") or {}).get("rng_counters"),
         "snapshot_sha": (last.get("behavior_context") or {}).get("snapshot_sha"),
-        "basis_sha": (last.get("behavior_context") or {}).get("basis_sha", None if u is None else sha256_array(u)),
+        "basis_sha": (last.get("behavior_context") or {}).get("basis_sha") or (None if u is None else sha256_array(u)),
         "predictor_sha": (last.get("behavior_context") or {}).get("predictor_sha"),
         "post_update_snapshot_sha": None if named is None else sha256_named(named),
         "post_update_predictor_sha": None if predictor is None else sha256_mapping(predictor),
@@ -402,6 +402,7 @@ def step_metrics_row(state, last: dict[str, Any], ctx: dict[str, Any], wall_s: f
         "n_stopped": last.get("n_stopped", sum(1 for r in records if r.z < 1.0)),
         "n_audited": last.get("n_audited"),
         "audit_gradient_source": last.get("audit_gradient_source"),
+        "predictor_frozen": bool(last.get("predictor_frozen", False)),
         "n_prescan": last.get("n_prescan"),
         "mean_p": _mean(r.p for r in records),
         "mean_reward": _mean(r.reward for r in records),
@@ -507,7 +508,8 @@ def _publish_snapshot(run, cfg, state, actor_named, optimizer, actor_full=None, 
     step_path = run.root / "checkpoints" / f"step_{int(state.step)}.npz"
     timings = dump_train_state(step_path, state, actor_named, optimizer, actor_full=actor_full, extra=payload_extra)
     timings.update(copy_checkpoint(step_path, run.root / "checkpoint.npz",
-                                   basis_artifact=timings.get("basis_artifact")))
+                                   basis_artifact=timings.get("basis_artifact"),
+                                   offline_predictor=timings.get("offline_predictor")))
     hash_timer = Timer()
     sha = sha256_file(step_path)
     timings.update(hash_wall_seconds=hash_timer.elapsed(), hash_cpu_seconds=hash_timer.cpu_elapsed())

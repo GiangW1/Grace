@@ -2,7 +2,7 @@
 
 Qwen3-4B-Base 上的 GRACE 训练、评测和前缀审计。本机先做 CPU 检查；服务器按下面全流程做。
 
-显示名用 **GRACE-GC**，避免和另外两篇同名工作混淆。多卡 allreduce 还没接上，**先单卡**。
+显示名用 **GRACE-GC**，避免和另外两篇同名工作混淆。主流程先单卡；另有“一张 actor 卡＋多张 rollout 卡”的离线对照，见 [实现与用法](docs/OFFLINE_PARALLEL_CONTROL_20260919.md)。actor allreduce 尚未接入。
 
 下面是一条能按顺序做完的全流程。第 1–7 节是同一条线的细节，卡住时再翻。
 
@@ -163,6 +163,18 @@ SEEDS=17 COMMON_CONFIG=configs/experiments/minimal_gpu_cost_candidate.yaml \
 与动态 U 对照时，去掉 `ABLATION_CONFIG`，其余设置相同；跨链使用 `SHARED_INIT_CHAIN` 复用同 seed 初始 actor。这里是开发 seed 的固定步数诊断，不能据此宣称同算力胜出。配置只固定基底，不强制 γ、不改变风险/ρ、不额外生成；上述 cost candidate 的固定 baseline 和无 fresh 设置应作为另一项已明确的实验选择。实现边界和后续验证见 [调研方案与实施状态](docs/GRACE_RESEARCH_IMPLEMENTATION_PLAN_20260919.md#91-首批实施状态2026-09-19)。
 
 `steps.jsonl` 新增 `timing_details`、`rollout_execution`、`sync_details`；生成/同步失败会写 `failed_execution.json`。子时间均已计入阶段总时间。缓存计数缺失记 null，提交批次不代表 GPU 内部调度批次，也不代表加速。固定 U 的 NPZ 依赖同目录 `basis-*.npy`；迁移时一并复制，恢复继续启用相同 overlay。只复制 NPZ 不足以恢复。
+
+### E5. 完全离线预测器与多卡对照
+
+```bash
+python scripts/run_offline_comparison_gpu.py \
+  --devices 0,1,2,3 --seeds 17 23 41 --steps 40 --fit-steps 40 \
+  --run-dir runs/offline-parallel-controls
+```
+
+复用上面设置的 MODEL/TRAIN_DATA/EVAL_DATA。每 seed 共用一次 SFT、一次仅使用 calib 题集的离线拟合，运行单卡/多卡 × Full-PG/离线 GRACE；N=16、固定 b=0.5、prescan=0。多卡是第一张卡放 actor，其余三个 vLLM worker；评测/审计统一单卡。配置/恢复/费用说明见 [离线并行对照](docs/OFFLINE_PARALLEL_CONTROL_20260919.md)。
+
+`matrix_summary.json` 列出配对 seed 结果、实际训练进程墙钟、GPU 秒，以及计入离线拟合和 SFT 的 cold 总成本。`--wall-seconds 2400` 对齐消费阶段预算；不能把它称为相同 cold 总预算。此变体尚无真实 GPU 结果。
 
 作业结束后保留完整检查点归档：
 
@@ -556,7 +568,7 @@ python scripts/plot.py --summary runs/eval-grace-seed17/eval_summary.json --out 
 
 ## 不要做的事
 
-- 不要用 `configs/hardware/a100_4.yaml` 或 `rtx5090_8.yaml` 启动，`n_gpu>1` 会直接失败。
+- 不要单独用旧 `a100_4.yaml` 或 `rtx5090_8.yaml` 启动。多卡必须显式设置 `rollout.workers=n_gpu-1`、TP=1；可使用 `a100_rollout_4.yaml` 或离线四组脚本，不能当作多卡 actor 训练。
 - 不要在没设 `CUDA_VISIBLE_DEVICES` 的 4 卡机器上直接开训。
 - 不要漏 `--num-steps`。默认是 1，GRACE 出不了 warmup。
 - 不要拿别人的 answers/bundles 当这个方法的结果。

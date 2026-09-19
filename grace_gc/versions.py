@@ -72,7 +72,7 @@ def _update_digest(digest, value) -> None:
             _update_digest(digest, value[key])
         return
     if hasattr(value, "tobytes"):
-        digest.update(np.ascontiguousarray(np.asarray(value)).tobytes())
+        digest.update(np.ascontiguousarray(np.asarray(value)))
         return
     digest.update(repr(value).encode("utf-8"))
 

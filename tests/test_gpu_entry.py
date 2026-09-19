@@ -791,7 +791,7 @@ def test_gpu_train_seeds_before_lora_init():
 
     from grace_gc.backends import verl_trainer
 
-    src = inspect.getsource(verl_trainer.train)
+    src = inspect.getsource(verl_trainer._train)
     assert src.index("seed_all") < src.index("load_lora_actor")
     assert src.index("apply_method_defaults") < src.index("resolve_start_counts")
 

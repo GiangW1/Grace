@@ -40,8 +40,8 @@ def archive_run(root: Path, output: Path, max_file_mib=20, include_checkpoints=F
                     "always_include_names": ["batch_audit_means.npz"],
                     "include_checkpoints": include_checkpoints,
                     "checkpoint_suffixes": [".npz"],
-                    "checkpoint_dependencies": ["basis-*.npy"],
-                    "explicit_npz_dependencies": "all basis-*.npy in the selected NPZ's directory",
+                    "checkpoint_dependencies": ["basis-*.npy", "predictor-*.npz"],
+                    "explicit_npz_dependencies": "all basis-*.npy and predictor-*.npz in the selected NPZ's directory",
                     "adapter_weight_names": list(_ADAPTER_WEIGHTS),
                     "include_paths": [p.relative_to(root).as_posix() for p in selected],
                 },
@@ -61,7 +61,7 @@ def archive_run(root: Path, output: Path, max_file_mib=20, include_checkpoints=F
             digest = hashlib.sha256()
             if any(path.is_relative_to(p) for p in selected):
                 inclusion_reason = "explicit_path"
-            elif path.parent in basis_directories and path.match("basis-*.npy"):
+            elif path.parent in basis_directories and (path.match("basis-*.npy") or path.match("predictor-*.npz")):
                 inclusion_reason = "checkpoint_dependency"
             elif path.suffix == ".jsonl" or path.name == "batch_audit_means.npz":
                 inclusion_reason = "scientific_evidence"

@@ -31,6 +31,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--target-step-seconds", type=float, default=None, help="enable measured-cost feedback for the next batch N")
     parser.add_argument("--resume", default=None)
     parser.add_argument("--init-checkpoint", default=None, help="load shared actor only; start a new method")
+    parser.add_argument("--offline-predictor", default=None, help="load a frozen predictor artifact; {seed} is expanded")
     args = parser.parse_args(argv)
     overrides = {}
     if args.method:
@@ -57,6 +58,8 @@ def main(argv: list[str] | None = None) -> int:
         overrides["resume"] = args.resume
     if args.init_checkpoint:
         overrides["init_checkpoint"] = args.init_checkpoint
+    if args.offline_predictor:
+        overrides["offline_predictor"] = args.offline_predictor
     cfg = build_run_config(args.config, overrides)
     run_dir = args.run_dir or str(default_run_dir("train"))
     payload = run_training(cfg, run_dir)

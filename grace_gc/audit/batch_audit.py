@@ -117,7 +117,7 @@ class OptimizerReplay:
 def _allocation(prefixes, lengths, finished, baselines, engines, predictor, u, spec, payload, cfg,
                 *, return_raw_coordinates=False):
     n = len(prefixes)
-    warmup = int(payload.get("step", 0)) < int((cfg.get("predictor") or {}).get("warmup_steps", 0))
+    warmup = not payload.get("offline_predictor") and int(payload.get("step", 0)) < int((cfg.get("predictor") or {}).get("warmup_steps", 0))
     remaining = continuation_remainings(prefixes, lengths, finished, int(cfg["max_new_tokens"]))
     f = np.zeros((n, u.shape[1]))
     risk, cost = np.ones(n), incremental_token_costs(remaining, finished)
@@ -230,7 +230,7 @@ def token_proxy_efficiency(full_cov, actual_cov, mean_extra, expected_tokens, fu
 def _intervention_allocations(options, raw_f, risk, cost, finished, spec, payload, cfg, uniform):
     alloc, pcfg = cfg.get("allocation") or {}, cfg.get("predictor") or {}
     basis = payload.get("basis") or {}
-    warmup = int(payload.get("step", 0)) < int(pcfg.get("warmup_steps", 0))
+    warmup = not payload.get("offline_predictor") and int(payload.get("step", 0)) < int(pcfg.get("warmup_steps", 0))
     ready = not spec.use_allocation or neyman_ready(basis.get("basis_id", 0), basis.get("predictor_synced_basis_id", -1))
     arms = {}
     for name, knobs in options.items():
