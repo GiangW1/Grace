@@ -3,3 +3,4 @@ experiment_variant: baseline_fixed_half
 baseline:
   mode: fixed
   fixed_value: 0.5
+  prescan: 0

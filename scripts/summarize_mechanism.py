@@ -15,26 +15,13 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.summarize_minimal import checkpoint_matches, finite, paired_delta, read_json, read_rows, stage_path
+from grace_gc.logging_util.experiment_evidence import (
+    auxiliary_count_evidence, evaluation_issues, response_tokens as _response_tokens,
+)
 
 
 def _config(path):
     return (yaml.safe_load(path.read_text(encoding="utf-8")) or {}) if path.is_file() else {}
-
-
-def _response_tokens(row, main):
-    if main:
-        for key in ("generated_response_tokens", "total_generated_tokens"):
-            if row.get(key) is not None:
-                return int(row[key])
-        if row.get("prefix_tokens") is not None and row.get("suffix_tokens") is not None:
-            return int(row["prefix_tokens"])+int(row["suffix_tokens"])
-    elif row.get("response_tokens") is not None:
-        return int(row["response_tokens"])
-    full, prompt = row.get("full_token_ids"), row.get("prompt_token_ids")
-    if full is None and main:
-        full = row.get("prefix_token_ids")
-    length = len(prompt) if prompt is not None else row.get("prompt_len")
-    return len(full)-int(length) if full is not None and length is not None else None
 
 
 def training_costs(train, steps, summary, main_rows=None):
@@ -52,31 +39,10 @@ def training_costs(train, steps, summary, main_rows=None):
     prescan_samples = (config.get("baseline") or {}).get("prescan")
 
     def auxiliary_matches_step_facts(key, rows, selected_steps):
-        by_step = {}
-        for row in rows:
-            by_step.setdefault(row.get("step"), []).append(row)
-        for step in selected_steps:
-            recorded = by_step.get(step["step"], [])
-            if key == "prescan_tokens":
-                count = step.get("n_prescan")  # Number of unseen problems, not answers.
-                if not finite(count):
-                    continue  # Legacy logs without this fact retain their observed sums.
-                if count == 0 and recorded:
-                    return False
-                if finite(prescan_samples) and len(recorded) != count * prescan_samples:
-                    return False
-                if all(row.get("problem_id") is not None for row in recorded):
-                    groups = Counter(row["problem_id"] for row in recorded)
-                    if len(groups) != count or (finite(prescan_samples) and any(n != prescan_samples for n in groups.values())):
-                        return False
-            else:
-                fact = ((step.get("predictor") or {}).get("fresh_supervision") or {})
-                if finite(fact.get("n")) and len(recorded) != fact["n"]:
-                    return False
-                tokens = [_response_tokens(row, False) for row in recorded]
-                if finite(fact.get("generated_tokens")) and all(finite(n) for n in tokens) and sum(tokens) != fact["generated_tokens"]:
-                    return False
-        return True
+        # Missing legacy count facts allow an observed sum, not verified counts.
+        return all(auxiliary_count_evidence(key.removesuffix("_tokens"),
+            [row for row in rows if row.get("step") == step["step"]], step, prescan_samples) is not False
+            for step in selected_steps)
 
     def proves_zero(key, selected_steps):
         if key == "prescan_tokens":
@@ -169,10 +135,7 @@ def _paired_with_evidence(left, right, left_eval, right_eval):
     if not all(arm.get("starts_per_step") and all(n == 16 for n in arm["starts_per_step"]) for arm in (left, right)):
         issues.append("fixed_n16_missing_or_mismatched")
     lm, rm = left.get("evaluation_manifest") or {}, right.get("evaluation_manifest") or {}
-    for field in ("ordered_records_sha256", "reward_protocol_version", "samples_per_problem", "temperature",
-                  "top_p", "max_new_tokens", "sample_batch_size", "sample_seed_start"):
-        if lm.get(field) is None or lm.get(field) == "" or lm.get(field) != rm.get(field):
-            issues.append("evaluation_"+field+"_missing_or_mismatched")
+    issues.extend(evaluation_issues(lm, rm))
     if issues:
         return {"available": False, "issues": issues, "note": "Mechanism paired inference withheld because initialization, training seed, complete fixed-N inputs, endpoint source or evaluation protocol is unverified; raw per-arm scores remain visible."}
     result = paired_delta(left_eval, right_eval)

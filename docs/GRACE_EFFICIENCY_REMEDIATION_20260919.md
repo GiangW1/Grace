@@ -294,16 +294,27 @@ python scripts/summarize_training_dynamics.py FULL_PG_TRAIN GRACE_TRAIN UNIFORM_
 
 ### 10.5 把组合候选拆成可归因的实验（P02/P03/P04/P06/P14/P18）
 
-已有signal/cost组合候选继续保留；新增五份单因素配置，均叠在deeper之后：
+已有signal/cost组合候选继续保留；五种单因素对照均叠在deeper之后。其中三份为新增配置，固定/平滑baseline复用已有文件，避免重复维护：
 
 | 配置文件 | 改动 | 要回答的问题 |
 |---|---|---|
 | `minimal_gpu_audit_all.yaml` | 主完成轨迹audit_s=1 | 多标签收益能否覆盖拷贝、存储和拟合费用？ |
 | `minimal_gpu_no_fresh.yaml` | fresh_samples_per_problem=0 | 取消额外生成后是否仍有足够当前策略监督？ |
 | `minimal_gpu_signal_basis.yaml` | 交叉矩正谱建基 | 可预测方向是否改善独立残差，而不只是预测幅度？ |
-| `minimal_gpu_smoothed_baseline.yaml` | 相同4次prescan加入先验 | 增加非零优势是否带来有效信号而非噪声？ |
-| `minimal_gpu_fixed_baseline.yaml` | b=.5且无prescan | 辅助成本下降能否补偿baseline精度损失？ |
+| `baseline_smoothed.yaml` | 相同4次prescan加入先验 | 增加非零优势是否带来有效信号而非噪声？ |
+| `baseline_fixed.yaml` | b=.5且无prescan | 辅助成本下降能否补偿baseline精度损失？ |
 
 例如 `SEEDS=17 COMMON_CONFIG=configs/experiments/minimal_gpu_audit_all.yaml bash scripts/run_mechanism_gpu.sh runs/audit-all`。四机制臂使用同一候选、固定N和共享actor。跨配置比较时用 `SHARED_INIT_CHAIN=已有链路径` 引用经过数据隔离的同一共享起点，并记录初始化导入费用；不要把不同SFT起点的差当配置效应。先保留单因素及原设置，组合优选依据开发证据并明确记录；最终论文评测须独立，不能反复按测试集挑配方。
 
 这些是可运行、可审计的候选，未获得GPU改善结果。若独立留出残差、同p的m0消融、净成本和同时间质量不能共同改善，论文核心主张仍然缺乏支持；代码完备不能保证自然数据中存在足够可预测的梯度信号。
+
+## 11. 按简洁与一致性原则收敛实现
+
+对 `fd0dca1` 的实际审查发现两项可复现问题，现以小范围修复处理：
+
+- 普通seed汇总的方法均值/SD/starts此前可能把同一实际seed的两个目录计成两次独立实验，而配对区间只计一次。现在普通汇总、预算汇总和配对检查共用seed规则；错配或缺失seed的原始观测保留并列出原因，不进入独立seed聚合。
+- 预算汇总的训练配方hash此前包含纯名称 `experiment_variant`，改名就会错误阻止跨seed合并。现在忽略该标签，学习率、保存频率、精度等实际设置仍参与比较，原配置不变。
+
+重复的评测协议字段/比较、token读取及辅助生成数量检查合并为 `grace_gc/logging_util/experiment_evidence.py` 中的普通函数，供现有入口调用；没有引入框架、运行审批或新配置开关。辅助证据检查区分“匹配、矛盾、旧日志缺字段”：机制汇总可继续展示旧日志的已观察token和，训练动态只把计数证据充分的总量标成完整；两者保持各自已说明的报告口径。
+
+两份本轮新增且与已有baseline对照重复的YAML已移除，§10.5改用 `baseline_fixed.yaml` / `baseline_smoothed.yaml`。固定baseline显式记prescan=0，原训练已按fixed模式跳过预扫，算法行为不变。此轮修改限于汇总与配置收敛，没有新的GPU性能结论；测试结果见 [TEST_STATUS.md](TEST_STATUS.md)。

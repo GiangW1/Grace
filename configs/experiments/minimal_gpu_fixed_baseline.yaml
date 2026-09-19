@@ -1,6 +1,0 @@
-# One baseline intervention relative to deeper; same settings for every method.
-experiment_variant: fixed_baseline_only
-baseline:
-  mode: fixed
-  fixed_value: 0.5
-  prescan: 0

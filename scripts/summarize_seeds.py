@@ -13,10 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from scripts.summarize_minimal import finite, read_rows, stage_path
-
-
-_PROTOCOL_FIELDS = ("ordered_records_sha256", "reward_protocol_version", "samples_per_problem",
-                    "temperature", "top_p", "max_new_tokens", "sample_batch_size")
+from grace_gc.logging_util.experiment_evidence import evaluation_issues, training_seed_issues
 
 
 def pairing_issues(seed, a, b):
@@ -24,16 +21,12 @@ def pairing_issues(seed, a, b):
     if any(any(issue.get("reason") == "checkpoint_source_unverified" and issue.get("stage") in {"eval-final", "eval-40"}
                for issue in row.get("source_issues", [])) for row in (a, b)):
         issues.append("final_checkpoint_source_unverified")
-    expected_seed = seed.removeprefix("seed-")
-    if any(str(row.get("actual_seed")) != expected_seed for row in (a, b)):
-        issues.append("actual_training_seed_missing_or_mismatched")
+    issues.extend(training_seed_issues(seed, a.get("actual_seed"), b.get("actual_seed")))
     initial = [row.get("shared_initial_actor_hash") for row in (a, b)]
     if not initial[0] or initial[0] != initial[1]:
         issues.append("shared_initial_actor_missing_or_mismatched")
     ma, mb = a.get("evaluation_manifest") or {}, b.get("evaluation_manifest") or {}
-    for field in (*_PROTOCOL_FIELDS, "sample_seed_start"):
-        if ma.get(field) is None or ma.get(field) != mb.get(field):
-            issues.append(f"evaluation_{field}_missing_or_mismatched")
+    issues.extend(evaluation_issues(ma, mb))
     return issues
 
 
@@ -91,13 +84,15 @@ def summarize(root: Path):
     output["cost_note"] = "Inspect actual final steps and costs per seed; wall budgets end at batch boundaries and can overshoot."
     for method in methods:
         rows = [(seed, rows[method]) for seed, rows in runs if method in rows]
-        values = [r["final_avg4"] for _, r in rows if finite(r.get("final_avg4"))]
-        passes = [r["final_pass4"] for _, r in rows if finite(r.get("final_pass4"))]
         per_seed = []
         for seed, row in rows:
             count, source = all_starts(root / seed, row)
-            per_seed.append({"seed": seed, **row, "all_starts": count, "all_starts_source": source})
-        starts = [row["all_starts"] for row in per_seed if row["all_starts"] is not None]
+            per_seed.append({**row, "seed": seed, "all_starts": count, "all_starts_source": source,
+                             "aggregation_issues": training_seed_issues(seed, row.get("actual_seed"))})
+        eligible = [row for row in per_seed if not row["aggregation_issues"]]
+        values = [r["final_avg4"] for r in eligible if finite(r.get("final_avg4"))]
+        passes = [r["final_pass4"] for r in eligible if finite(r.get("final_pass4"))]
+        starts = [row["all_starts"] for row in eligible if row["all_starts"] is not None]
         output["methods"].append({
             "method": method, "n_seeds_with_final_eval": len(values),
             "final_avg4_mean": float(np.mean(values)) if values else None,

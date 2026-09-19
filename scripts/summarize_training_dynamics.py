@@ -5,11 +5,18 @@ import argparse
 from collections import Counter, defaultdict
 import hashlib
 import json
-import math
 from pathlib import Path
 import statistics
+import sys
 
 import yaml
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from grace_gc.logging_util.experiment_evidence import (
+    auxiliary_count_evidence, is_number as _number, response_tokens as _tokens,
+)
 
 
 def _read(path, rows=False):
@@ -25,10 +32,6 @@ def _hash(path):
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-def _number(value):
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
 def _stats(values):
@@ -47,20 +50,6 @@ def _booleans(values):
     known = [v for v in values if isinstance(v, bool)]
     return {"observed": len(known), "missing": len(values) - len(known), "true": sum(known),
             "rate_among_observed": sum(known) / len(known) if known else None}
-
-
-def _tokens(row, main=False):
-    for key in (("generated_response_tokens", "total_generated_tokens") if main else ("response_tokens",)):
-        if _number(row.get(key)):
-            return row[key]
-    if main and all(_number(row.get(key)) for key in ("prefix_tokens", "suffix_tokens")):
-        return row["prefix_tokens"] + row["suffix_tokens"]
-    full = row.get("full_token_ids")
-    if full is None and main:
-        full = row.get("prefix_token_ids")
-    prompt = row.get("prompt_token_ids")
-    plen = len(prompt) if prompt is not None else row.get("prompt_len")
-    return len(full) - plen if full is not None and _number(plen) else None
 
 
 def _groups(rows, main=True):
@@ -102,27 +91,18 @@ def _group_counts(groups):
 def _auxiliary(kind, rows, steps, exists, prescan_samples):
     ids = {s["step"] for s in steps}
     selected = [r for r in rows if r.get("step") in ids]
-    by_step = Counter(r.get("step") for r in selected)
     groups = _groups(selected, main=False)
-    groups_by_step = Counter(g["step"] for g in groups)
     if kind == "prescan":
         zero = all(s.get("n_prescan") == 0 for s in steps)
-        complete = all(_number(s.get("n_prescan")) and groups_by_step[s["step"]] == s["n_prescan"] and
-                       (s["n_prescan"] == 0 or (_number(prescan_samples) and
-                        by_step[s["step"]] == s["n_prescan"] * prescan_samples and
-                        all(g["starts"] == prescan_samples for g in groups if g["step"] == s["step"]))) for s in steps)
     else:
-        facts = [(s, (s.get("predictor") or {}).get("fresh_supervision") or {}) for s in steps]
-        zero = all(f.get("n") == 0 and f.get("generated_tokens") == 0 for _, f in facts)
-        complete = all(_number(f.get("n")) and by_step[s["step"]] == f["n"] for s, f in facts)
+        facts = [(s.get("predictor") or {}).get("fresh_supervision") or {} for s in steps]
+        zero = all(f.get("n") == 0 and f.get("generated_tokens") == 0 for f in facts)
+    complete = all(auxiliary_count_evidence(kind,
+        [row for row in selected if row.get("step") == step["step"]], step, prescan_samples) is True
+        for step in steps)
     complete = complete and (exists or zero) and (bool(steps) or exists)
     tokens = _stats(_tokens(r) for r in selected)
     complete = complete and tokens["missing"] == 0
-    if kind == "fresh":
-        for step, fact in facts:
-            observed = [_tokens(r) for r in selected if r.get("step") == step["step"]]
-            if _number(fact.get("generated_tokens")) and all(_number(n) for n in observed) and sum(observed) != fact["generated_tokens"]:
-                complete = False
     generated = tokens["sum"] if complete else None
     return {"log_exists": exists, "complete": complete, "zero_proven_by_step_facts": zero and not selected and bool(steps),
             "rows_observed": len(selected), "generated_tokens": generated,

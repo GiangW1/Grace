@@ -67,6 +67,21 @@ def test_training_entry_clock_is_explicit_not_a_fallback(tmp_path):
     assert points[0]["clock"] == "training_entry"
 
 
+def test_recipe_hash_ignores_label_but_preserves_real_training_differences():
+    import copy
+    from scripts.summarize_cost_quality import training_recipe_hash
+
+    config = {"seed": 17, "experiment_variant": "label-a", "vllm": {"seed": 17, "dtype": "bfloat16"},
+              "optim": {"lr": .001}, "checkpoint_every": 5}
+    original = copy.deepcopy(config)
+    same = {**config, "experiment_variant": "label-b"}
+    same.pop("seed")
+    assert training_recipe_hash(config) == training_recipe_hash(same)
+    assert config == original
+    for changed in ({"optim": {"lr": .002}}, {"checkpoint_every": 10}, {"vllm": {"dtype": "float32"}}):
+        assert training_recipe_hash(config) != training_recipe_hash({**config, **changed})
+
+
 def test_evaluation_plan_adds_budget_snapshot_without_using_quality(tmp_path):
     train, _ = fixture(tmp_path)
     assert evaluation_steps(train, "0 20 40", budget=30.) == [0, 10, 20, 40]

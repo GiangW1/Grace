@@ -104,3 +104,20 @@ def test_mismatched_and_missing_final_seeds_remain_visible_outside_ci(tmp_path):
     assert paired["n_seeds"] == 1 and paired["mean_delta"] == pytest.approx(.02)
     assert paired["seed_ci95"] is None
     assert {row["seed"] for row in paired["incomparable"]} == {"seed-23", "seed-41"}
+
+
+@pytest.mark.parametrize("actual_seed", [17, None])
+def test_method_aggregates_exclude_wrong_or_unknown_seed_but_keep_observations(tmp_path, actual_seed):
+    _write_seed(tmp_path, 17, .02, pass4=.75, starts=[4, 8])
+    folder, rows = _write_seed(tmp_path, 23, .4, pass4=.95, starts=[80, 80])
+    for row in rows:
+        row["actual_seed"] = actual_seed
+    (folder/"comparison.json").write_text(json.dumps({"methods": rows}))
+    result = summarize(tmp_path)
+    method = next(row for row in result["methods"] if row["method"] == "grace")
+    assert method["n_seeds_with_final_eval"] == result["paired"][0]["n_seeds"] == 1
+    assert method["final_avg4_mean"] == .52 and method["final_avg4_seed_sd"] is None
+    assert method["n_seeds_with_final_pass4"] == 1 and method["final_pass4_mean"] == .75
+    assert method["n_seeds_with_all_starts"] == 1 and method["all_starts_mean"] == 12
+    assert len(method["per_seed"]) == 2 and method["per_seed"][1]["final_avg4"] == .9
+    assert method["per_seed"][1]["aggregation_issues"] == ["actual_training_seed_missing_or_mismatched"]

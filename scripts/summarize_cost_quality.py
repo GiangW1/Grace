@@ -15,16 +15,15 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from scripts.summarize_minimal import checkpoint_matches, finite, read_json, read_rows, stage_path
 from scripts.summarize_seeds import pairing_issues, seed_interval
+from grace_gc.logging_util.experiment_evidence import EVALUATION_FIELDS, training_seed_issues
 
 
-PROTOCOL_FIELDS = ("ordered_records_sha256", "reward_protocol_version", "samples_per_problem",
-                   "temperature", "top_p", "max_new_tokens", "sample_batch_size", "sample_seed_start")
 CLOCK_FIELDS = {"command": "available_command_wall_seconds", "training_entry": "available_global_wall_seconds"}
 
 
 def training_recipe_hash(config):
     recipe = {k: copy.deepcopy(v) for k, v in config.items()
-              if not k.startswith("_") and k not in {"seed", "init_checkpoint", "resume", "run_dir"}}
+              if not k.startswith("_") and k not in {"seed", "init_checkpoint", "resume", "run_dir", "experiment_variant"}}
     if isinstance(recipe.get("vllm"), dict):
         recipe["vllm"].pop("seed", None)  # Engine seed follows the training replicate.
     return hashlib.sha256(json.dumps(recipe, sort_keys=True).encode()).hexdigest()
@@ -33,7 +32,7 @@ def training_recipe_hash(config):
 def aggregation_protocol(method, point):
     return {"hardware": method["hardware"], "training_recipe_sha256": method["training_recipe_sha256"],
             "requested_k": point["requested_k"],
-            "evaluation": {k: point["evaluation_manifest"].get(k) for k in PROTOCOL_FIELDS if k != "sample_seed_start"}}
+            "evaluation": {k: point["evaluation_manifest"].get(k) for k in EVALUATION_FIELDS if k != "sample_seed_start"}}
 
 
 def protocol_conflicts(protocols):
@@ -83,7 +82,7 @@ def collect_curve(train, evaluations, clock="command"):
         if not finite(seconds) or seconds < 0:
             seconds = None
             issues.append("checkpoint_availability_clock_missing")
-        if any(protocol.get(key) is None for key in PROTOCOL_FIELDS) or result.get("requested_k") is None:
+        if any(protocol.get(key) in (None, "") for key in EVALUATION_FIELDS) or result.get("requested_k") is None:
             issues.append("evaluation_protocol_incomplete")
         prefix = [r for r in training_steps if isinstance(r.get("step"), int) and step is not None and r["step"] <= step]
         counts_complete = (isinstance(step, int) and step >= 0 and len(prefix) == step
@@ -102,7 +101,7 @@ def collect_curve(train, evaluations, clock="command"):
     reference = next((r for r in points if "evaluation_protocol_incomplete" not in r["issues"]), None)
     if reference:
         for row in points:
-            if (any(row["evaluation_manifest"].get(k) != reference["evaluation_manifest"].get(k) for k in PROTOCOL_FIELDS)
+            if (any(row["evaluation_manifest"].get(k) != reference["evaluation_manifest"].get(k) for k in EVALUATION_FIELDS)
                     or row["requested_k"] != reference["requested_k"]):
                 row["issues"].append("evaluation_protocol_changed_within_curve")
     return points
@@ -202,7 +201,7 @@ def summarize(root, budgets=(), target=None, clock="command"):
     for seed, methods in output["seeds"].items():
         for method, record in methods.items():
             for budget, point in record["at_budget"].items():
-                issues = [] if str(record["actual_seed"]) == seed.removeprefix("seed-") else ["actual_training_seed_missing_or_mismatched"]
+                issues = training_seed_issues(seed, record["actual_seed"])
                 if point is None:
                     issues.append("no_verified_evaluation_at_or_before_cutoff")
                 groups.setdefault((budget, method), []).append({"seed": seed, "point": point, "issues": issues,

@@ -5,12 +5,14 @@
 ## 本机最近一次结果（2026-09-19）
 
 ```text
-575 passed, 1 skipped in 80.15s
+578 passed, 1 skipped in 81.64s
 ```
 
-命令：`python -m pytest tests -q -o addopts=''`。这是继续落实30项问题清单后的全量CPU回归，比上一轮521项增加54项；1项CUDA测试因本机无GPU跳过。requests仍报告既有可选依赖版本警告，未影响结果。
+命令：`python -m pytest tests -q -o addopts=''`。这是汇总一致性与重复实现收敛后的全量CPU回归，比上一轮575项增加3项；1项CUDA测试因本机无GPU跳过。requests仍报告既有可选依赖版本警告，未影响结果。
 
-本轮继续增加的覆盖：
+本轮3项新增测试先复现失败，再修至通过：普通方法汇总对错配/缺失实际seed的过滤，以及实验名称不改变训练配方hash（学习率、保存频率、精度差异仍可检出）。已有训练动态、辅助成本缺损、配对统计、实际脚本入口和包装器回归同时覆盖共享函数迁移。四方法9/18历史all/post token总量重算均不变，两个baseline配置替换后的有效设置及预扫行为一致。末尾仅清理了fresh零生成判断中的未使用元组成员，另跑15项训练动态回归。
+
+此前继续落实清单时增加的覆盖：
 
 - `test_checkpoint_availability.py`、`test_cost_quality.py`：发布后时钟、命令起点传递、真实tiny训练→checkpoint→评测→成本曲线，预算按时间选择、重复评测冲突、缺失seed/方法、跨seed题集/硬件/配方与重复seed不混池。
 - `test_minimal_budget_wrapper.py`：真实Git Bash包装器、外层命令计时和汇总器；仅训练/评测子命令为合成替身。验证不含Full-PG的显式预算、自动加评预算内checkpoint、最终别名去重、全保存点评测和硬件配置传递。

@@ -23,6 +23,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from grace_gc.logging_util.run_dir import RunDirectory, default_run_dir, resolve_run_dir
+from grace_gc.logging_util.experiment_evidence import EVALUATION_FIELDS
 
 RUNTIME_ENV_KEYS = ("CUDA_VISIBLE_DEVICES", "VLLM_ATTENTION_BACKEND", "VLLM_ENABLE_V1_MULTIPROCESSING",
                     "VLLM_BATCH_INVARIANT", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
@@ -94,8 +95,7 @@ def compare_runs(left, right):
         check(field, a, right["identity"].get(field), required=required)
     # File hash is optional for old artifacts, but a known mismatch must be shown.
     check("checkpoint_sha256", left["summary"].get("checkpoint_sha256"), right["summary"].get("checkpoint_sha256"), required=False)
-    for field in ("ordered_records_sha256", "n_problems", "reward_protocol_version", "samples_per_problem",
-                  "temperature", "top_p", "max_new_tokens", "sample_seed_start", "sample_batch_size"):
+    for field in ("n_problems", *EVALUATION_FIELDS):
         check(field, left["manifest"].get(field), right["manifest"].get(field))
     keys = sorted(set(left["samples"]) | set(right["samples"]))
     rows = []
