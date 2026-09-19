@@ -479,24 +479,29 @@ def audit_fixed_batches(records, engines, layout, encode, payload, predictor, u,
 
 
 def run_batch_audit(records, cfg, run_dir):
+    timer = Timer()
+    started = utc_now()
     cfg = copy.deepcopy(cfg)
-    cfg.setdefault("max_new_tokens", 2048 if cfg.get("backend") == "gpu_verl" else 8)
-    cfg.setdefault("decision_tokens", min(512, int(cfg["max_new_tokens"])))
-    ckpt = cfg.get("checkpoint") or cfg.get("resume")
-    if not ckpt:
-        raise ValueError("batch audit requires a frozen training checkpoint")
     backend = cfg.get("backend", "cpu_tiny")
     n_gpu = int((cfg.get("hardware") or {}).get("n_gpu", 1 if backend == "gpu_verl" else 0))
-    if backend == "gpu_verl" and n_gpu != 1:
-        raise ValueError("batch audit GPU backend currently supports exactly one GPU")
-    audit = cfg.setdefault("batch_audit", {})
+    hardware = str((cfg.get("hardware") or {}).get("name", "gpu" if backend == "gpu_verl" else "cpu"))
     run = RunDirectory(resolve_run_dir(run_dir))
-    started, timer = utc_now(), Timer()
-    ledger = ComputeLedger(n_gpu=n_gpu if backend == "gpu_verl" else 0, hardware=backend)
-    run.write_run_meta(kind="batch_audit", started=started, requested=run_dir)
-    run.write_yaml("config.yaml", cfg)
-    versions = collect_environment(cfg); run.write_json("environment.json", versions)
+    ledger = ComputeLedger(n_gpu=n_gpu if backend == "gpu_verl" else 0, hardware=hardware)
+    versions, status = {}, "failed"
     try:
+        cfg.setdefault("max_new_tokens", 2048 if backend == "gpu_verl" else 8)
+        cfg.setdefault("decision_tokens", min(512, int(cfg["max_new_tokens"])))
+        ckpt = cfg.get("checkpoint") or cfg.get("resume")
+        if not ckpt:
+            raise ValueError("batch audit requires a frozen training checkpoint")
+        if backend == "gpu_verl" and n_gpu != 1:
+            raise ValueError("batch audit GPU backend currently supports exactly one GPU")
+        audit = cfg.setdefault("batch_audit", {})
+        run.write_run_meta(kind="batch_audit", started=started, requested=run_dir)
+        run.write_yaml("config.yaml", cfg)
+        versions = collect_environment(cfg)
+        versions["started"] = started
+        run.write_json("environment.json", versions)
         payload = load_checkpoint(ckpt)
         spec = _audit_method_spec(cfg, payload)
         cfg["method"] = spec.name
@@ -541,13 +546,16 @@ def run_batch_audit(records, cfg, run_dir):
         run.write_json("batch_audit_manifest.json", manifest); persist_load_report(run, data_path=cfg.get("data_path"))
         result = audit_fixed_batches(selected, engines, layout, encode, payload, predictor, u, spec, cfg, run)
         result.update(status="completed", started=started, finished=utc_now(), run_dir=str(run.root), manifest=manifest)
-        ledger.add("batch_audit", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status="completed")
-        result["cost_scope"] = "Whole audit envelope: initialization, optional full prescan, every prefix/suffix, every full gradient, CPU optimizer replay and evidence persistence. GPU time is reserved envelope, not utilization."
+        result["cost_scope"] = "Audit function envelope: initialization, optional full prescan, every prefix/suffix, every full gradient, CPU optimizer replay and evidence persistence. Excludes final ledger publication and caller-side CLI/data loading. GPU time is reserved envelope, not utilization."
         run.write_json("batch_audit_summary.json", result)
-        run.write_json("compute_ledger.json", ledger.summary()); run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])
+        status = "completed"
         return result
     except Exception as exc:
-        ledger.add("batch_audit", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status="failed")
-        run.write_json("compute_ledger.json", ledger.summary()); run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])
+        status = "failed"
         write_failed(run, exc, versions, started)
         raise
+    finally:
+        ledger.add("batch_audit", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status=status,
+                   timing_scope="Function entry through setup, computation and result/failure persistence; excludes final ledger publication and caller-side CLI/data loading.")
+        run.write_json("compute_ledger.json", ledger.summary())
+        run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])

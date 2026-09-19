@@ -408,3 +408,54 @@ def records_for_split(
             "pass MATH-500 or mark split=eval"
         )
     return list(records)
+
+
+def load_training_data(data_path, eval_data_path=None, seed: int = 17):
+    """Split first, then exclude external evaluation problems before any training use.
+
+    Match problem text, never gold or source-specific IDs. This detects exact text
+    after whitespace/known DAPO wrapper normalization, not semantic near-duplicates.
+    """
+    from grace_gc.data.format_prompt import apply_solve_instruction, DAPO_SOLVE_PREFIX, DAPO_SOLVE_SUFFIX
+    from grace_gc.versions import sha256_file
+
+    records = load_math_records(data_path)
+    report = last_load_report()
+    buckets = split_records(apply_solve_instruction(records), seed=seed)
+    exclusion = {"status": "not_provided", "eval_source": None, "removed": [],
+                 "normalization": "whitespace_and_exact_dapo_wrapper_case_sensitive",
+                 "scope": "train/calib/audit pools before SFT and sampling; all external eval problems",
+                 "note": "No semantic near-duplicate detection; gold does not affect exclusion. This does not certify the exposure history of a reused actor/checkpoint."}
+    if eval_data_path:
+        evaluation = load_math_records(eval_data_path)
+
+        def key(rec):
+            # Compare user content when DAPO supplies chat messages.
+            users = [m["content"] for m in (rec.messages or []) if m["role"] == "user"]
+            text = _normalize(users[-1] if users else rec.prompt)
+            prefix, suffix = _normalize(DAPO_SOLVE_PREFIX), _normalize(DAPO_SOLVE_SUFFIX)
+            if text.startswith(prefix):
+                text = text[len(prefix):].strip()
+            if text.endswith(suffix):
+                text = text[:-len(suffix)].strip()
+            return _hash_text(text)
+
+        heldout = {}
+        for rec in evaluation:
+            heldout.setdefault(key(rec), []).append(rec.problem_id)
+        exclusion.update(status="applied", eval_source={"path": str(eval_data_path),
+                         "sha256": sha256_file(eval_data_path), "n_problems": len(evaluation)})
+        for split in ("train", "calib", "audit"):
+            kept = []
+            for rec in buckets[split]:
+                digest = key(rec)
+                if digest in heldout:
+                    exclusion["removed"].append({"split": split, "problem_id": rec.problem_id,
+                        "prompt_sha256": digest, "eval_problem_ids": heldout[digest]})
+                else:
+                    kept.append(rec)
+            buckets[split] = kept
+    report["eval_exclusion"] = exclusion
+    # Existing callers of last_load_report must still see the training source.
+    load_math_records.last = report
+    return buckets, report

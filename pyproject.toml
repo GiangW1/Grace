@@ -26,6 +26,9 @@ gpu = [
 dev = [
   "pytest>=7.4",
 ]
+analysis = [
+  "scipy>=1.10",
+]
 
 [project.scripts]
 grace-train = "scripts.train:main"

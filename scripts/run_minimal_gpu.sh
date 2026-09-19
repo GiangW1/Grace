@@ -56,6 +56,11 @@ atomic_write_text(path, json.dumps(manifest, indent=2))
 print(paths[-1])
 PY
 }
+measured_python() {
+  local stage="$1"; shift
+  python scripts/measure_command.py --log "$experiment_root/command_timing.jsonl" \
+    --stage "seed-$seed/$stage" -- python "$@"
+}
 for seed in "${seeds[@]}"; do
   seed_root="$experiment_root/seed-$seed"
   mkdir -p "$seed_root/logs"
@@ -79,7 +84,7 @@ PY
     init_args+=(--init-checkpoint "$shared_checkpoint")
   fi
   # Full-PG entry performs the shared reasoning-lead SFT once, with zero RL steps.
-  python scripts/train.py "${common[@]}" --method full_pg --data-path "$TRAIN_DATA" \
+  measured_python shared-init scripts/train.py "${common[@]}" --method full_pg --data-path "$TRAIN_DATA" --eval-data-path "$EVAL_DATA" \
     --config configs/experiments/minimal_gpu_train_memory.yaml \
     --num-steps 0 "${init_args[@]}" --run-dir "$seed_root/shared-init" | tee "$seed_root/logs/shared-init.stdout"
   init_run=$(record_stage shared init "$seed_root/logs/shared-init.stdout")
@@ -93,7 +98,7 @@ PY
       steps="${MAX_STEPS:-10000}"
     fi
     if [[ -n "$target_step" ]]; then budget_args+=(--target-step-seconds "$target_step"); fi
-    python scripts/train.py "${common[@]}" --method "$method" --data-path "$TRAIN_DATA" \
+    measured_python "$method/train" scripts/train.py "${common[@]}" --method "$method" --data-path "$TRAIN_DATA" --eval-data-path "$EVAL_DATA" \
       --config configs/experiments/minimal_gpu_train_memory.yaml \
       --init-checkpoint "$init_run/checkpoints/step_0.npz" \
       --num-steps "$steps" "${budget_args[@]}" --run-dir "$seed_root/$method/train" | tee "$seed_root/logs/$method-train.stdout"
@@ -124,7 +129,7 @@ PY
     if [[ " $post_train_stages " == *" eval "* ]]; then
     for step in 0 20 40; do
       if [[ ! -f "$train_run/checkpoints/step_$step.npz" ]]; then continue; fi
-      python scripts/evaluate.py --generate "${common[@]}" --method "$method" --data-path "$EVAL_DATA" \
+      measured_python "$method/eval-$step" scripts/evaluate.py --generate "${common[@]}" --method "$method" --data-path "$EVAL_DATA" \
         --checkpoint "$train_run/checkpoints/step_$step.npz" \
         --run-dir "$seed_root/$method/eval-$step" | tee "$seed_root/logs/$method-eval-$step.stdout"
       record_stage "$method" "eval-$step" "$seed_root/logs/$method-eval-$step.stdout"
@@ -133,7 +138,7 @@ PY
       fi
     done
     if [[ "$final_step" != 0 && "$final_step" != 20 && "$final_step" != 40 ]]; then
-      python scripts/evaluate.py --generate "${common[@]}" --method "$method" --data-path "$EVAL_DATA" \
+      measured_python "$method/eval-final" scripts/evaluate.py --generate "${common[@]}" --method "$method" --data-path "$EVAL_DATA" \
         --checkpoint "$train_run/checkpoint.npz" --run-dir "$seed_root/$method/eval-final" \
         | tee "$seed_root/logs/$method-eval-final.stdout"
       record_stage "$method" eval-final "$seed_root/logs/$method-eval-final.stdout"
@@ -143,7 +148,7 @@ PY
     for stage in audit audit-training; do
       audit_extra=()
       if [[ "$stage" == audit-training ]]; then audit_extra=(--config configs/experiments/minimal_gpu_audit_training.yaml); fi
-      python scripts/audit.py --generate "${common[@]}" --method "$method" --data-path "$TRAIN_DATA" \
+      measured_python "$method/$stage" scripts/audit.py --generate "${common[@]}" --method "$method" --data-path "$TRAIN_DATA" \
         --config configs/experiments/minimal_gpu_audit.yaml "${audit_extra[@]}" \
         --checkpoint "$train_run/checkpoint.npz" --run-dir "$seed_root/$method/$stage" \
         | tee "$seed_root/logs/$method-$stage.stdout"
@@ -152,7 +157,7 @@ PY
     fi
     if [[ " $post_train_stages " == *" batch-audit "* ]]; then
     if [[ "$method" != grpo && "$method" != grpo_short ]]; then
-      python scripts/audit_batch.py --generate "${common[@]}" --method "$method" --data-path "$TRAIN_DATA" \
+      measured_python "$method/batch-audit" scripts/audit_batch.py --generate "${common[@]}" --method "$method" --data-path "$TRAIN_DATA" \
         --config configs/experiments/minimal_gpu_train_memory.yaml \
         --checkpoint "$train_run/checkpoint.npz" --run-dir "$seed_root/$method/batch-audit" \
         | tee "$seed_root/logs/$method-batch-audit.stdout"

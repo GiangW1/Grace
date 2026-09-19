@@ -17,7 +17,7 @@ def test_wrapper_four_arms_shared_init_and_one_audit(tmp_path):
         pytest.skip("Bash unavailable")
     scripts = tmp_path/"scripts"; scripts.mkdir()
     config = tmp_path/"configs/experiments"; config.mkdir(parents=True)
-    for name in ("run_mechanism_gpu.sh", "summarize_mechanism.py"):
+    for name in ("run_mechanism_gpu.sh", "summarize_mechanism.py", "measure_command.py"):
         shutil.copyfile(root/"scripts"/name, scripts/name)
     shutil.copyfile(root/"configs/experiments/mechanism_fixed.yaml", config/"mechanism_fixed.yaml")
     # The actual wrapper, config writer, manifest resolver and final summarizer run.
@@ -73,6 +73,9 @@ print("run_dir",root)
     manifest = json.loads((result/"mechanism.json").read_text())
     assert set(manifest["arms"]) == {"grace", "p1", "m0", "uniform"}
     assert len(list(result.glob("batch-audit-seed-*"))) == 1
+    timed = [json.loads(line) for line in (result/"command_timing.jsonl").read_text().splitlines()]
+    assert len(timed) == 1 and timed[0]["stage"] == "seed-17/batch-audit"
+    assert timed[0]["exit_code"] == 0 and timed[0]["wall_seconds"] > 0
     for name in ("p1", "m0", "uniform"):
         parent = json.loads((result/name/"test_parent_environment.json").read_text())
         assert Path(parent["shared"]) == Path("result/grace")

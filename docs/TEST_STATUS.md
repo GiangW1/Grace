@@ -5,12 +5,22 @@
 ## 本机最近一次结果（2026-09-19）
 
 ```text
-471 passed, 1 skipped in 61.03s
+521 passed, 1 skipped in 69.48s
 ```
 
-命令：`python -m pytest tests -q -o addopts=''`。这是9月19日最终合并工作树的全量CPU回归，比上一次增加50项；1项CUDA测试因本机无GPU跳过。requests仍报告既有可选依赖版本警告，未影响结果。
+命令：`python -m pytest tests -q -o addopts=''`。这是9月19日数据/计时/归档/统计追加修复后的全量CPU回归，比此前471项增加50项；1项CUDA测试因本机无GPU跳过。requests仍报告既有可选依赖版本警告，未影响结果。
 
 本轮新增覆盖：
+
+- `test_training_eval_exclusion.py`：外部评测题在SFT/采样前排除、不同题号/不同金标仍匹配、保留大小写及原split、来源报告不被eval读取覆盖、原文件不修改；过滤删空时仍保存排除证据。
+- `test_stage_cost_timing.py`：20项可控时钟测试，覆盖准备/环境/成功/失败/空prefix路径、结果保存异常只记一次和硬件标签。
+- `test_command_timing.py`：真实CPU子进程成功/非零退出/启动失败留证，阶段空隙不伪装成计算；四臂Bash替身测试验证最终独立审计也有外层计时。
+- `test_archive_evidence.py`：大JSONL/审计NPZ保留、adapter/指定checkpoint选择、基础模型默认不越过大小限制、流式hash、逐项归档来源与CLI。
+- `test_seed_summary_intervals.py`：配对seed Student-t区间、样本不足/缺SciPy的null、缺失错配可见、pass@4及完整starts汇总。
+
+脚本帮助、Git Bash语法和 `git diff --check` 检查通过。这里的子进程/时钟/四臂数据均为CPU或合成测试，不是GPU效率结果。历史回答重判另列修复文档，不计入pytest数量。
+
+此前9月19日已覆盖的效率实现：
 
 - `test_backward_reuse_20260919.py`：一次求导复用真实G，HT权重/梯度符号、p=1、审计掩码隔离、零优势、停止者和unused参数；FP32与旧加权反向数值比较。
 - `test_fixed_n_20260919.py`：关闭wall之外仍绕开旧token回收；固定N续训；四臂真实tiny训练的初始actor、warmup更新和输入序列一致，p1/m0/停止者null。

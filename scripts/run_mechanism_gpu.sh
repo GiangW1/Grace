@@ -57,7 +57,8 @@ root = Path(sys.argv[1]); stages = json.loads((root/"stages.json").read_text())
 print(stage_path(root, stages["grace"]["train"]))
 PY
 )
-  python scripts/audit_batch.py --generate --config "$train_run/config.yaml" \
+  python scripts/measure_command.py --log "$root/command_timing.jsonl" \
+    --stage "seed-$seed/batch-audit" -- python scripts/audit_batch.py --generate --config "$train_run/config.yaml" \
     --checkpoint "$train_run/checkpoint.npz" \
     --batch-shape training --training-run "$train_run" --run-dir "$root/batch-audit-seed-$seed" \
     | tee "$root/logs/batch-audit-seed-$seed.stdout"

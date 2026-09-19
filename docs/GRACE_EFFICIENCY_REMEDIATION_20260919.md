@@ -159,10 +159,58 @@ Full-PG先提供实际预算，GRACE按共同预算跑；包括训练入口后�
 - fixed模式续训应继续传入同一有效配置。当前请求配置可以有意改变调度模式；不同配置续训不叫精确重放。
 - 顶层seed传给eval/audit引擎修复了非17 seed可能仍用17的问题；**它不能解释9月18日seed17下同初始actor仍有不同eval输出**。新增请求chunk、fallback、seed、ID、token hash及导出adapter hash帮助下次定位，但没有验证vLLM内部权重hash或GPU逐token确定性。
 - HF/vLLM行为策略一致性、混合精度误差、显存峰值、主机拷贝/拟合代价仍需真实单卡检查。只允许n_gpu=1；未接多卡。
-- 旧包排除的NPZ/adapter无法从hash还原。新运行保留原始轨迹、所有账本、audit原始记录及checkpoint；归档 `--include-checkpoints` 可保留NPZ，大JSONL仍受 `--max-file-mib` 限制，应检查归档清单并保留服务器原件。
+- 旧包排除的NPZ/adapter无法从hash还原。9月19日追加修复后，归档默认保留所有JSONL和 `batch_audit_means.npz`，不受大小上限影响；`--include-checkpoints` 包含NPZ及LoRA adapter，或用重复 `--include PATH` 精确选择初始/最终状态。超限基础模型权重仍默认排除；完整规则、纳入原因和排除hash写入manifest，服务器原件继续保留。
 
 不调整R−b、停止者null、ChatML、repetition_penalty=1、无min_tokens、全局N与G上升方向，不改parse/ρ平均，不增加Go/No-Go。最小实验仍是最小实验，不是Pilot或论文已完成实验。
 
 ## 6. 验证记录
 
 最终合并树的CPU回归和脚本检查记录在 [TEST_STATUS.md](TEST_STATUS.md)。新测试包含四臂tiny训练及Git Bash替身编排；后者替换昂贵的训练/审计命令，只验证编排，不代表真实GPU链已完成。实际质量、净成本、LAG和多seed结果仍待服务器实测。
+
+## 7. 追加修复：数据隔离、全程计时、归档与多seed统计
+
+对应完整清单P26/P27/P28/P22，改动建立在 `a5d58e2` 之上，不修改9月18日原始实验文件或分数。
+
+- **数据隔离（P26）**：CPU/GPU共用 `load_training_data`，先按原seed分割，再从train/calib/audit池排除外部评测题。比较题面而非题号/金标；规范化空白和精确DAPO包装，保留数学变量大小写，不声称检测语义近重复。`--eval-data-path` 传入完整评测语料，`run_minimal_gpu.sh` 自动把EVAL_DATA传给共享SFT和所有训练方法。原文件不改写，排除记录/评测文件hash存入 `data_exclusions.json`，实际池写 `data_splits.json`。未传入时标明not_provided，不阻断普通训练。新过滤不能净化已经训练过的旧共享actor；新实验应重新创建共享SFT，或确认旧来源没有相关曝光。
+- **内部计时（P28）**：eval、prefix audit、batch audit从函数入口计时，覆盖环境采集、准备、结果/失败记录；finally只记一条envelope，避免结果保存失败时completed/failed双计。batch audit记录hardware.name。最终账本自身发布、CLI前置数据加载和进程退出由外层命令计时覆盖。
+- **命令计时（P28）**：主链的SFT/train/eval/audit子进程通过 `measure_command.py` 测量启动至退出，失败也留记录。`command_timing.jsonl` 与 `.summary.json` 报告完整命令时长、第一条命令启动至最后一条退出的观测区间，以及未归因阶段空隙。空隙不冒充GPU计算；内外账本不能相加。该区间不包含首条被测命令之前的测试/准备、末条之后的工作，硬杀/不可写磁盘可能无法持久化。旧14.38分钟间隙无法事后自动归因。
+- **未来归档（P27）**：保留上述关键原始证据，可按路径精确保留初始/最终checkpoint；不会凭hash恢复旧包漏掉的12.48GB。
+- **跨seed区间（P22）**：增加配对训练seed差的Student-t均值95%区间，自由度n−1；保留原题目bootstrap并区分统计单位。区间假设配对seed差近似正态且独立同分布，少量seed下不稳，未经多重比较校正。n<2或缺SciPy时正常输出null及原因，均值/SD仍保留；安装 `pip install -e '.[analysis]'` 提供SciPy。新增pass@4均值/seed SD和完整主starts及来源；缺失、不完整、错配数据不补零。实现区间计算不等于已有多seed实验。
+
+## 8. 用户四张目标表应如何验证
+
+76.8%、+3.6pp、1.50倍、0.7875/0.7344、γ在[.4,.8]、35%覆盖和60%联合率均为用户提出的目标示例，**不是已测结果或理论保证**。不把它们写入运行门槛，不按评测结果挑选性地隐藏失败seed，不为了数值达标改奖励或ρ定义。
+
+| 表 | 真正需要比较的量 | 不能混用的口径 |
+|---|---|---|
+| 同算力质量 | 相同设备/外部负载与请求预算，各seed实际完整成本、步数、starts、终点评测和配对seed区间 | 请求40分钟不等于物理恰好40分钟；当前按完整batch停止，会有overshoot，CLI/退出另有成本。必须展示实际成本，超额不可忽略时不能声称严格同算力。当前没有自动选择物理截止前checkpoint的功能。 |
+| 端到端成本 | 增量RL、共同SFT费用加回后的单方法成本，以及实际整链成本分列；所有主/辅助生成、拟合、同步、保存、失败均记账 | 同墙钟可以因更多更新而生成更多token；同40步也可能N不同。不能同时把固定工作量净节省要求强加到固定时间吞吐表，更不能仅看停止比例。 |
+| 估计器收益 | 相同冻结状态、N、t、baseline、采样概率下GRACE对m0；同成本uniform；完整空间方差及token成本代理 | 在现有HT/CV设计下，完整梯度方差之外还有非负抽样项；补全应降低相对m0的额外项。表中Var=1.05等不是低于Full-PG单样本方差，而是方差×成本折中。token代理优于1也不等于GPU提速。 |
+| LAG与补全机制 | 相同checkpoint、t、horizon、baseline、题/路径集合和独立report协议下成对的ρ与联合事件；同时报告全体、筛选和有效分母 | 1.3408与.5333来自不同集合，不能拼成一对。联合率不能由两条总体均值推出；“未观测到联合成立”不等于真实概率为0。非零比例、γ或realized-G覆盖不能替代留出残差及效率。 |
+
+γ随原始预测尺度变化：原始预测乘c时，等效收缩可除c，而实际补全量不变，因此[.4,.8]不是尺度不变的成功定义。有效秩接近8、覆盖已实现G的35%也非必要；覆盖可能包含不可约后缀噪声。应保留合法零G和独立校准，不强制γ非零。
+
+机制实验共用baseline/prescan配置；成本候选同样应用到Full-PG等适用方法。应用性能比较还应给各基线合理调参资源，不能以昂贵或已退化的Full-PG/Uniform-CV作为唯一参照。单次40步仍不能建立长期训练结论。
+
+明确请求40分钟预算的已有用法（尚未在GPU执行）：
+
+```bash
+pip install -e '.[analysis]'
+SEEDS="17 23 41" RUN_WALL_SECONDS=2400 \
+COMMON_CONFIG=configs/experiments/minimal_gpu_signal_candidate.yaml \
+bash scripts/run_matched_cost_gpu.sh runs/signal-wall-2400 full_pg grace uniform_cv grpo
+```
+
+这条命令从新共享SFT起点比较增量RL预算；SFT费用另列且加回单方法端到端成本，实际共享作业只计一次。基模预训练是共同既有资产，明确排除。未设置RUN_WALL_SECONDS时仍沿用Full-PG固定步数产生的实测预算，不能标成固定40分钟。应先使用§4的冻结/独立四臂识别补全效果，再扩大到多seed；数据不足或结果不利时继续正常记录。
+
+当前仍需GPU定位P20重复评测差异、P29后端数值差异，检验P01–P08补全/风险有效性、P11/P14–P16净成本、P17基线稳定性、P18/P19/P22多seed公平效率，以及P23同组LAG。本轮修复不构成这些研究问题已经解决的证据。
+
+## 9. 历史6144条评测回答全量重判（P30）
+
+已在本机CPU对9月18日四方法eval-0/20/40重新执行当前 `rule_reward`，没有把保存reward当作重判输入。6144条回答对应5536个精确唯一 `(text, gold, truncated)` 输入；608条重复输入复用相同输入的重判结果。全部成功，错误0、未执行0、奖励差异0、提取差异0，1536条题级指标及12组汇总全部一致。原件和使用源码的前后SHA256一致。
+
+Full-PG终点avg@4仍为0.712890625，GRACE仍为0.705078125，其余方法/阶段也未改变。因此这次核对没有为“历史分数算错导致GRACE未赢”提供支持，也没有产生任何新训练收益。
+
+复判环境为math-verify 0.9.0、SymPy 1.14.0、NumPy 1.26.4，耗时601.0秒（本机评分复核时间，不是GPU训练成本）。当前reward源码与包内版本逐行一致；旧环境只记录present-no-version，不能独立证明依赖版本完全相同。这是同协议当前实现的完整一致性复核，不替代人工独立数学真值，也不能排除评分器的共同偏差；未扩展到训练/audit续写。
+
+本机完整报告和逐条证据保存在 `_minimal_review_20260918_063159/reward_rejudge_20260919*`，未加入Git；其中 `.md` 含12组对照表，`.json` 记录输入hash/环境，`_answers.jsonl` 为逐答案旧新结果，`_issues.json` 的差异/错误列表均为空。

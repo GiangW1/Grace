@@ -654,52 +654,53 @@ def _audit_max_new(cfg: dict[str, Any]) -> int:
 
 
 def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path) -> dict:
-    spec = _audit_method_spec(cfg)
+    timer = Timer()
+    started = utc_now()
     cfg = dict(cfg)
-    cfg["method"] = spec.name
-    n_pref = int(cfg.get("audit", {}).get("n_prefixes", cfg.get("n_prefixes", 2)))
-    n_cont = int(cfg.get("audit", {}).get("n_continuations", cfg.get("n_cont", 16)))
-    decision = int(cfg.get("decision_tokens", 4))
-    max_new = _audit_max_new(cfg)
-    records = apply_solve_instruction(list(records))
-    seed = int(cfg.get("seed", 17))
-    raw_grid = list(cfg.get("audit", {}).get("decision_grid") or [decision])
-    grid = [int(t) for t in raw_grid]
-    if any(t < 0 for t in grid):
-        raise ValueError("decision tokens must be non-negative")
-    dropped = [t for t in grid if t > max_new]
-    kept = [t for t in grid if t <= max_new]
-    if not kept:
-        raise ValueError(f"audit decision exceeds max_new_tokens {max_new}")
-    grid = kept
-    n_problems = int(cfg.get("audit", {}).get("n_problems", 0) or 0)
-    audit_cfg = cfg.get("audit") or {}
-    selection = str(audit_cfg.get("selection", "first"))
-    selection_seed = int(audit_cfg.get("selection_seed", cfg.get("split_seed", seed)))
-    recs = select_records(records, n_problems, selection, selection_seed)
     requested = Path(run_dir)
     run_dir = resolve_run_dir(run_dir)
     run = RunDirectory(run_dir)
-    started = utc_now()
-    versions = collect_environment(cfg)
-    versions["started"] = started
-    run.write_run_meta(kind="audit", started=started, requested=requested)
-    run.write_yaml("config.yaml", cfg)
-    run.write_json("environment.json", versions)
-    manifest = selection_manifest(recs, selection, selection_seed)
-    manifest.update(n_baseline=int(audit_cfg.get("n_baseline", n_cont)), n_continuations=n_cont,
-                    max_new_tokens=max_new, decision_grid=grid, method=spec.name,
-                    reward_protocol_version=REWARD_PROTOCOL_VERSION,
-                    baseline_configuration=baseline_from_config(cfg.get("baseline")).configuration(),
-                    baseline_protocol="Independent prescan with configured prior; explicit audit.baseline or configured fixed mode overrides both gradient and feature baseline.")
-    run.write_json("audit_manifest.json", manifest)
-    persist_load_report(run, data_path=cfg.get("data_path"))
     backend = cfg.get("backend", "cpu_tiny")
     n_gpu = int((cfg.get("hardware") or {}).get("n_gpu", 1 if backend == "gpu_verl" else 0))
     hardware = str((cfg.get("hardware") or {}).get("name", "gpu" if backend == "gpu_verl" else "cpu"))
     ledger = ComputeLedger(n_gpu=n_gpu, hardware=hardware)
-    timer = Timer()
+    versions, status = {}, "failed"
     try:
+        spec = _audit_method_spec(cfg)
+        cfg["method"] = spec.name
+        n_pref = int(cfg.get("audit", {}).get("n_prefixes", cfg.get("n_prefixes", 2)))
+        n_cont = int(cfg.get("audit", {}).get("n_continuations", cfg.get("n_cont", 16)))
+        decision = int(cfg.get("decision_tokens", 4))
+        max_new = _audit_max_new(cfg)
+        records = apply_solve_instruction(list(records))
+        seed = int(cfg.get("seed", 17))
+        raw_grid = list(cfg.get("audit", {}).get("decision_grid") or [decision])
+        grid = [int(t) for t in raw_grid]
+        if any(t < 0 for t in grid):
+            raise ValueError("decision tokens must be non-negative")
+        dropped = [t for t in grid if t > max_new]
+        kept = [t for t in grid if t <= max_new]
+        if not kept:
+            raise ValueError(f"audit decision exceeds max_new_tokens {max_new}")
+        grid = kept
+        n_problems = int(cfg.get("audit", {}).get("n_problems", 0) or 0)
+        audit_cfg = cfg.get("audit") or {}
+        selection = str(audit_cfg.get("selection", "first"))
+        selection_seed = int(audit_cfg.get("selection_seed", cfg.get("split_seed", seed)))
+        recs = select_records(records, n_problems, selection, selection_seed)
+        versions = collect_environment(cfg)
+        versions["started"] = started
+        run.write_run_meta(kind="audit", started=started, requested=requested)
+        run.write_yaml("config.yaml", cfg)
+        run.write_json("environment.json", versions)
+        manifest = selection_manifest(recs, selection, selection_seed)
+        manifest.update(n_baseline=int(audit_cfg.get("n_baseline", n_cont)), n_continuations=n_cont,
+                        max_new_tokens=max_new, decision_grid=grid, method=spec.name,
+                        reward_protocol_version=REWARD_PROTOCOL_VERSION,
+                        baseline_configuration=baseline_from_config(cfg.get("baseline")).configuration(),
+                        baseline_protocol="Independent prescan with configured prior; explicit audit.baseline or configured fixed mode overrides both gradient and feature baseline.")
+        run.write_json("audit_manifest.json", manifest)
+        persist_load_report(run, data_path=cfg.get("data_path"))
         with RunLog(run.root / "run.log"):
             print(f"audit start {started} backend={backend} n_problems={len(recs)} grid={grid} dir={run.root}")
             if Path(run.root).resolve() != requested.resolve():
@@ -727,11 +728,9 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
                     "started": started,
                     "run_dir": str(run.root),
                 }
-                ledger.add("audit", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status="completed")
                 result["finished"] = utc_now()
                 run.write_json("audit_summary.json", result)
-                run.write_json("compute_ledger.json", ledger.summary())
-                run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])
+                status = "completed"
                 return result
             u = _audit_u(bundles, cfg)
             rng = np.random.default_rng(seed)
@@ -763,21 +762,21 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
                 result["decision_grid_unobserved"] = unobserved
             result["started"] = started
             result["run_dir"] = str(run.root)
-            run.write_json("audit_summary.json", result)
             from grace_gc.backends.vllm_two_phase import build_sampling_params
 
             if getattr(build_sampling_params, "last", None):
                 run.write_json("sampling.json", build_sampling_params.last)
             print(f"audit done n_bundles={result.get('n_bundles')}")
-        ledger.add("audit", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status="completed")
         result["finished"] = utc_now()
         run.write_json("audit_summary.json", result)
-        run.write_json("compute_ledger.json", ledger.summary())
-        run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])
+        status = "completed"
         return result
     except Exception as exc:
-        ledger.add("audit", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status="failed")
-        run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])
+        status = "failed"
         write_failed(run, exc, versions, started)
-        run.write_json("compute_ledger.json", ledger.summary())
         raise
+    finally:
+        ledger.add("audit", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status=status,
+                   timing_scope="Function entry through setup, computation and result/failure persistence; excludes final ledger publication and caller-side CLI/data loading.")
+        run.write_json("compute_ledger.json", ledger.summary())
+        run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])

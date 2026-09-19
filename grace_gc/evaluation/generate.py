@@ -354,41 +354,42 @@ def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, 
 
 
 def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path) -> dict:
+    timer = Timer()
+    started = utc_now()
     cfg = dict(cfg)
-    ckpt = cfg.get("checkpoint") or cfg.get("resume")
-    if ckpt:
-        from grace_gc.trainer.checkpoint import load_checkpoint
-
-        payload = load_checkpoint(ckpt)
-        cfg["method"] = payload.get("spec") or cfg.get("method", "grace")
     backend = cfg.get("backend", "cpu_tiny")
-    n_source = len(records)
-    math500 = looks_like_math500(records, path=cfg.get("data_path"), n_source=n_source)
-    records = apply_solve_instruction(records)
-    records = limit_eval_records(records, cfg)
-    k, n, max_new, temperature, top_p = _eval_hparams(cfg)
     requested = Path(run_dir)
     run_dir = resolve_run_dir(run_dir)
     run = RunDirectory(run_dir)
-    started = utc_now()
-    versions = collect_environment(cfg)
-    versions["started"] = started
-    run.write_run_meta(kind="eval", started=started, requested=requested)
-    run.write_yaml("config.yaml", cfg)
-    run.write_json("environment.json", versions)
-    ev = cfg.get("eval") or {}
-    manifest = selection_manifest(records, str(ev.get("selection", "first")),
-                                  int(ev.get("selection_seed", cfg.get("split_seed", cfg.get("seed", 17)))))
-    manifest.update(sample_seed_start=int(cfg.get("seed", 17)), samples_per_problem=n,
-                    temperature=temperature, top_p=top_p, max_new_tokens=max_new,
-                    sample_batch_size=int(ev.get("sample_batch_size", 1)),
-                    reward_protocol_version=REWARD_PROTOCOL_VERSION)
-    run.write_json("evaluation_manifest.json", manifest)
     n_gpu = int((cfg.get("hardware") or {}).get("n_gpu", 1 if backend == "gpu_verl" else 0))
     hardware = str((cfg.get("hardware") or {}).get("name", "gpu" if backend == "gpu_verl" else "cpu"))
     ledger = ComputeLedger(n_gpu=n_gpu, hardware=hardware)
-    timer = Timer()
+    versions, status = {}, "failed"
     try:
+        ckpt = cfg.get("checkpoint") or cfg.get("resume")
+        if ckpt:
+            from grace_gc.trainer.checkpoint import load_checkpoint
+
+            payload = load_checkpoint(ckpt)
+            cfg["method"] = payload.get("spec") or cfg.get("method", "grace")
+        n_source = len(records)
+        math500 = looks_like_math500(records, path=cfg.get("data_path"), n_source=n_source)
+        records = apply_solve_instruction(records)
+        records = limit_eval_records(records, cfg)
+        k, n, max_new, temperature, top_p = _eval_hparams(cfg)
+        versions = collect_environment(cfg)
+        versions["started"] = started
+        run.write_run_meta(kind="eval", started=started, requested=requested)
+        run.write_yaml("config.yaml", cfg)
+        run.write_json("environment.json", versions)
+        ev = cfg.get("eval") or {}
+        manifest = selection_manifest(records, str(ev.get("selection", "first")),
+                                      int(ev.get("selection_seed", cfg.get("split_seed", cfg.get("seed", 17)))))
+        manifest.update(sample_seed_start=int(cfg.get("seed", 17)), samples_per_problem=n,
+                        temperature=temperature, top_p=top_p, max_new_tokens=max_new,
+                        sample_batch_size=int(ev.get("sample_batch_size", 1)),
+                        reward_protocol_version=REWARD_PROTOCOL_VERSION)
+        run.write_json("evaluation_manifest.json", manifest)
         with RunLog(run.root / "run.log"):
             print(f"eval start {started} backend={backend} n_problems={len(records)} n={n} k={k} dir={run.root}")
             if Path(run.root).resolve() != requested.resolve():
@@ -430,15 +431,16 @@ def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path
                 },
             )
             print(f"eval done avg={result.get('avg')} pass_at_k={result.get('pass_at_k')}")
-        ledger.add("eval", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status="completed")
         result["finished"] = utc_now()
         run.write_json("eval_summary.json", result)
-        run.write_json("compute_ledger.json", ledger.summary())
-        run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])
+        status = "completed"
         return result
     except Exception as exc:
-        ledger.add("eval", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status="failed")
-        run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])
+        status = "failed"
         write_failed(run, exc, versions, started)
-        run.write_json("compute_ledger.json", ledger.summary())
         raise
+    finally:
+        ledger.add("eval", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status=status,
+                   timing_scope="Function entry through setup, computation and result/failure persistence; excludes final ledger publication and caller-side CLI/data loading.")
+        run.write_json("compute_ledger.json", ledger.summary())
+        run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])

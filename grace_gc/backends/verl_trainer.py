@@ -14,8 +14,7 @@ from grace_gc.backends.gpu_engine import make_gpu_engines
 from grace_gc.backends.hf_actor import actor_numerics, named_lora_params
 from grace_gc.core.layout import collect_lora_layout
 from grace_gc.core.rng import IsolatedRNG, seed_all
-from grace_gc.data.format_prompt import apply_solve_instruction
-from grace_gc.data.math_data import last_load_report, load_math_records, split_records
+from grace_gc.data.math_data import load_training_data
 from grace_gc.data.tokenize import encode_records_hf, load_hf_tokenizer, tokenizer_inventory
 from grace_gc.trainer.format_warmup import format_warmup_steps, run_format_warmup_hf
 from grace_gc.logging_util.forensics import persist_final_checkpoint, persist_initial_checkpoint, persist_training_step, write_data_inventory
@@ -205,14 +204,12 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         packed = None
         if not data_path:
             raise ValueError("data_path or prompt_token_ids is required for GPU training")
-        loaded = apply_solve_instruction(load_math_records(data_path))
-        buckets = split_records(loaded, seed=int(cfg.get("split_seed", 17)))
+        buckets, report = load_training_data(data_path, cfg.get("eval_data_path"), seed=int(cfg.get("split_seed", 17)))
         train_recs = buckets["train"]
+        write_data_inventory(run, buckets, data_path, source="file", load_report=report,
+                             split_seed=int(cfg.get("split_seed", 17)))
         if not train_recs:
             raise ValueError("training split is empty")
-        write_data_inventory(run, buckets, data_path, source="file", load_report=last_load_report(),
-                             split_seed=int(cfg.get("split_seed", 17)))
-        report = last_load_report()
         if report and int(report.get("n_conflict_groups") or 0) > 0:
             print(
                 f"dropped {report['n_conflict_groups']} conflicting prompt groups; "

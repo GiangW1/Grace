@@ -12,7 +12,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-from scripts.summarize_minimal import stage_path
+from scripts.summarize_minimal import finite, read_rows, stage_path
 
 
 _PROTOCOL_FIELDS = ("ordered_records_sha256", "reward_protocol_version", "samples_per_problem",
@@ -37,6 +37,43 @@ def pairing_issues(seed, a, b):
     return issues
 
 
+def seed_interval(values):
+    """Student-t interval for the mean of paired training-seed differences."""
+    n = len(values)
+    result = {"n_seeds": n, "seed_ci95": None, "seed_ci95_df": n - 1 if n else None,
+              "seed_ci95_method": "Student-t mean interval: mean +/- t(0.975, n-1) * seed_sd / sqrt(n)",
+              "seed_ci95_unavailable_reason": None}
+    if n < 2:
+        result["seed_ci95_unavailable_reason"] = "fewer_than_two_paired_training_seeds"
+        return result
+    try:
+        from scipy.stats import t
+    except (ImportError, OSError):
+        result["seed_ci95_unavailable_reason"] = "scipy_unavailable_install_analysis_extra"
+        return result
+    mean = float(np.mean(values))
+    half = float(t.ppf(.975, n - 1) * np.std(values, ddof=1) / np.sqrt(n))
+    result["seed_ci95"] = [mean - half, mean + half]
+    return result
+
+
+def all_starts(seed_root, row):
+    """Keep missing or truncated step evidence unknown, rather than count zero."""
+    count = row.get("all_starts")
+    if finite(count) and count >= 0 and int(count) == count:
+        return int(count), "comparison_row"
+    train = (row.get("stage_paths") or {}).get("train")
+    endpoint = row.get("final_training_step")
+    if train and finite(endpoint) and endpoint >= 0 and int(endpoint) == endpoint:
+        path = stage_path(seed_root, train) / "steps.jsonl"
+        steps = read_rows(path)
+        ids = [step.get("step") for step in steps]
+        if (path.is_file() and len(ids) == len(set(ids)) and set(ids) == set(range(1, int(endpoint) + 1))
+                and all(finite(step.get("n")) and step["n"] >= 0 and int(step["n"]) == step["n"] for step in steps)):
+            return sum(int(step["n"]) for step in steps), "complete_training_steps"
+    return None, "missing_or_incomplete_training_steps"
+
+
 def summarize(root: Path):
     runs = []
     for path in sorted(root.glob("seed-*/comparison.json")):
@@ -54,18 +91,30 @@ def summarize(root: Path):
     output["cost_note"] = "Inspect actual final steps and costs per seed; wall budgets end at batch boundaries and can overshoot."
     for method in methods:
         rows = [(seed, rows[method]) for seed, rows in runs if method in rows]
-        values = [r["final_avg4"] for _, r in rows if r.get("final_avg4") is not None]
+        values = [r["final_avg4"] for _, r in rows if finite(r.get("final_avg4"))]
+        passes = [r["final_pass4"] for _, r in rows if finite(r.get("final_pass4"))]
+        per_seed = []
+        for seed, row in rows:
+            count, source = all_starts(root / seed, row)
+            per_seed.append({"seed": seed, **row, "all_starts": count, "all_starts_source": source})
+        starts = [row["all_starts"] for row in per_seed if row["all_starts"] is not None]
         output["methods"].append({
             "method": method, "n_seeds_with_final_eval": len(values),
             "final_avg4_mean": float(np.mean(values)) if values else None,
             "final_avg4_seed_sd": float(np.std(values, ddof=1)) if len(values) > 1 else None,
-            "per_seed": [{"seed": seed, **row} for seed, row in rows],
+            "n_seeds_with_final_pass4": len(passes),
+            "final_pass4_mean": float(np.mean(passes)) if passes else None,
+            "final_pass4_seed_sd": float(np.std(passes, ddof=1)) if len(passes) > 1 else None,
+            "n_seeds_with_all_starts": len(starts),
+            "all_starts_mean": float(np.mean(starts)) if starts else None,
+            "all_starts_seed_sd": float(np.std(starts, ddof=1)) if len(starts) > 1 else None,
+            "per_seed": per_seed,
         })
     for baseline in ("full_pg", "uniform_cv", "grpo"):
         pairs, incomparable = [], []
         for seed, rows in runs:
             a, b = rows.get("grace", {}), rows.get(baseline, {})
-            if a.get("final_avg4") is not None and b.get("final_avg4") is not None:
+            if finite(a.get("final_avg4")) and finite(b.get("final_avg4")):
                 issues = pairing_issues(seed, a, b)
                 if issues:
                     incomparable.append({"seed": seed, "issues": issues})
@@ -74,13 +123,17 @@ def summarize(root: Path):
                                   "grace_step": a.get("final_training_step"), "baseline_step": b.get("final_training_step"),
                                   "grace_cost": a.get("cost_control"), "baseline_cost": b.get("cost_control"),
                                   "grace_wall_hours": a.get("train_wall_hours"), "baseline_wall_hours": b.get("train_wall_hours")})
+            else:
+                incomparable.append({"seed": seed, "issues": [f"{name}_final_evaluation_missing_or_nonfinite"
+                    for name, row in (("grace", a), (baseline, b)) if not finite(row.get("final_avg4"))]})
         values = [p["delta"] for p in pairs]
         output["paired"].append({
             "comparison": f"grace minus {baseline}", "pairs": pairs,
             "incomparable": incomparable,
             "mean_delta": float(np.mean(values)) if values else None,
             "seed_sd": float(np.std(values, ddof=1)) if len(values) > 1 else None,
-            "note": "Descriptive seed dispersion; no small-sample significance claim.",
+            **seed_interval(values),
+            "note": "The interval assumes approximately normal, independent and identically distributed paired training-seed differences; it is unstable with few seeds, not a problem bootstrap and not adjusted for multiple comparisons. Scores and differences use accuracy fractions, not percentage points.",
         })
     # Shared SFT is paid once per seed; keep it separate from each method's RL cost.
     output["shared_initialization"] = []

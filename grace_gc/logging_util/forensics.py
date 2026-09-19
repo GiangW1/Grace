@@ -225,6 +225,8 @@ def write_data_inventory(run: RunDirectory, records_or_buckets, data_path=None, 
         manifest["selection_seed"] = split_seed
         payload["splits"][name] = manifest
     if report:
+        if report.get("eval_exclusion") is not None:
+            run.write_json("data_exclusions.json", report["eval_exclusion"])
         payload["load"] = {
             "n_raw": report.get("n_raw"),
             "n_kept": report.get("n_kept"),
