@@ -5,6 +5,24 @@
 ## 本机最近一次结果（2026-09-19）
 
 ```text
+721 passed, 1 skipped in 80.39s
+```
+
+命令：`D:\Anaconda\python.exe -m pytest tests -q -o addopts=''`。本轮为固定基底在线监督及运行开销优化的全量 CPU/替身回归；1项真实CUDA测试因本机无GPU跳过，requests仍有既有依赖版本警告。没有新GPU训练、质量或加速数字。
+
+新增143项覆盖：
+
+- `test_feature_reduction.py`（85项）：legacy/response/decision、EOS/pad、批量和prompt特征与旧定义对照；CPU FP32/BF16/FP64输入，容差 `rtol=1e-6, atol=1e-7`。先复现完整hidden序列回传，再验证只回传最终特征；该样例传输元素数不代表GPU加速比。
+- `test_fixed_basis_supervision.py`（8项）：一般/秩亏Gram残差、零G、FP32标签范数舍入、IPW/γ/风险拟合对照；真实tiny训练固定U且在线更新预测头，连续训练与恢复状态一致，p=1与Full-PG actor一致，停止者null、固定N和无信号时不冻结占位基。
+- `test_basis_artifact.py`（23项）：固定U引用、旧内嵌格式、hash/维度/缺失文件、写失败保留旧状态、跨目录latest、目录迁移和归档依赖；显式包含NPZ也带同目录U，归档不解析pickle。
+- `test_rollout_observability.py`（22项）：不吞无关TypeError、兼容回退保seed/失败费用、cached tokens缺失为null、续写全局索引、同步失败；GPU入口用CPU替身验证失败落盘及正常同步日志，日志写失败不覆盖原异常，已恢复回退不误报为后续失败。
+- `test_array_hash_buffer.py`（5项）：直接连续buffer计算hash，不创建整份bytes副本；非连续/字节序/空数组/标量保持原hash协议。
+
+完整回归后仅更新文档。训练/归档CLI帮助、候选配置按实际层叠顺序加载和 `git diff --check` 通过。服务器仍需验证CUDA数值、显存、真实生成批次/缓存、完整费用及同成本质量。代码与命令见 [实施状态§9.1](GRACE_RESEARCH_IMPLEMENTATION_PLAN_20260919.md#91-首批实施状态2026-09-19)。
+
+## 本机上一轮结果（2026-09-19）
+
+```text
 578 passed, 1 skipped in 81.64s
 ```
 

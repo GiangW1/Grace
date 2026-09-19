@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Callable
+import copy
+import time
 
 import numpy as np
 
@@ -311,6 +313,11 @@ def run_algorithm1_step(
         state.n_ref = n
     alloc = cfg.get("allocation", {})
     pred_cfg = cfg.get("predictor", {})
+    if state.reservoir.fixed_basis_id is not None:
+        if not pred_cfg.get("fixed_basis", False):
+            raise ValueError("compact supervision requires predictor.fixed_basis=true on resume")
+        if state.reservoir.fixed_basis_id != state.basis_id:
+            raise ValueError("compact supervision does not match the actor basis")
     from grace_gc.versions import sha256_array, sha256_mapping, sha256_named
 
     behavior_context = {
@@ -343,13 +350,16 @@ def run_algorithm1_step(
         _gpu_progress(cfg, f"phase=prescan_done n_prescanned={n_prescanned} wall_s={timings['prescan']:.1f}")
     _gpu_progress(cfg, f"phase=prefix n={n} decision={decision}")
 
+    detail_started = time.perf_counter()
     prefixes, finished = engines.generate_prefix(prompt_ids, decision, state.rng, "token")
+    timing_details = {"prefix_generate": time.perf_counter() - detail_started}
     finished = np.asarray(finished, dtype=bool).reshape(-1)
     if len(prefixes) != n or finished.shape[0] != n:
         raise ValueError(f"generate_prefix returned {len(prefixes)} sequences for {n} starts")
     prompt_lens = np.array([len(p) for p in prompt_ids], dtype=np.int64)
     k = int(state.u.shape[1])
     need_features = state.spec.use_predictor or state.spec.feature_mode != "none"
+    detail_started = time.perf_counter()
     if need_features:
         feat_bundle = engines.prefix_features(
             prefixes, prompt_lens, [state.baseline.get(pid) for pid in problem_ids]
@@ -363,7 +373,9 @@ def run_algorithm1_step(
     else:
         feat = np.zeros((n, max(k, 1)), dtype=np.float64)
         cost_feat = None
+    timing_details["prefix_features"] = time.perf_counter() - detail_started
 
+    detail_started = time.perf_counter()
     remainings = continuation_remainings(prefixes, prompt_lens, finished, max_new)
     if state.predictor is not None and not warmup and state.spec.use_predictor:
         pred = state.predictor.forward_numpy(feat, cost_feat)
@@ -390,6 +402,7 @@ def run_algorithm1_step(
         reward_feats = np.stack(
             [_reward_features(state.baseline.get(problem_ids[i]), lengths[i]) for i in range(n)]
         )
+    timing_details["predictor_forward"] = time.perf_counter() - detail_started
     timings["prefix"] = timer.lap()
 
     basis_at_allocate = int(state.basis_id)
@@ -419,6 +432,7 @@ def run_algorithm1_step(
     timings["allocate"] = timer.lap()
 
     selected = (z >= 1.0) & (~finished) & (remainings > 0)
+    detail_started = time.perf_counter()
     full_ids: list[list[int] | None] = [None] * n
     for rem in sorted({int(remainings[i]) for i in range(n) if selected[i]}):
         mask = selected & (remainings == rem)
@@ -431,6 +445,12 @@ def run_algorithm1_step(
     for i in range(n):
         if z[i] >= 1.0 and full_ids[i] is None:
             full_ids[i] = prefixes[i]
+    timing_details["suffix_generate"] = time.perf_counter() - detail_started
+    # Read only after selection, and snapshot before auxiliary rollouts.
+    rollout = engines.last_rollout or {}
+    rollout_execution = {key: copy.deepcopy(rollout[key]) for key in (
+        "prefix_execution", "continue_execution", "prefix_num_cached_tokens", "continue_num_cached_tokens"
+    ) if key in rollout}
     rewards: list[float | None] = []
     texts: list[str | None] = []
     traj_finished: list[bool] = []
@@ -582,7 +602,7 @@ def run_algorithm1_step(
                     remaining_cost=float(max(remainings[i], 1)),
                     prefix_finished=bool(finished[i]),
                 )
-            state.reservoir.add(item)
+            state.reservoir.add(item, u=state.u)
             new_audit_items.append(item)
         records.append(rec)
     timings["audit"] = timer.lap()
@@ -593,7 +613,7 @@ def run_algorithm1_step(
         engines, state, prompt_ids, problem_ids, golds, cfg,
     )
     for item in fresh_items:
-        state.reservoir.add(item)
+        state.reservoir.add(item, u=state.u)
     new_audit_items.extend(fresh_items)
     for row in fresh_rows:
         row["behavior_context"] = behavior_context
@@ -602,7 +622,7 @@ def run_algorithm1_step(
     logprob_probe = None if engines.before_update is None else engines.before_update(records)
     frozen_predictor = (None if state.predictor is None else
                         diagnose_frozen_predictor(state.predictor, new_audit_items, state.u,
-                                                  risk_mode=state.spec.risk_mode))
+                                                  risk_mode=state.spec.risk_mode, basis_id=state.basis_id))
     if frozen_predictor is not None:
         frozen_predictor["used_in_actor_update"] = bool(state.spec.use_ht_correction and not warmup and control_variate_enabled)
         frozen_predictor["basis_id"] = int(state.basis_id)
@@ -657,7 +677,7 @@ def run_algorithm1_step(
         basis_mask = split["fit"] if crossfit_basis else split["basis"]
         basis_items = [it for it, keep in zip(state.reservoir.items, basis_mask) if keep]
         basis_metrics = {"variant": variant, "refreshed": False}
-        if should_refresh_basis(
+        if state.reservoir.fixed_basis_id is None and should_refresh_basis(
             len(basis_items),
             min(k, len(basis_items)) if crossfit_basis else k,
             state.step,
@@ -698,6 +718,11 @@ def run_algorithm1_step(
                 basis_rank = int(basis.rank)
                 basis_metrics["refreshed"] = True
                 state.reservoir.stamp_basis_id(state.basis_id)
+        if (pred_cfg.get("fixed_basis", False) and state.reservoir.fixed_basis_id is None
+                and state.step + 1 >= int(pred_cfg.get("warmup_steps", 0)) and state.basis_id > 0):
+            state.reservoir.compact(state.u, state.basis_id)
+        basis_metrics.update(fixed=state.reservoir.fixed_basis_id is not None,
+                             fixed_basis_id=state.reservoir.fixed_basis_id)
         pred_metrics = update_predictor_from_reservoir(
             state.predictor,
             state.reservoir,
@@ -712,6 +737,7 @@ def run_algorithm1_step(
                                      for it in state.reservoir.items]) if not state.spec.use_allocation else None),
             calibration_risk_mode=state.spec.risk_mode,
             calibration_uniform_shrink=float(alloc.get("uniform_shrink", 0.0)),
+            basis_id=state.basis_id,
         )
         pred_metrics["frozen_new_problems"] = frozen_predictor
         pred_metrics["basis"] = basis_metrics
@@ -789,6 +815,9 @@ def run_algorithm1_step(
         "predictor_synced_basis_id": int(state.predictor_synced_basis_id),
         "basis_rank": basis_rank,
         "timings": timings,
+        "timing_details": {"wall_seconds": timing_details,
+                           "scope": "nested in prefix/continue phases; not additional ledger charges"},
+        "rollout_execution": rollout_execution or None,
         "u_frozen": u_frozen,
         "grad_norm": update_stats.get("grad_norm"),
         "grad_norm_preclip": update_stats.get("grad_norm_preclip"),

@@ -134,6 +134,7 @@ def dump_train_state(path, state: TrainState, actor_named, optimizer, actor_full
             "u": state.u,
             "basis_id": state.basis_id,
             "predictor_synced_basis_id": state.predictor_synced_basis_id,
+            "fixed": state.reservoir.fixed_basis_id is not None,
         },
         "prescan_rng": None if state.prescan_rng is None else state.prescan_rng.state_dict(),
         "reservoir": state.reservoir.state_dict(),
@@ -212,6 +213,11 @@ def restore_train_state(path, actor, optimizer, in_dim: int, k: int, spec_name: 
         raise ValueError(f"checkpoint basis U shape {u.shape} does not match LoRA dim {layout.dim}")
     if predictor is not None and u.shape[1] != predictor.k:
         raise ValueError(f"checkpoint basis k {u.shape[1]} != predictor k {predictor.k}")
+    if reservoir.fixed_basis_id is not None:
+        if reservoir.fixed_basis_id != int(payload["basis"].get("basis_id", 0)):
+            raise ValueError("compact supervision does not match checkpoint basis")
+        for item in reservoir.items:
+            item.coordinates(u, reservoir.fixed_basis_id)
     state = TrainState(
         spec=spec,
         baseline=baseline,

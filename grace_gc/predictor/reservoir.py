@@ -1,4 +1,4 @@
-"""Host-side reservoir of audited full-space gradients."""
+"""Audited gradient labels, optionally compacted after freezing the basis."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import numpy as np
 @dataclass
 class ReservoirItem:
     problem_id: str
-    g: np.ndarray
+    g: np.ndarray | None
     p: float
     s: float
     features: np.ndarray
@@ -23,6 +23,51 @@ class ReservoirItem:
     remaining_cost: float | None = None
     prefix_finished: bool | None = None
     source: str = "training_audit"
+    coords: np.ndarray | None = None
+    g_norm_sq: float | None = None
+
+    def coordinates(self, u: np.ndarray, basis_id: int | None = None) -> np.ndarray:
+        if self.g is not None:
+            return np.asarray(self.g, dtype=np.float64).reshape(-1) @ u
+        if basis_id is None or self.basis_id != basis_id:
+            raise ValueError("compact label requires its fixed basis id")
+        if self.coords is None or self.coords.shape != (u.shape[1],):
+            raise ValueError("compact label coordinate dimension does not match basis")
+        return self.coords
+
+    def gradient_norm_sq(self) -> float:
+        if self.g is not None:
+            g = np.asarray(self.g, dtype=np.float64).reshape(-1)
+            return float(np.dot(g, g))
+        if self.g_norm_sq is None or not np.isfinite(self.g_norm_sq) or self.g_norm_sq < 0:
+            raise ValueError("compact label requires a finite nonnegative gradient norm")
+        return self.g_norm_sq
+
+    def residual(self, f: np.ndarray, u: np.ndarray, basis_id: int | None = None,
+                 gram: np.ndarray | None = None) -> float:
+        if self.g is not None:
+            from grace_gc.predictor.risk import full_space_residual
+            return float(full_space_residual(self.g.reshape(-1), f, u))
+        coords = self.coordinates(u, basis_id)
+        gram = u.T @ u if gram is None else gram
+        norm = self.gradient_norm_sq()
+        cross, prediction = float(2. * np.dot(f, coords)), float(f @ gram @ f)
+        value = norm - cross + prediction
+        # The Gram identity includes energy outside U. Only roundoff-sized
+        # negative values may be clamped; no statistical floor is introduced.
+        tolerance = 64 * np.finfo(np.float64).eps * (norm + abs(cross) + abs(prediction))
+        if not np.isfinite(value) or value < -tolerance:
+            raise ValueError("compact label has an invalid full-space residual")
+        return max(0., value)
+
+    def compact(self, u: np.ndarray, basis_id: int) -> None:
+        if self.g is not None:
+            self.coords = np.asarray(self.coordinates(u), dtype=np.float64)
+            self.g_norm_sq = self.gradient_norm_sq()
+            self.basis_id = int(basis_id)
+            self.g = None
+        self.coordinates(u, basis_id)
+        self.gradient_norm_sq()
 
 
 @dataclass
@@ -32,8 +77,13 @@ class GradientReservoir:
     fit_problem_ids: set[str] | None = None
     hold_problem_ids: set[str] | None = None
     calibration_problem_ids: set[str] | None = None
+    fixed_basis_id: int | None = None
 
-    def add(self, item: ReservoirItem) -> None:
+    def add(self, item: ReservoirItem, *, u: np.ndarray | None = None) -> None:
+        if self.fixed_basis_id is not None:
+            if u is None or item.basis_id != self.fixed_basis_id:
+                raise ValueError("new compact label requires the fixed basis")
+            item.compact(u, self.fixed_basis_id)
         self.items.append(item)
         if len(self.items) > self.capacity:
             self.items = self.items[-self.capacity :]
@@ -42,6 +92,8 @@ class GradientReservoir:
         if not self.items:
             raise ValueError("reservoir is empty")
         take = self.items if n is None else self.items[-n:]
+        if any(it.g is None for it in take):
+            raise ValueError("compact labels cannot reconstruct full gradients")
         return np.stack([it.g.reshape(-1) for it in take], axis=0)
 
     def problem_ids(self) -> list[str]:
@@ -49,12 +101,22 @@ class GradientReservoir:
 
     def stamp_basis_id(self, basis_id: int) -> None:
         bid = int(basis_id)
+        if self.fixed_basis_id is not None and bid != self.fixed_basis_id:
+            raise ValueError("compact labels cannot change basis")
         for it in self.items:
             it.basis_id = bid
+
+    def compact(self, u: np.ndarray, basis_id: int) -> None:
+        if self.fixed_basis_id is not None and self.fixed_basis_id != basis_id:
+            raise ValueError("compact labels cannot change basis")
+        for item in self.items:
+            item.compact(u, basis_id)
+        self.fixed_basis_id = int(basis_id)
 
     def state_dict(self) -> dict:
         return {
             "capacity": self.capacity,
+            "fixed_basis_id": self.fixed_basis_id,
             "fit_problem_ids": None if self.fit_problem_ids is None else sorted(self.fit_problem_ids),
             "hold_problem_ids": None if self.hold_problem_ids is None else sorted(self.hold_problem_ids),
             "calibration_problem_ids": None if self.calibration_problem_ids is None else sorted(self.calibration_problem_ids),
@@ -62,6 +124,8 @@ class GradientReservoir:
                 {
                     "problem_id": it.problem_id,
                     "g": it.g,
+                    "coords": it.coords,
+                    "g_norm_sq": it.g_norm_sq,
                     "p": it.p,
                     "s": it.s,
                     "features": it.features,
@@ -82,6 +146,8 @@ class GradientReservoir:
     @classmethod
     def from_state_dict(cls, state: dict) -> GradientReservoir:
         obj = cls(capacity=int(state["capacity"]))
+        if state.get("fixed_basis_id") is not None:
+            obj.fixed_basis_id = int(state["fixed_basis_id"])
         if state.get("fit_problem_ids") is not None:
             obj.fit_problem_ids = set(state["fit_problem_ids"])
         if state.get("hold_problem_ids") is not None:
@@ -92,7 +158,9 @@ class GradientReservoir:
             obj.items.append(
                 ReservoirItem(
                     problem_id=raw["problem_id"],
-                    g=np.asarray(raw["g"], dtype=np.float64),
+                    g=None if raw["g"] is None else np.asarray(raw["g"], dtype=np.float64),
+                    coords=None if raw.get("coords") is None else np.asarray(raw["coords"], dtype=np.float64),
+                    g_norm_sq=None if raw.get("g_norm_sq") is None else float(raw["g_norm_sq"]),
                     p=float(raw["p"]),
                     s=float(raw["s"]),
                     features=np.asarray(raw["features"], dtype=np.float64),
@@ -107,6 +175,13 @@ class GradientReservoir:
                     source=str(raw.get("source", "training_audit")),
                 )
             )
+            item = obj.items[-1]
+            if item.g is None:
+                if (obj.fixed_basis_id is None or item.basis_id != obj.fixed_basis_id
+                        or item.coords is None or item.coords.ndim != 1
+                        or not np.all(np.isfinite(item.coords))):
+                    raise ValueError("invalid compact label or fixed basis id")
+                item.gradient_norm_sq()
         return obj
 
 

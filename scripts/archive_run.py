@@ -30,6 +30,9 @@ def archive_run(root: Path, output: Path, max_file_mib=20, include_checkpoints=F
         if not path.exists():
             raise FileNotFoundError(path)
         selected.append(path)
+    # Sidecar references are basenames in the NPZ's own directory. Include all
+    # neighboring basis files conservatively, without unpickling checkpoints.
+    basis_directories = {p.parent for p in selected if p.is_file() and p.suffix == ".npz"}
     manifest = {"run_root": str(root), "files": [],
                 "selection_policy": {
                     "max_file_mib": max_file_mib,
@@ -37,6 +40,8 @@ def archive_run(root: Path, output: Path, max_file_mib=20, include_checkpoints=F
                     "always_include_names": ["batch_audit_means.npz"],
                     "include_checkpoints": include_checkpoints,
                     "checkpoint_suffixes": [".npz"],
+                    "checkpoint_dependencies": ["basis-*.npy"],
+                    "explicit_npz_dependencies": "all basis-*.npy in the selected NPZ's directory",
                     "adapter_weight_names": list(_ADAPTER_WEIGHTS),
                     "include_paths": [p.relative_to(root).as_posix() for p in selected],
                 },
@@ -56,9 +61,12 @@ def archive_run(root: Path, output: Path, max_file_mib=20, include_checkpoints=F
             digest = hashlib.sha256()
             if any(path.is_relative_to(p) for p in selected):
                 inclusion_reason = "explicit_path"
+            elif path.parent in basis_directories and path.match("basis-*.npy"):
+                inclusion_reason = "checkpoint_dependency"
             elif path.suffix == ".jsonl" or path.name == "batch_audit_means.npz":
                 inclusion_reason = "scientific_evidence"
-            elif include_checkpoints and (path.suffix == ".npz" or path.name in _ADAPTER_WEIGHTS):
+            elif include_checkpoints and (path.suffix == ".npz" or path.name in _ADAPTER_WEIGHTS
+                                          or path.match("basis-*.npy")):
                 inclusion_reason = "checkpoint"
             elif size <= max_file_mib * 1024 * 1024:
                 inclusion_reason = "within_size_limit"
@@ -99,9 +107,9 @@ if __name__ == "__main__":
     parser.add_argument("output", type=Path)
     parser.add_argument("--max-file-mib", type=float, default=20)
     parser.add_argument("--include-checkpoints", action="store_true",
-                        help="also retain all NPZ states and LoRA adapter weights, regardless of size; not base HF weights")
+                        help="also retain all NPZ states, basis sidecars and LoRA adapter weights, regardless of size; not base HF weights")
     parser.add_argument("--include", action="append", type=Path, default=[], metavar="PATH",
-                        help="retain a specific file or directory inside root regardless of size (repeatable, relative to root)")
+                        help="retain a file or directory regardless of size; NPZ includes neighboring basis sidecars (repeatable, relative to root)")
     args = parser.parse_args()
     manifest = archive_run(args.root, args.output, args.max_file_mib, args.include_checkpoints,
                            include_paths=args.include)

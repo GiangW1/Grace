@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
+from time import perf_counter
 
 import numpy as np
 
@@ -19,6 +21,8 @@ class PhaseResult:
     sampling: dict | None = None
     logprob_sums: list[float | None] | None = None
     token_logprobs: list[list[float | None]] | None = None
+    num_cached_tokens: list[int | None] | None = None
+    execution: dict | None = None
 
 
 def _require_vllm():
@@ -238,6 +242,32 @@ def _vllm_prompts(prompt_token_ids: list[list[int]]):
         return [{"prompt_token_ids": ids} for ids in prompt_token_ids]
 
 
+def _sampling_list_rejected(exc: TypeError) -> bool:
+    """Only explicit scalar-vs-list API errors permit a serial retry."""
+    message = " ".join(str(exc).lower().replace("'", "").replace('"', "").split()).rstrip(".")
+    return any(re.fullmatch(pattern, message) for pattern in (
+        r"sampling_params (?:must be (?:a )?|must be of type |expected )samplingparams(?: instance)?, (?:not|got) (?:a )?list",
+        r"argument sampling_params has incorrect type \(expected samplingparams, got list\)",
+    ))
+
+
+def _execution_metadata(execution: dict | None, requested_batch_size: int) -> dict:
+    execution = {} if execution is None else execution
+    execution.update({
+        "requested_batch_size": int(requested_batch_size),
+        "num_generate_calls": 0,
+        "successful_generate_batches": 0,
+        "failed_generate_batches": 0,
+        "successful_batch_sizes": [],
+        "generate_calls": [],
+        "serial_fallback": False,
+        "serial_fallback_reason": None,
+        "wall_seconds": 0.,
+        "scope": "LLM.generate submissions, not internal scheduler batches; includes failed attempts; already included in phase wall time",
+    })
+    return execution
+
+
 def generate_phase(
     llm,
     prompt_token_ids: list[list[int]],
@@ -247,8 +277,11 @@ def generate_phase(
     rng: IsolatedRNG,
     stream: str,
     lora_request=None,
+    *,
+    execution: dict | None = None,
 ) -> PhaseResult:
     """Generate from raw token IDs. Prefix caching reuses KV, not RNG state."""
+    execution = _execution_metadata(execution, len(prompt_token_ids))
     _LLM, _SP = _require_vllm()
     prompts = _vllm_prompts(prompt_token_ids)
     seeds = [int(rng.integers(stream, 0, 2**31 - 1)) for _ in prompt_token_ids]
@@ -264,12 +297,37 @@ def generate_phase(
     kwargs = {"use_tqdm": False}
     if lora_request is not None:
         kwargs["lora_request"] = lora_request
+
+    def generate_batch(batch, params):
+        call = {"batch_size": len(batch), "status": "running"}
+        execution["generate_calls"].append(call)
+        execution["num_generate_calls"] += 1
+        started = perf_counter()
+        try:
+            result = llm.generate(batch, sampling_params=params, **kwargs)
+        except Exception as exc:
+            call.update(status="failed", error_type=type(exc).__name__, error=str(exc))
+            execution["failed_generate_batches"] += 1
+            raise
+        else:
+            call["status"] = "returned"
+            execution["successful_generate_batches"] += 1
+            execution["successful_batch_sizes"].append(len(batch))
+            return result
+        finally:
+            call["wall_seconds"] = perf_counter() - started
+            execution["wall_seconds"] += call["wall_seconds"]
+
     try:
-        outputs = llm.generate(prompts, sampling_params=param_list, **kwargs)
-    except TypeError:
+        outputs = generate_batch(prompts, param_list)
+    except TypeError as exc:
+        if not _sampling_list_rejected(exc):
+            raise
+        execution["serial_fallback"] = True
+        execution["serial_fallback_reason"] = str(exc)
         outputs = []
         for prompt, params in zip(prompts, param_list):
-            outputs.extend(llm.generate([prompt], sampling_params=params, **kwargs))
+            outputs.extend(generate_batch([prompt], params))
     if len(outputs) != len(prompt_token_ids):
         raise ValueError(f"vLLM returned {len(outputs)} outputs for {len(prompt_token_ids)} prompts")
     token_ids = []
@@ -279,6 +337,7 @@ def generate_phase(
     stop_reasons = []
     logprob_sums: list[float | None] = []
     token_logprobs = []
+    cached_tokens = []
     for prompt, out in zip(prompt_token_ids, outputs):
         out_prompt = getattr(out, "prompt_token_ids", None)
         if out_prompt is None:
@@ -306,6 +365,8 @@ def generate_phase(
         stop_reasons.append(None if raw_stop is None else raw_stop)
         logprob_sums.append(_sum_sampled_logprobs(completion, len(gen)))
         token_logprobs.append(_sampled_token_logprobs(completion, len(gen)))
+        cached = getattr(out, "num_cached_tokens", None)
+        cached_tokens.append(None if cached is None else int(cached))
     # Independent draws can coincide, especially for short format-SFT answers.
     sampling = getattr(build_sampling_params, "last", None)
     if sampling is not None:
@@ -319,6 +380,8 @@ def generate_phase(
         sampling=None if sampling is None else dict(sampling),
         logprob_sums=logprob_sums,
         token_logprobs=token_logprobs,
+        num_cached_tokens=cached_tokens,
+        execution=execution,
     )
 
 
@@ -331,6 +394,8 @@ def continue_selected(
     eos_id: int | list[int],
     rng: IsolatedRNG,
     lora_request=None,
+    *,
+    execution: dict | None = None,
 ) -> list[list[int] | None]:
     """Continue only selected prefixes on the same engine/snapshot."""
     from grace_gc.data.tokenize import is_stop_token
@@ -350,11 +415,14 @@ def continue_selected(
     out: list[list[int] | None] = [None] * len(prefix_token_ids)
     for i, seq in already.items():
         out[i] = seq
+    execution = _execution_metadata(execution, len(chosen))
+    execution["request_indices"] = list(chosen_idx)
+    continue_selected.last_phase = None
+    continue_selected.last_idx = list(chosen_idx)
     if not chosen:
-        continue_selected.last_phase = None
-        continue_selected.last_idx = []
         return out
-    phase = generate_phase(llm, chosen, max_tokens, temperature, eos_id, rng, "continuation", lora_request=lora_request)
+    phase = generate_phase(llm, chosen, max_tokens, temperature, eos_id, rng, "continuation",
+                           lora_request=lora_request, execution=execution)
     continue_selected.last_phase = phase
     continue_selected.last_idx = list(chosen_idx)
     for j, i in enumerate(chosen_idx):

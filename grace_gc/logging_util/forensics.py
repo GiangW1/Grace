@@ -421,6 +421,9 @@ def step_metrics_row(state, last: dict[str, Any], ctx: dict[str, Any], wall_s: f
         "wall_seconds": float(wall_s),
         "written_at": utc_now(),
         "phases": last.get("timings") or {},
+        "timing_details": last.get("timing_details"),
+        "rollout_execution": last.get("rollout_execution"),
+        "sync_details": last.get("sync_details"),
         "snapshot_sha": ctx.get("snapshot_sha"),
         "post_update_snapshot_sha": ctx.get("post_update_snapshot_sha"),
         "post_update_predictor_sha": ctx.get("post_update_predictor_sha"),
@@ -503,7 +506,8 @@ def _publish_snapshot(run, cfg, state, actor_named, optimizer, actor_full=None, 
     payload_extra = {**(extra or {}), "run_config": effective, "identity": cfg.get("_run_identity")}
     step_path = run.root / "checkpoints" / f"step_{int(state.step)}.npz"
     timings = dump_train_state(step_path, state, actor_named, optimizer, actor_full=actor_full, extra=payload_extra)
-    timings.update(copy_checkpoint(step_path, run.root / "checkpoint.npz"))
+    timings.update(copy_checkpoint(step_path, run.root / "checkpoint.npz",
+                                   basis_artifact=timings.get("basis_artifact")))
     hash_timer = Timer()
     sha = sha256_file(step_path)
     timings.update(hash_wall_seconds=hash_timer.elapsed(), hash_cpu_seconds=hash_timer.cpu_elapsed())
@@ -553,6 +557,7 @@ def persist_training_step(
     if extra:
         last.setdefault("adapter_path", None if extra.get("adapter_path") is None else str(extra.get("adapter_path")))
         last.setdefault("lora_id", extra.get("lora_id"))
+        last.setdefault("sync_details", extra.get("last_sync"))
     every = int(cfg.get("checkpoint_every", 1))
     if every <= 0:
         raise ValueError("checkpoint_every must be positive")

@@ -9,7 +9,6 @@ from grace_gc.predictor.heads import PredictorHeads
 from grace_gc.predictor.features import reward_risk_features
 from grace_gc.predictor.ipw import assign_new_problems, ipw_weights
 from grace_gc.predictor.reservoir import GradientReservoir, ReservoirItem, age_weights
-from grace_gc.predictor.risk import full_space_residual
 from grace_gc.predictor.scale import design_shrink_diagnostics, design_shrink_from_projections
 
 
@@ -60,9 +59,10 @@ def prepare_predictor_split(heads, reservoir, rng, basis_fit_only=False, *,
             "age_weight": recency, "freshness": freshness}
 
 
-def _residuals(items, f, u):
+def _residuals(items, f, u, basis_id=None):
     # Do not assemble another reservoir-sized n x D gradient or prediction.
-    return np.array([float(full_space_residual(it.g.reshape(-1), row, u))
+    gram = u.T @ u if any(it.g is None for it in items) else None
+    return np.array([it.residual(row, u, basis_id, gram=gram)
                      for it, row in zip(items, f)], dtype=np.float64)
 
 
@@ -73,11 +73,12 @@ def _current_reward_features(heads, feats, items):
 
 
 def _supervision_summary(items, weights, split, current_step):
-    norms = np.array([float(np.dot(it.g.reshape(-1), it.g.reshape(-1))) for it in items])
+    norms = np.array([it.gradient_norm_sq() for it in items])
     ages = [int(current_step) - it.observed_step for it in items
             if current_step is not None and it.observed_step is not None]
     summary = {
         "n": len(items), "n_problems": len({it.problem_id for it in items}),
+        "n_compact": sum(it.g is None for it in items),
         "n_zero_gradient": int(np.count_nonzero(norms == 0)),
         "ipw_effective_n": float(weights.sum() ** 2 / np.dot(weights, weights)) if np.any(weights > 0) else 0.,
         "weight_definition": "inverse propensity multiplied by configured age weight",
@@ -102,7 +103,8 @@ def _supervision_summary(items, weights, split, current_step):
 
 
 def diagnose_frozen_predictor(heads: PredictorHeads, new_items: list[ReservoirItem],
-                              u: np.ndarray, only_unseen: bool = True, risk_mode: str = "full") -> dict:
+                              u: np.ndarray, only_unseen: bool = True, risk_mode: str = "full", *,
+                              basis_id: int | None = None) -> dict:
     """Evaluate BEFORE any basis/head update; leave heads, split and RNG unchanged.
 
     Unseen means no previous supervised predictor update on this problem. Old
@@ -117,8 +119,8 @@ def diagnose_frozen_predictor(heads: PredictorHeads, new_items: list[ReservoirIt
     if not items:
         return out
     pred = heads.forward_numpy(np.stack([it.features for it in items]))
-    e = _residuals(items, pred.f, u)
-    e0 = np.array([np.dot(it.g.reshape(-1), it.g.reshape(-1)) for it in items])
+    e = _residuals(items, pred.f, u, basis_id)
+    e0 = np.array([it.gradient_norm_sq() for it in items])
     w = ipw_weights(np.array([it.p for it in items]), np.array([it.s for it in items]))
     emean, e0mean = float(np.average(e, weights=w)), float(np.average(e0, weights=w))
     out.update(residual_mean=emean, m0_residual_mean=e0mean,
@@ -143,7 +145,7 @@ def update_predictor_from_reservoir(
     heads: PredictorHeads, reservoir: GradientReservoir, u: np.ndarray,
     rng: np.random.Generator, epochs: int = 2, *, current_step=None,
     split=None, calibration_p=None, calibration_beta=.5, calibration_p_min=.2,
-    calibration_risk_mode="full", calibration_uniform_shrink=0.0,
+    calibration_risk_mode="full", calibration_uniform_shrink=0.0, basis_id=None,
 ) -> dict:
     if not reservoir.items:
         return {"coord_loss": None, "risk_loss": None, "n": 0}
@@ -151,8 +153,8 @@ def update_predictor_from_reservoir(
     feats = np.stack([it.features for it in items])
     p = np.array([it.p for it in items], dtype=np.float64)
     weights = ipw_weights(p, np.array([it.s for it in items]))
-    # G remains in its existing reservoir arrays. Only n x k coordinates copy.
-    coords = np.stack([it.g.reshape(-1) @ u for it in items])
+    # Fixed-basis labels already contain these n x k sufficient statistics.
+    coords = np.stack([it.coordinates(u, basis_id) for it in items])
     if split is None:
         split = prepare_predictor_split(heads, reservoir, rng, current_step=current_step)
     weights *= split.get("age_weight", np.ones(len(items)))
@@ -219,7 +221,7 @@ def update_predictor_from_reservoir(
     e = None
     if np.any(hold):
         hold_items = [it for it, keep in zip(items, hold) if keep]
-        e = _residuals(hold_items, heads.predict_f(feats[hold]), u)
+        e = _residuals(hold_items, heads.predict_f(feats[hold]), u, basis_id)
         if heads.feature_scaler == "refit" or not heads.risk_scale_fitted:
             heads.risk_scale_fitted = heads.scaler.fit_risk_scale(e)
         risk_loss = heads.train_risk(feats[hold], e, weights[hold], epochs=epochs)

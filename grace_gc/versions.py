@@ -46,7 +46,7 @@ def sha256_file(path: str | Path) -> str:
 
 def sha256_array(arr) -> str:
     data = np.ascontiguousarray(np.asarray(arr))
-    return hashlib.sha256(data.tobytes()).hexdigest()
+    return hashlib.sha256(data).hexdigest()
 
 
 def sha256_named(named) -> str:

@@ -5,12 +5,98 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 import os
+import re
 import shutil
 import tempfile
 import time
 import zipfile
 
 import numpy as np
+
+from grace_gc.versions import sha256_array
+
+
+def _basis_digest(name):
+    match = re.fullmatch(r"basis-([0-9a-f]{64})\.npy", str(name))
+    if match is None:
+        raise ValueError(f"invalid basis artifact basename: {name}")
+    return match.group(1)
+
+
+def _load_basis_artifact(directory, reference):
+    name = reference["path"]
+    digest = _basis_digest(name)
+    path = directory / name
+    if digest != reference["sha256"]:
+        raise ValueError(f"basis artifact reference hash mismatch: {path}")
+    if not path.is_file():
+        raise FileNotFoundError(f"basis artifact is not readable: {path}")
+    try:
+        u = np.load(path, allow_pickle=False)
+    except (OSError, ValueError, EOFError) as exc:
+        raise ValueError(f"basis artifact is not a valid NPY array: {path}") from exc
+    if not isinstance(u, np.ndarray):
+        u.close()
+        raise ValueError(f"basis artifact is not an NPY array: {path}")
+    if sha256_array(u) != digest:
+        raise ValueError(f"basis artifact content hash mismatch: {path}")
+    if ("dtype" in reference and u.dtype.str != reference["dtype"]
+            or "shape" in reference and list(u.shape) != reference["shape"]):
+        raise ValueError(f"basis artifact dtype or shape mismatch: {path}")
+    return u
+
+
+def _publish_basis_artifact(directory, reference, write):
+    """Publish an immutable NPY once, validating any existing same-name file."""
+    path = directory / reference["path"]
+    if path.exists():
+        _load_basis_artifact(directory, reference)
+        return
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=directory, prefix=f".{path.name}.", suffix=".tmp", delete=False) as stream:
+            temporary = Path(stream.name)
+            write(stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        # A hard-link publishes the complete bytes atomically without replacing
+        # another writer's immutable artifact if it appeared in the meantime.
+        try:
+            os.link(temporary, path)
+        except FileExistsError:
+            _load_basis_artifact(directory, reference)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def _externalize_fixed_basis(directory, payload):
+    basis = payload.get("basis")
+    if not isinstance(basis, dict) or not basis.get("fixed", False):
+        return payload, None
+    u = np.asarray(basis["u"])
+    digest = sha256_array(u)
+    reference = {"path": f"basis-{digest}.npy", "sha256": digest,
+                 "dtype": u.dtype.str, "shape": list(u.shape)}
+    _publish_basis_artifact(directory, reference, lambda stream: np.save(stream, u, allow_pickle=False))
+    stored_basis = {key: value for key, value in basis.items() if key != "u"}
+    stored_basis["u_artifact"] = reference
+    return {**payload, "basis": stored_basis}, reference["path"]
+
+
+def _copy_basis_artifact(source, target, name):
+    reference = {"path": name, "sha256": _basis_digest(name)}
+    u = _load_basis_artifact(source, reference)
+    if source.resolve() == target.resolve():
+        return
+    reference.update(dtype=u.dtype.str, shape=list(u.shape))
+    del u
+
+    def write(stream):
+        with (source / name).open("rb") as original:
+            shutil.copyfileobj(original, stream, length=1024 * 1024)
+
+    _publish_basis_artifact(target, reference, write)
 
 
 def _compact_gradients(payload):
@@ -48,7 +134,7 @@ def _write_archive(stream, payload):
             np.lib.format.write_array(member, np.array(payload, dtype=object), allow_pickle=True)
 
 
-def save_checkpoint(path: str | Path, payload: dict[str, Any]) -> dict[str, float | int]:
+def save_checkpoint(path: str | Path, payload: dict[str, Any]) -> dict[str, float | int | str]:
     """Publish only a complete archive; a failed write preserves the old file."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -56,6 +142,9 @@ def save_checkpoint(path: str | Path, payload: dict[str, Any]) -> dict[str, floa
     temporary = None
     try:
         stored, stats = _compact_gradients(payload)
+        stored, basis_artifact = _externalize_fixed_basis(path.parent, stored)
+        if basis_artifact is not None:
+            stats["basis_artifact"] = basis_artifact
         with tempfile.NamedTemporaryFile(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False) as stream:
             temporary = Path(stream.name)
             _write_archive(stream, stored)
@@ -70,13 +159,15 @@ def save_checkpoint(path: str | Path, payload: dict[str, Any]) -> dict[str, floa
             "checkpoint_bytes": path.stat().st_size, "checkpoint_compression_level": 1}
 
 
-def copy_checkpoint(source: str | Path, target: str | Path) -> dict[str, float]:
+def copy_checkpoint(source: str | Path, target: str | Path, *, basis_artifact: str | None = None) -> dict[str, float]:
     """Reuse compressed bytes when publishing latest, without a second dump."""
     source, target = Path(source), Path(target)
     target.parent.mkdir(parents=True, exist_ok=True)
     started, cpu = time.perf_counter(), time.process_time()
     temporary = None
     try:
+        if basis_artifact is not None:
+            _copy_basis_artifact(source.parent, target.parent, basis_artifact)
         with tempfile.NamedTemporaryFile(dir=target.parent, prefix=f".{target.name}.", suffix=".tmp", delete=False) as stream:
             temporary = Path(stream.name)
             with source.open("rb") as original:
@@ -99,6 +190,9 @@ def load_checkpoint(path: str | Path) -> dict[str, Any]:
         payload = data["payload"].item()
     if not isinstance(payload, dict):
         raise ValueError("checkpoint payload is not a mapping")
+    basis = payload.get("basis")
+    if isinstance(basis, dict) and "u_artifact" in basis:
+        basis["u"] = _load_basis_artifact(path.parent, basis["u_artifact"])
     reservoir = payload.get("reservoir")
     for item in reservoir.get("items", []) if isinstance(reservoir, dict) else []:
         dtype = item.pop("_grace_checkpoint_g_dtype", None)

@@ -145,6 +145,20 @@ SEEDS=17 COMMON_CONFIG=configs/experiments/minimal_gpu_signal_candidate.yaml \
 
 [完整30项清单](docs/GRACE_ISSUE_CHECKLIST_20260919.md)已更新处理状态。[实现说明§10](docs/GRACE_EFFICIENCY_REMEDIATION_20260919.md#10-继续落实问题清单预算模型定位工具和同组机制统计)提供五份单因素候选、`check_eval_repeatability.py`同checkpoint重复评测、`summarize_training_dynamics.py`逐阶段定位及预算曲线命令。独立LAG现在报告同一前缀双条件联合统计，方差×token附冻结问题簇条件区间；这些工具的CPU通过不等于论文收益已获实证。
 
+### E4. 固定基底与在线紧凑监督候选
+
+已实现调研方案的首批代码：特征在 actor 设备归约后回传、生成/同步细分观测，以及 `predictor.fixed_basis`。后者在 warmup 结束后固定已学得的 U，历史监督保存 `U.T @ G` 与 `||G||²`，预测头仍在批末在线更新。默认动态基底路径保留。
+
+```bash
+SEEDS=17 COMMON_CONFIG=configs/experiments/minimal_gpu_cost_candidate.yaml \
+  ABLATION_CONFIG=configs/experiments/minimal_gpu_fixed_basis.yaml \
+  bash scripts/run_minimal_gpu.sh runs/minimal-fixed-basis full_pg grace
+```
+
+与动态 U 对照时，去掉 `ABLATION_CONFIG`，其余设置相同；跨链使用 `SHARED_INIT_CHAIN` 复用同 seed 初始 actor。这里是开发 seed 的固定步数诊断，不能据此宣称同算力胜出。配置只固定基底，不强制 γ、不改变风险/ρ、不额外生成；上述 cost candidate 的固定 baseline 和无 fresh 设置应作为另一项已明确的实验选择。实现边界和后续验证见 [调研方案与实施状态](docs/GRACE_RESEARCH_IMPLEMENTATION_PLAN_20260919.md#91-首批实施状态2026-09-19)。
+
+`steps.jsonl` 新增 `timing_details`、`rollout_execution`、`sync_details`；生成/同步失败会写 `failed_execution.json`。子时间均已计入阶段总时间。缓存计数缺失记 null，提交批次不代表 GPU 内部调度批次，也不代表加速。固定 U 的 NPZ 依赖同目录 `basis-*.npy`；迁移时一并复制，恢复继续启用相同 overlay。只复制 NPZ 不足以恢复。
+
 作业结束后保留完整检查点归档：
 
 ```bash

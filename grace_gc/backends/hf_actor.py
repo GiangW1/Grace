@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 
 from grace_gc.backends.fsdp_actor import token_sum_logprob
-from grace_gc.predictor.features import pool_last_hidden, prefix_features
+from grace_gc.predictor.features import POOL_LAST, pool_last_hidden, prefix_features
 
 
 def _cutoff_len(seq, eos_id, prompt_len: int) -> int:
@@ -107,17 +107,32 @@ def logprob_one(model, token_ids: list[int], prompt_len: int, pad_id: int, eos_i
     return token_sum_logprob(out.logits, ids, [prompt_len], valid_lens=[len(token_ids)], eos_id=eos_id)[0]
 
 
-def _hidden_entropy(out, chunk_size: int = 64):
-    hiddens = out.hidden_states
+def _token_entropy(out, chunk_size: int = 64):
+    torch = _torch()
     # Bound the FP32 softmax temporary, including the decision-position logit.
     chunks = []
     for start in range(0, out.logits.shape[1], chunk_size):
         logp = out.logits[:, start:start + chunk_size].float().log_softmax(-1)
-        chunks.append((-(logp.exp() * logp).sum(dim=-1)).detach().cpu().numpy())
-    token_ent = np.concatenate(chunks, axis=1)
-    last_seq = hiddens[-1].detach().float().cpu().numpy()
-    mid_seq = hiddens[len(hiddens) // 2].detach().float().cpu().numpy()
-    return last_seq, mid_seq, token_ent
+        chunks.append((-(logp.exp() * logp).sum(dim=-1)).detach())
+    return torch.cat(chunks, dim=1)
+
+
+def _device_features(last_row, mid_row, token_ent, end: int, entropy_start: int, entropy_end: int, length: int, baseline: float):
+    """Reduce on the actor device, preserving the NumPy feature layout and FP64 reductions."""
+    torch = _torch()
+    end = max(min(int(end), last_row.shape[0]), 1)
+    ent = token_ent[entropy_start:entropy_end].to(torch.float64)
+    if ent.numel():
+        stats = torch.stack((ent.mean(), ent.max(), (ent > np.log(2.0)).sum().to(ent.dtype)))
+    else:
+        stats = ent.new_zeros(3)
+    # The original path converted hidden states to FP32, then pooled in NumPy FP64.
+    pooled = last_row[max(end - POOL_LAST, 0):end].float().to(torch.float64).mean(dim=0)
+    return torch.cat((
+        last_row[end - 1].float().to(torch.float64),
+        mid_row[end - 1].float().to(torch.float64),
+        pooled, stats, ent.new_tensor([float(length), float(baseline)]),
+    ))
 
 
 def _features_from_hidden(prefix, last_row, mid_row, token_ent, prompt_len: int, baseline: float, eos_id, feature_mode="legacy") -> tuple[np.ndarray, list[float], np.ndarray]:
@@ -151,7 +166,7 @@ def _features_from_hidden(prefix, last_row, mid_row, token_ent, prompt_len: int,
 
 
 def prefix_feature_bundle(model, prefixes: list[list[int]], prompt_lens, baselines, pad_id: int, eos_id: int | None = None, feature_mode="legacy", batch_size: int = 1) -> dict[str, Any]:
-    """One prefix at a time. A 512×4B logits tensor does not fit beside vLLM."""
+    """Use small forward batches and copy only reduced feature rows to the CPU."""
     torch = _torch()
     stop = pad_id if eos_id is None else eos_id
     feats = []
@@ -161,16 +176,39 @@ def prefix_feature_bundle(model, prefixes: list[list[int]], prompt_lens, baselin
         for start in range(0, len(prefixes), max(1, int(batch_size))):
             batch = prefixes[start:start + max(1, int(batch_size))]
             out, _ids, _mask = actor_forward(model, batch, pad_id, output_hidden_states=True)
-            last_seq, mid_seq, token_ent = _hidden_entropy(out)
+            token_ent = _token_entropy(out)
+            last_seq = out.hidden_states[-1]
+            mid_seq = out.hidden_states[len(out.hidden_states) // 2]
+            rows = []
             for j, prefix in enumerate(batch):
                 i = start + j
-                feat, cost, prompt_feat = _features_from_hidden(
-                    prefix, last_seq[j], mid_seq[j], token_ent[j], int(prompt_lens[i]), float(baselines[i]), stop,
-                    feature_mode=feature_mode,
+                prompt_len = int(prompt_lens[i])
+                cutoff = _cutoff_len(prefix, stop, prompt_len)
+                end = max(min(cutoff, last_seq.shape[1]), 1)
+                if feature_mode == "legacy":
+                    ent_start, ent_end, length = 0, max(end - 1, 1), cutoff
+                elif feature_mode == "response":
+                    ent_start, ent_end = max(prompt_len - 1, 0), end - 1
+                    length = max(cutoff - prompt_len, 0)
+                elif feature_mode == "decision":
+                    ent_start, ent_end = end - 1, end
+                    length = max(cutoff - prompt_len, 0)
+                else:
+                    raise ValueError(f"unknown feature_mode: {feature_mode}")
+                feat = _device_features(
+                    last_seq[j], mid_seq[j], token_ent[j], end, ent_start, ent_end,
+                    length, float(baselines[i]),
                 )
-                feats.append(feat)
-                cost_feat.append(cost)
-                prompt_feats.append(prompt_feat)
+                plen = max(prompt_len, 1)
+                prompt_feat = _device_features(
+                    last_seq[j], mid_seq[j], token_ent[j], plen, 0, max(plen - 1, 1),
+                    plen, float(baselines[i]),
+                )
+                rows.append(torch.stack((feat, prompt_feat)))
+                cost_feat.append([float(cutoff), float(prompt_len), 1.0])
+            reduced = torch.stack(rows).detach().cpu().numpy()
+            feats.extend(reduced[:, 0])
+            prompt_feats.extend(reduced[:, 1])
     return {
         "features": np.stack(feats, axis=0),
         "cost_feat": np.asarray(cost_feat, dtype=np.float64),

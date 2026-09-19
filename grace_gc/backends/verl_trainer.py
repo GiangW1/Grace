@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import atexit
 from pathlib import Path
+import sys
 from typing import Any
 
 import numpy as np
@@ -238,6 +239,44 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
     if getattr(build_vllm_engine, "last", None):
         run.write_json("vllm_engine.json", build_vllm_engine.last)
     engines, extra = make_gpu_engines(actor, llm, tokenizer, cfg, Path(run.root) / "lora")
+    def observed_call(phase, step, action):
+        timer = Timer()
+        try:
+            return action()
+        except Exception as exc:
+            roll = engines.last_rollout or {}
+            failed_attempt = None
+            if phase == "algorithm_step":
+                phases = [("prefix", 1, roll.get("prefix_execution") or {})]
+                phases.extend(("continue", i + 1, item)
+                              for i, item in enumerate(roll.get("continue_execution") or []))
+                for name, index, item in phases:
+                    calls = item.get("generate_calls") or []
+                    if calls and calls[-1].get("status") == "failed":
+                        failed_attempt = {**calls[-1], "phase": name, "phase_call_index": index,
+                                          "generate_call_index": len(calls),
+                                          "request_indices": item.get("request_indices")}
+            payload = {
+                "step": int(step), "phase": phase,
+                "error_type": type(exc).__name__, "error": str(exc),
+                "phase_attempt_wall_seconds": timer.elapsed(),
+                "failed_attempt": failed_attempt,
+                "rollout_execution": {key: roll[key] for key in (
+                    "prefix_execution", "continue_execution", "prefix_num_cached_tokens",
+                    "continue_num_cached_tokens") if key in roll},
+                "last_sync": extra.get("last_sync"),
+                "scope": "Failure observations only; timings remain included in failed-run costs; call indices are one-based",
+            }
+            try:
+                run.write_json("failed_execution.json", payload)
+            except Exception as write_error:
+                note = f"failed_execution.json could not be written: {write_error}"
+                if hasattr(exc, "add_note"):
+                    exc.add_note(note)
+                else:
+                    print(note, file=sys.stderr)
+            raise
+
     from grace_gc.backends.logprob_probe import probe_behavior_batch
 
     engines.before_update = lambda records: probe_behavior_batch(
@@ -246,7 +285,7 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         max_sequences=(cfg.get("diagnostics") or {}).get("probe_sequences", 1),
         include_stopped=bool((cfg.get("diagnostics") or {}).get("probe_stopped_prefixes", True)),
     )
-    extra["sync"]()
+    observed_call("initial_sync", 0, extra["sync"])
     print(
         "phase=post_sync implementation=gpu_vllm_hf "
         f"adapter={extra.get('adapter_path')} lora_id={extra.get('lora_id')} "
@@ -315,7 +354,7 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         from grace_gc.logging_util.forensics import record_effective_config
 
         record_effective_config(run, cfg, state, opt)
-        extra["sync"]()
+        observed_call("resume_sync", state.step, extra["sync"])
         print(
             f"phase=resume_sync adapter={extra.get('adapter_path')} lora_id={extra.get('lora_id')}",
             flush=True,
@@ -374,9 +413,10 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
             f"n_prompts={n_prompts} starts_per={starts_per}",
             flush=True,
         )
-        last = run_algorithm1_step(engines, state, prompts, pids, golds, cfg, opt, prompt_meta=prompt_meta)
+        last = observed_call("algorithm_step", state.step + 1, lambda: run_algorithm1_step(
+            engines, state, prompts, pids, golds, cfg, opt, prompt_meta=prompt_meta))
         sync_timer = Timer()
-        extra["sync"]()
+        observed_call("step_sync", state.step, extra["sync"])
         last["timings"]["sync"] = sync_timer.elapsed()
         last["force_final_checkpoint"] = controller.stop_reason() is not None
         persist_training_step(
@@ -392,6 +432,7 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
                 "lora": dict(cfg.get("lora") or {}),
                 "adapter_path": None if extra.get("adapter_path") is None else str(extra.get("adapter_path")),
                 "lora_id": extra.get("lora_id"),
+                "last_sync": extra.get("last_sync"),
             },
             wall_s=step_timer.elapsed(),
             cpu_s=step_timer.cpu_elapsed(),
