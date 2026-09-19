@@ -2,7 +2,15 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
-## 离线预测器与多卡 rollout 对照（2026-09-19，本轮）
+## 离线对照审查修复（2026-09-19，本轮）
+
+全量 CPU/替身回归：`755 passed, 1 skipped in 95.43s`。命令：`D:\Anaconda\python.exe -m pytest tests -q -o addopts='' --tb=short`。真实 CUDA 项因本机无 GPU 跳过；requests 仍有既有依赖版本警告。
+
+新增10项覆盖两处审查问题：离线目录迁移后续训拒绝决策位置、生成上限和特征模式不兼容；墙钟矩阵的均值、pass、标准差及配对区间使用预算内检查点，同时保留实际结束分数和全部运行费用；预算不足、时间/hash/阶段证据缺失不回退最终分数；最终评测缺失不妨碍有效预算内结果。固定步数模式与原有迁移恢复、归档回归一起通过。上述矩阵记录均为合成数据，不是 GPU 实测。
+
+先以新增用例复现失败，修复后的相关测试得到 `37 passed in 18.67s`，随后补充最终评测缺失场景并完成全量回归。矩阵 CLI 帮助和 `git diff --check` 通过。输出字段说明见 [离线并行对照](OFFLINE_PARALLEL_CONTROL_20260919.md)。
+
+## 离线预测器与多卡 rollout 对照（2026-09-19，首次实现）
 
 最终全量 CPU/替身回归：`745 passed, 1 skipped in 91.68s`，命令 `D:\Anaconda\python.exe -m pytest tests -q -o addopts='' --tb=short`。1项真实 CUDA 测试因本机无 GPU 跳过；requests 有既有依赖版本警告。
 

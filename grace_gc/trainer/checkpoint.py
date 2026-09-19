@@ -215,7 +215,8 @@ def load_checkpoint(path: str | Path) -> dict[str, Any]:
         body = read_predictor(source, reference["sha256"])
         payload["predictor"] = body["predictor"]
         basis["u"] = body["u"]
-        payload["_offline_predictor_source"] = {**reference, "path": str(source.resolve())}
+        payload["_offline_predictor_source"] = {**reference, "path": str(source.resolve()),
+                                                "protocol": body["protocol"]}
     if isinstance(basis, dict) and "u_artifact" in basis:
         basis["u"] = _load_basis_artifact(path.parent, basis["u_artifact"])
     reservoir = payload.get("reservoir")

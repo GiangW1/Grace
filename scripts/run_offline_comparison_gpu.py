@@ -17,7 +17,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from grace_gc.logging_util.run_dir import RunDirectory, resolve_run_dir
-from scripts.summarize_minimal import read_json, read_rows, finite
+from scripts.summarize_minimal import read_json, read_rows, finite, stage_path
+from scripts.summarize_cost_quality import collect_curve, select_at_budget
 from scripts.summarize_seeds import pairing_issues, seed_interval
 
 
@@ -33,9 +34,23 @@ def command_wall(log, stage):
     return sum(row['wall_seconds'] for row in rows)
 
 
+def comparison_evaluation(seed_root, method, row, budget):
+    if budget is None:
+        return {'step':row.get('final_training_step'), 'main_starts':row.get('all_starts'),
+                'avg':row.get('final_avg4'), 'pass_at_k':row.get('final_pass4'),
+                'evaluation_manifest':row.get('evaluation_manifest')}
+    stages = read_json(seed_root/'stages.json').get(method, {})
+    if not stages.get('train'):
+        return None
+    evaluations = [stage_path(seed_root, path) for name, path in stages.items() if name.startswith('eval-')]
+    points = collect_curve(stage_path(seed_root, stages['train']), evaluations, clock='command')
+    return select_at_budget(points, budget)
+
+
 def summarize_matrix(root):
     root = Path(root)
     manifest = read_json(root/'matrix.json')
+    budget = manifest.get('consumer_wall_seconds')
     observations, pairs = [], []
     for seed in manifest.get('seeds', []):
         name = f'seed-{seed}'
@@ -47,15 +62,17 @@ def summarize_matrix(root):
             chain = prep/label
             rows = read_json(chain/name/'comparison.json').get('methods', [])
             methods = {row['method']: row for row in rows}
+            selected = {}
             for method in ('full_pg', 'grace'):
                 row = methods.get(method, {})
+                selected[method] = comparison_evaluation(chain/name, method, row, budget)
                 wall = command_wall(chain/'command_timing.jsonl', f'{name}/{method}/train')
                 copy_wall = command_wall(chain/'command_timing.jsonl', f'{name}/shared-init')
                 offline_wall = fit_wall if method == 'grace' else 0.0
                 parts = (wall, copy_wall, init_wall, offline_wall)
                 complete_cost = all(finite(value) for value in parts)
                 observations.append({'seed':seed, 'hardware':label, 'method':method,
-                    'n_gpu':n_gpu, 'comparison':row or None,
+                    'n_gpu':n_gpu, 'comparison':row or None, 'selected_evaluation':selected[method],
                     'train_process_wall_seconds':wall,
                     'train_process_gpu_seconds':None if wall is None else n_gpu*wall,
                     'shared_actor_load_wall_seconds':copy_wall,
@@ -65,19 +82,26 @@ def summarize_matrix(root):
                     'cold_total_wall_seconds':sum(parts) if complete_cost else None,
                     'cold_total_gpu_seconds':n_gpu*(wall+copy_wall)+init_wall+offline_wall if complete_cost else None,
                     'cost_scope':'shared SFT + shared actor load + RL subprocess + one full offline fit for each hypothetical standalone GRACE run; excludes eval/audits/tests; no amortization assumption'})
-            a, b = methods.get('grace', {}), methods.get('full_pg', {})
-            issues = pairing_issues(seed, a, b)
-            if not all(finite(row.get('final_avg4')) for row in (a,b)):
-                issues.append('final_evaluation_missing')
+            a, b = [selected[method] or {} for method in ('grace','full_pg')]
+            pair_rows = [methods.get(method, {}) for method in ('grace','full_pg')]
+            if budget is not None:
+                # Budget points are verified against their own checkpoint and evaluation.
+                pair_rows = [{**row, 'evaluation_manifest':point.get('evaluation_manifest'), 'source_issues':[]}
+                             for row, point in zip(pair_rows, (a,b))]
+            issues = pairing_issues(seed, *pair_rows)
+            if not all(finite(point.get('avg')) for point in (a,b)):
+                issues.append('final_evaluation_missing' if budget is None else 'no_verified_evaluation_at_or_before_cutoff')
+            if budget is not None and a.get('requested_k') != b.get('requested_k'):
+                issues.append('evaluation_k_mismatch')
             pairs.append({'seed':seed, 'hardware':label, 'issues':issues,
-                          'delta':a['final_avg4']-b['final_avg4'] if not issues else None})
+                          'delta':a['avg']-b['avg'] if not issues else None})
     aggregate = []
     for label in ('one_gpu', 'multi_gpu'):
         deltas = [row['delta'] for row in pairs if row['hardware'] == label and not row['issues']]
         for method in ('full_pg', 'grace'):
-            rows = [row['comparison'] or {} for row in observations if row['hardware'] == label and row['method'] == method]
-            avg = [row['final_avg4'] for row in rows if finite(row.get('final_avg4'))]
-            passes = [row['final_pass4'] for row in rows if finite(row.get('final_pass4'))]
+            rows = [row['selected_evaluation'] or {} for row in observations if row['hardware'] == label and row['method'] == method]
+            avg = [row['avg'] for row in rows if finite(row.get('avg'))]
+            passes = [row['pass_at_k'] for row in rows if finite(row.get('pass_at_k'))]
             aggregate.append({'hardware':label, 'method':method, 'n_evaluated_seeds':len(avg),
                 'avg4_mean':float(np.mean(avg)) if avg else None,
                 'avg4_seed_sd':float(np.std(avg, ddof=1)) if len(avg)>1 else None,
@@ -85,7 +109,9 @@ def summarize_matrix(root):
         aggregate.append({'hardware':label, 'contrast':'grace minus full_pg',
             'mean_delta':float(np.mean(deltas)) if deltas else None, **seed_interval(deltas)})
     result = {'manifest':manifest, 'observations':observations, 'pairs':pairs, 'aggregate':aggregate,
-              'note':'Compare algorithms within the same hardware layout. Warm consumer budgets exclude offline fitting/shared SFT; cold totals add them and are not equal-budget endpoints. Seed intervals use paired training seeds. Missing data are unavailable, never zero.'}
+              'quality_endpoint':'at_budget' if budget is not None else 'final',
+              'quality_clock':'command' if budget is not None else None,
+              'note':'Compare algorithms within the same hardware layout. With a wall budget, quality uses the latest verified evaluated checkpoint available within that budget; actual final scores and full job costs remain separate. Warm consumer budgets exclude offline fitting/shared SFT; cold totals add them and are not equal-budget endpoints. Seed intervals use paired training seeds. Missing data are unavailable, never zero.'}
     RunDirectory(root).write_json('matrix_summary.json', result)
     return result
 

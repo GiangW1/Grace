@@ -20,6 +20,12 @@ def feature_protocol(cfg):
             "baseline": baseline_from_config(cfg.get("baseline")).configuration()}
 
 
+def check_feature_protocol(protocol, cfg):
+    for key, value in feature_protocol(cfg).items():
+        if protocol.get(key) != value:
+            raise ValueError(f"offline predictor {key} does not match the consumer")
+
+
 def export_predictor(checkpoint, directory):
     from grace_gc.trainer.checkpoint import load_checkpoint, save_checkpoint
     payload = load_checkpoint(checkpoint)
@@ -60,6 +66,7 @@ def read_predictor(path, digest=None):
 def attach_predictor(state, cfg, run):
     """A resume uses the checkpoint's local dependency, never an obsolete donor path."""
     if state.offline_predictor is not None:
+        check_feature_protocol(state.offline_predictor['protocol'], cfg)
         state.u.setflags(write=False)
         state.offline_predictor['basis_sha'] = sha256_array(state.u)
         return
@@ -69,10 +76,7 @@ def attach_predictor(state, cfg, run):
         raise ValueError("offline_predictor requires a predictor method")
     path = Path(str(cfg["offline_predictor"]).format(seed=state.rng.seed)).resolve()
     body = read_predictor(path)
-    protocol = feature_protocol(cfg)
-    for key in protocol:
-        if body["protocol"].get(key) != protocol.get(key):
-            raise ValueError(f"offline predictor {key} does not match the consumer")
+    check_feature_protocol(body['protocol'], cfg)
     raw, u = body["predictor"], np.asarray(body["u"], dtype=np.float64)
     if (u.shape != (state.layout.dim, state.predictor.k)
             or int(raw["in_dim"]) != state.predictor.in_dim
@@ -90,7 +94,7 @@ def attach_predictor(state, cfg, run):
     state.reservoir.fixed_basis_id = None
     state.u.setflags(write=False)
     state.offline_predictor = {"path": str(path), "sha256": sha256_file(path),
-                               "basis_sha": sha256_array(state.u)}
+                               "basis_sha": sha256_array(state.u), "protocol": body["protocol"]}
     run.write_json("offline_predictor.json", {**state.offline_predictor, "source": body["source"],
         "frozen": True, "offline_cost": "source training/export costs are additional; not included in consumer training wall"})
 

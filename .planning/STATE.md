@@ -13,6 +13,7 @@ status: in-progress
 - 本地分支：`codex/grace-efficiency-20260919`；`f20506e` 为在线固定 U 功能，`f1aa568` 为此前知识收尾。本轮追加离线预测器及多卡 rollout 对照，详见 [实施记录](../docs/OFFLINE_PARALLEL_CONTROL_20260919.md)。
 - 修复已通过 fork 提交 [PR #2](https://github.com/GiangW1/Grace/pull/2)，核对时为 OPEN、未合并；未观察到 CI 检查结果。不能把 PR 发布当作服务器已部署或实测。
 - 后端为 HF actor + vLLM 两阶段；原在线固定 U 变体保留。新增完全冻结预测器、单 actor＋n_gpu−1 个 rollout worker，要求 TP=1。未实现多卡 actor。
+- `dbf66c6` 的后续审查发现两处问题，现已修复：墙钟矩阵使用预算内检查点统计；离线续训复用 artifact 协议校验。新增10项回归，全量 `755 passed, 1 skipped`；本次修复沿用 PR #2 对应分支，详见 [测试记录](../docs/TEST_STATUS.md)。
 
 ## 实验与测试
 

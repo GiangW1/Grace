@@ -87,6 +87,23 @@ def test_offline_rejects_wrong_feature_protocol(donor, tmp_path, options, field)
         loop.run_training(merge_configs(cfg, {'offline_predictor':str(artifact), **options}), tmp_path/'wrong')
 
 
+@pytest.mark.parametrize('options,field', [({'decision_tokens':3}, 'decision_tokens'),
+    ({'max_new_tokens':6}, 'max_new_tokens'),
+    ({'predictor':{'feature_mode':'decision'}}, 'feature_mode')])
+def test_offline_resume_rejects_changed_protocol_after_move(donor, tmp_path, options, field):
+    from grace_gc.predictor.offline import export_predictor
+    cfg, source = donor
+    artifact = export_predictor(source/'checkpoint.npz', tmp_path/'artifact')
+    offline = merge_configs(cfg, {'num_steps':1, 'offline_predictor':str(artifact)})
+    loop.run_training(offline, tmp_path/'consumer')
+    moved = tmp_path/'moved'
+    shutil.copytree(tmp_path/'consumer', moved)
+    artifact.unlink()
+    resumed = merge_configs(offline, {**options, 'resume':str(moved/'checkpoint.npz')})
+    with pytest.raises(ValueError, match=f'offline predictor {field}'):
+        loop.run_training(resumed, tmp_path/'invalid-resume')
+
+
 def test_fit_uses_only_calibration_and_deployment_beta(donor, tmp_path):
     from scripts.train_offline_predictor import fit_offline
     from grace_gc.predictor.offline import read_predictor

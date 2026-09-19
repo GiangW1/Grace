@@ -11,7 +11,7 @@
 | 采集与校准 | 整个离线拟合处于完整续写 warmup，审计概率为 1。部署的 beta 保留用于 holdout γ 校准；不把采集的 p=1 当成部署设计。固定 actor 下停用策略年龄淘汰/衰减。最后冻结 U。 |
 | 推理 artifact | `predictor-<内容 hash>.npz` 保存 U、坐标/风险/成本头、scaler、γ、basis/sync ID、特征/LoRA/模型协议及来源 hash；不带 actor、actor 优化器、reservoir 或预测器优化器状态。 |
 | 完全离线消费 | `train.py --offline-predictor PATH` 同时支持 CPU 与 GPU。在线不收集监督、不生成 fresh、不更新 U/heads/scaler/γ；仍按完整空间 HT/CV 更新 actor，停止者 reward 为 null。普通在线 GRACE 入口保留。 |
-| 恢复与归档 | checkpoint 引用同目录 artifact；保存时复制依赖并校验字节 hash，避免重复压缩/解压 U。迁移完整目录后可续训，不依赖旧 donor 路径。显式归档 checkpoint 会带上 artifact。离线 U 只读，日志复用加载时计算的 U hash。 |
+| 恢复与归档 | checkpoint 引用同目录 artifact；保存时复制依赖并校验字节 hash，避免重复压缩/解压 U。迁移完整目录后可续训，不依赖旧 donor 路径。续训与首次加载共用协议校验，拒绝不兼容的决策位置、生成上限或特征语义；复用加载时取得的协议，不额外解压 U。显式归档 checkpoint 会带上 artifact。离线 U 只读，日志复用加载时计算的 U hash。 |
 | 多卡训练 | `rollout.workers=n_gpu-1`：第一张可见卡放 HF actor，其余卡各一个独立 TP=1 的 vLLM worker，使用 spawn 隔离进程。Full-PG 与 GRACE 复用相同并行入口。 |
 | 请求及同步 | 父进程集中抽请求 seed、决定 p/Z/global N，worker 只生成。前缀与选中的续写分片并发，结果按原顺序还原。LoRA 保存一次后在所有 worker 同步加载、清空旧缓存，完成后才能继续。 |
 | 故障及费用 | worker 异常/退出、同步返回失败与输出数量错误会报出，不能混用部分 snapshot。记录分片索引、worker RPC 时间、兼容回退尝试，时间已在父阶段内，不能再相加。退出时关闭本任务的 worker。 |
@@ -41,6 +41,7 @@ python scripts/run_offline_comparison_gpu.py \
 ## 成本与输出解释
 
 - `matrix_summary.json` 保留四组逐 seed 结果、主 starts/步数、avg@4 均值与 seed 标准差、同硬件 GRACE−Full-PG 的配对 seed 区间；初始化或评测协议证据缺失时保留观测，不生成有效配对结论。
+- `quality_endpoint=at_budget` 时，均值、标准差及配对区间来自 `selected_evaluation`：按命令起点时钟选择预算内最后可用且已评测的检查点，并核对来源、hash 和评测协议。任意步数的评测从 `stages.json` 读取；缺失有效预算证据时输出 null，不回退到结束分数。原始 `comparison.final_*` 和完整实际费用继续保留。固定步数模式为 `quality_endpoint=final`，使用实际结束分数。
 - 训练 subprocess 墙钟含启动、加载、检查点和退出；GPU 秒按该运行配置使用的卡数乘墙钟，包含角色空闲时间，并非硬件利用率积分或云账单。
 - cold 总成本额外计入共享 SFT、共享 actor 加载和一次完整离线拟合。每个假设独立部署的 GRACE 都计一次拟合；实际四组实验只拟合一次，不能把各组 cold 假设总计再次当成真实实验总费。
 - 拟合内部 `offline_summary.json` 还记录数据准备、训练、导出范围；主报告采用外层 subprocess 实测时间，包括进程启动/退出。不要把两层时间相加。
