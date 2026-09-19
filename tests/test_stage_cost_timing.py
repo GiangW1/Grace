@@ -18,6 +18,7 @@ def test_stage_envelope_includes_setup_and_result_or_failure_persistence(
     from grace_gc.audit import batch_audit, run
     from grace_gc.evaluation import generate
     from grace_gc.trainer import checkpoint
+    from grace_gc import versions
 
     module = generate if stage == "eval" else batch_audit if stage == "batch_audit" else run
     kind = "audit" if stage == "audit_empty" else stage
@@ -82,6 +83,7 @@ def test_stage_envelope_includes_setup_and_result_or_failure_persistence(
     monkeypatch.setattr(module, "resolve_run_dir", resolve_run_dir)
     monkeypatch.setattr(module, "collect_environment", collect_environment)
     monkeypatch.setattr(checkpoint, "load_checkpoint", load_checkpoint)
+    monkeypatch.setattr(versions, "sha256_file", lambda path: "checkpoint-hash")
     monkeypatch.setattr(run, "load_checkpoint", load_checkpoint)
     monkeypatch.setattr(batch_audit, "load_checkpoint", load_checkpoint)
     monkeypatch.setattr(RunDirectory, "write_json", measured_write)

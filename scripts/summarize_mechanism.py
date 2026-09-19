@@ -47,6 +47,36 @@ def training_costs(train, steps, summary, main_rows=None):
     endpoint = summary.get("step", (summary.get("summary") or {}).get("step"))
     all_steps_recorded = bool(steps) and endpoint is not None and len(step_ids) == len(steps) and step_ids == set(range(1, int(endpoint)+1))
     zero_evidence = []
+    config_path = train/"effective_config.yaml"
+    config = _config(config_path if config_path.is_file() else train/"config.yaml")
+    prescan_samples = (config.get("baseline") or {}).get("prescan")
+
+    def auxiliary_matches_step_facts(key, rows, selected_steps):
+        by_step = {}
+        for row in rows:
+            by_step.setdefault(row.get("step"), []).append(row)
+        for step in selected_steps:
+            recorded = by_step.get(step["step"], [])
+            if key == "prescan_tokens":
+                count = step.get("n_prescan")  # Number of unseen problems, not answers.
+                if not finite(count):
+                    continue  # Legacy logs without this fact retain their observed sums.
+                if count == 0 and recorded:
+                    return False
+                if finite(prescan_samples) and len(recorded) != count * prescan_samples:
+                    return False
+                if all(row.get("problem_id") is not None for row in recorded):
+                    groups = Counter(row["problem_id"] for row in recorded)
+                    if len(groups) != count or (finite(prescan_samples) and any(n != prescan_samples for n in groups.values())):
+                        return False
+            else:
+                fact = ((step.get("predictor") or {}).get("fresh_supervision") or {})
+                if finite(fact.get("n")) and len(recorded) != fact["n"]:
+                    return False
+                tokens = [_response_tokens(row, False) for row in recorded]
+                if finite(fact.get("generated_tokens")) and all(finite(n) for n in tokens) and sum(tokens) != fact["generated_tokens"]:
+                    return False
+        return True
 
     def proves_zero(key, selected_steps):
         if key == "prescan_tokens":
@@ -79,6 +109,9 @@ def training_costs(train, steps, summary, main_rows=None):
                         zero_evidence.append(scope+"."+key)
                     else:
                         target[key] = None
+                if not auxiliary_matches_step_facts(key, rows, selected_steps):
+                    target[key] = None
+                    issues.append(scope+"."+filename+"_inconsistent_with_step_facts")
         if not complete:
             issues.append(filename+"_missing_or_incomplete_token_evidence")
     if not all_steps_recorded:
@@ -98,7 +131,7 @@ def training_costs(train, steps, summary, main_rows=None):
         all(finite(row.get("last_batch_wall_seconds")) for row in boundaries)) else None
     return {"all_training": all_cost, "post_warmup": active_cost, "issues": issues,
             "zero_proven_by_complete_step_facts": zero_evidence,
-            "scope": "Generated response tokens from main/prescan/fresh logs; excludes shared or in-entry SFT tokens. Absent auxiliary rows become zero only when every completed step in that range records zero generation (n_prescan=0; fresh n=0 and generated_tokens=0), never from configuration alone; otherwise missing evidence remains null. Total training wall is the cumulative run envelope (ledger fallback), including setup, auxiliary computation and persistence, not a sum of token proxies. Post-warmup wall sums recorded complete batch boundaries including persistence; unassigned setup/failure tails are not allocated to it."}
+            "scope": "Generated response tokens from main/prescan/fresh logs; excludes shared or in-entry SFT tokens. Absent auxiliary rows become zero only when every completed step in that range records zero generation (n_prescan=0; fresh n=0 and generated_tokens=0), never from configuration alone; otherwise missing evidence remains null. Present auxiliary rows are checked against recorded problem/sample counts and fresh token totals when available; prescan sample counts also use the saved configuration. Legacy logs lacking these count fields retain observed sums, without claiming independent completeness certification. Total training wall is the cumulative run envelope (ledger fallback), including setup, auxiliary computation and persistence, not a sum of token proxies. Post-warmup wall sums recorded complete batch boundaries including persistence; unassigned setup/failure tails are not allocated to it."}
 
 
 def _evaluation_evidence(train, source_train, final_path, final, summary, config, steps):

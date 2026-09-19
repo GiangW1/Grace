@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import subprocess
 import time
@@ -31,7 +32,8 @@ def measure_command(command, log, stage):
     start = time.monotonic()
     code, error = None, None
     try:
-        code = subprocess.run(command, check=False).returncode
+        env = {**os.environ, "GRACE_COMMAND_START_MONOTONIC": str(start)}
+        code = subprocess.run(command, check=False, env=env).returncode
         return code
     except BaseException as exc:
         error = type(exc).__name__

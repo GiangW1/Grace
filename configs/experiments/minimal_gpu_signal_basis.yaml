@@ -1,0 +1,4 @@
+# One factor relative to deeper: signed cross-moment basis objective.
+experiment_variant: signal_basis_only
+predictor:
+  basis_variant: predictable_crossfit_signal

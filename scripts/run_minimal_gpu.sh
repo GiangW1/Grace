@@ -67,7 +67,7 @@ for seed in "${seeds[@]}"; do
   common=(--config configs/default.yaml --config configs/experiments/minimal_gpu.yaml
     --config configs/experiments/minimal_gpu_repaired.yaml
     --config "${EXPERIMENT_CONFIG:-configs/experiments/minimal_gpu_deeper.yaml}"
-    --config configs/hardware/a100_1.yaml --backend gpu_verl --model-path "$MODEL" --seed "$seed")
+    --config "${HARDWARE_CONFIG:-configs/hardware/a100_1.yaml}" --backend gpu_verl --model-path "$MODEL" --seed "$seed")
   if [[ -n "${COMMON_CONFIG:-}" ]]; then common+=(--config "$COMMON_CONFIG"); fi
   if [[ -n "${ABLATION_CONFIG:-}" ]]; then common+=(--config "$ABLATION_CONFIG"); fi
   init_args=()
@@ -89,6 +89,15 @@ PY
     --num-steps 0 "${init_args[@]}" --run-dir "$seed_root/shared-init" | tee "$seed_root/logs/shared-init.stdout"
   init_run=$(record_stage shared init "$seed_root/logs/shared-init.stdout")
   wall_budget="${RUN_WALL_SECONDS:-}"
+  if [[ "$comparison_mode" == wall && -n "$wall_budget" ]]; then
+    python - "$seed_root" "$wall_budget" <<'PY'
+import json, sys
+from pathlib import Path
+(Path(sys.argv[1])/"wall_budget.json").write_text(json.dumps({"run_wall_seconds": float(sys.argv[2]),
+    "reference_method": None, "reference_run": None, "source": "explicit",
+    "note": "same requested wall budget; actual batch-boundary overshoot is reported, not hidden"}, indent=2))
+PY
+  fi
   target_step=""
   for method in "${methods[@]}"; do
     budget_args=()
@@ -127,7 +136,15 @@ print(json.load(open(sys.argv[1]))["step"])
 PY
 )
     if [[ " $post_train_stages " == *" eval "* ]]; then
-    for step in 0 20 40; do
+    selected_eval_steps=$(python - "$train_run" "${EVAL_STEPS:-0 20 40}" "$wall_budget" <<'PY'
+import sys
+from scripts.summarize_cost_quality import evaluation_steps
+print(" ".join(map(str, evaluation_steps(sys.argv[1], sys.argv[2], float(sys.argv[3]) if sys.argv[3] else None))))
+PY
+)
+    read -r -a eval_steps <<< "$selected_eval_steps"
+    final_evaluated=false
+    for step in "${eval_steps[@]}"; do
       if [[ ! -f "$train_run/checkpoints/step_$step.npz" ]]; then continue; fi
       measured_python "$method/eval-$step" scripts/evaluate.py --generate "${common[@]}" --method "$method" --data-path "$EVAL_DATA" \
         --checkpoint "$train_run/checkpoints/step_$step.npz" \
@@ -135,9 +152,10 @@ PY
       record_stage "$method" "eval-$step" "$seed_root/logs/$method-eval-$step.stdout"
       if [[ "$step" == "$final_step" ]]; then
         record_stage "$method" eval-final "$seed_root/logs/$method-eval-$step.stdout"
+        final_evaluated=true
       fi
     done
-    if [[ "$final_step" != 0 && "$final_step" != 20 && "$final_step" != 40 ]]; then
+    if [[ "$final_evaluated" != true ]]; then
       measured_python "$method/eval-final" scripts/evaluate.py --generate "${common[@]}" --method "$method" --data-path "$EVAL_DATA" \
         --checkpoint "$train_run/checkpoint.npz" --run-dir "$seed_root/$method/eval-final" \
         | tee "$seed_root/logs/$method-eval-final.stdout"
@@ -177,3 +195,4 @@ PY
   python scripts/summarize_minimal.py "$seed_root"
 done
 python scripts/summarize_seeds.py "$experiment_root"
+python scripts/summarize_cost_quality.py "$experiment_root"

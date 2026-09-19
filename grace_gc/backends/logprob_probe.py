@@ -5,6 +5,65 @@ from __future__ import annotations
 from typing import Any
 
 
+def logprob_error_summary(hf, behavior, token_ids, prompt_len, prefix_tokens=None):
+    """Locate deviations in already computed scores; never rescore or resample."""
+    import numpy as np
+
+    a, b = np.asarray(hf, dtype=float), np.asarray(behavior, dtype=float)
+    if a.shape != b.shape or a.ndim != 1 or len(token_ids) != len(a):
+        raise ValueError("logprob diagnostic positions must align")
+    diff = a-b
+    finite = np.isfinite(a) & np.isfinite(b)
+    def stats(mask):
+        values = diff[mask & finite]
+        return {"n_tokens": int(len(values)), "signed_mean": float(values.mean()) if len(values) else None,
+                "rms": float(np.sqrt(np.mean(values**2))) if len(values) else None,
+                "mean_abs": float(np.abs(values).mean()) if len(values) else None,
+                "absolute_quantiles": dict(zip(("p50", "p90", "p99"), np.quantile(np.abs(values), [.5, .9, .99]).tolist())) if len(values) else {}}
+    result = {**stats(np.ones(len(a), dtype=bool)), "nonfinite_tokens": int((~finite).sum()),
+              "max_error_token": None, "by_phase": {}, "position_base": "zero-based; logit position predicts sequence position"}
+    if finite.any():
+        index = int(np.flatnonzero(finite)[np.argmax(np.abs(diff[finite]))])
+        phase = None if prefix_tokens is None else ("prefix" if index < prefix_tokens else "continuation")
+        result["max_error_token"] = {"response_index": index, "sequence_index": int(prompt_len)+index,
+            "logit_index": int(prompt_len)+index-1, "token_id": int(token_ids[index]), "phase": phase,
+            "hf_logprob": float(a[index]), "behavior_logprob": float(b[index]),
+            "signed_error": float(diff[index]), "absolute_error": float(abs(diff[index]))}
+    if prefix_tokens is not None:
+        prefix = np.arange(len(a)) < int(prefix_tokens)
+        result["by_phase"] = {"prefix": stats(prefix), "continuation": stats(~prefix)}
+    return result
+
+
+def probe_numerics(model, llm, lora_request):
+    """Small metadata only: no tensor copies/hashes or extra engine requests."""
+    result = {"hf_compute_dtype": getattr(model, "_grace_compute_dtype", None),
+              "hf_log_softmax_dtype": "float32", "hf_probe_microbatch_size": 1, "hf_use_cache": False,
+              "hf_training": getattr(model, "training", None),
+              "hf_attention_implementation": getattr(getattr(model, "config", None), "_attn_implementation", None),
+              "hf_parameter_dtypes": [], "lora_parameter_dtypes": [], "active_adapters": None,
+              "lora_configuration": {}, "lora_request": {}, "vllm_dtype": None, "vllm_lora_dtype": None,
+              "scope": "Host metadata; not a vLLM worker tensor hash or kernel equivalence check. Join step with trajectory snapshot_sha for frozen actor provenance."}
+    try:
+        named = list(model.named_parameters()) if model is not None else []
+        result["hf_parameter_dtypes"] = sorted({str(param.dtype) for _, param in named})
+        result["lora_parameter_dtypes"] = sorted({str(param.dtype) for name, param in named if "lora_" in name.lower()})
+        active = getattr(model, "active_adapters", None)
+        result["active_adapters"] = active if isinstance(active, (list, str)) else None
+        for name, config in (getattr(model, "peft_config", None) or {}).items():
+            result["lora_configuration"][str(name)] = {key: getattr(config, key, None) for key in ("r", "lora_alpha", "lora_dropout", "use_rslora", "use_dora")}
+        result["lora_request"] = {key: getattr(lora_request, key, None) for key in ("lora_name", "lora_int_id", "lora_path")}
+        engine = getattr(llm, "llm_engine", None)
+        engine_config = getattr(engine, "vllm_config", None)
+        model_config = getattr(engine_config, "model_config", None) or getattr(engine, "model_config", None)
+        lora_config = getattr(engine_config, "lora_config", None) or getattr(engine, "lora_config", None)
+        result["vllm_dtype"] = None if model_config is None else str(getattr(model_config, "dtype", None))
+        result["vllm_lora_dtype"] = None if lora_config is None else str(getattr(lora_config, "lora_dtype", None))
+    except Exception as exc:
+        result["metadata_error"] = f"{type(exc).__name__}: {exc}"
+    return result
+
+
 def hf_response_logprobs(model, token_ids: list[int], prompt_len: int, pad_id: int, eos_id=None, max_n: int = 64):
     from grace_gc.backends.hf_actor import actor_forward
     from grace_gc.data.tokenize import as_stop_ids
@@ -131,6 +190,7 @@ def compare_hf_vllm_logprob(
                 "vllm_prompt_token_logprobs": b.tolist(),
                 "response_token_ids": list(checked_ids[int(prompt_len):int(prompt_len) + n]),
                 "full_response_checked": n == len(token_ids) - int(prompt_len),
+                "deviation": logprob_error_summary(a, b, checked_ids[int(prompt_len):int(prompt_len)+n], prompt_len),
             }
         )
         return payload
@@ -177,6 +237,11 @@ def _probe_first_completed(model, llm, records, pad_id: int, eos_id=None, lora_r
             out["source"] = "teacher_forced_prompt_logprobs"
         out["problem_id"] = rec.problem_id
         out["timing"] = "before_actor_update"
+        out["prompt_len"] = int(rec.prompt_len)
+        if out.get("status") == "compared":
+            scores = out.get("behavior_token_logprobs", out.get("vllm_prompt_token_logprobs"))
+            out["deviation"] = logprob_error_summary(out["hf_token_logprobs"], scores,
+                out["response_token_ids"], rec.prompt_len, getattr(rec, "prefix_tokens", None))
         out["behavior_logprob_sum"] = rec.rollout_logprob_sum
         if out.get("full_response_checked") and rec.rollout_logprob_sum is not None:
             out["hf_minus_behavior_sum"] = out["hf_sum"] - rec.rollout_logprob_sum
@@ -235,6 +300,10 @@ def probe_behavior_batch(model, llm, records, pad_id, eos_id=None, lora_request=
     counts = {}
     for row in details:
         counts[row["status"]] = counts.get(row["status"], 0) + 1
+    worst = max(compared, key=lambda row: row["max_abs"], default=None)
+    worst_token = None if worst is None else {**worst["deviation"]["max_error_token"],
+        "record_index": worst["record_index"], "problem_id": worst["problem_id"],
+        "observed_scope": worst["observed_scope"], "request_seeds": worst["request_seeds"]}
     return {
         "status": ("no_observed_sequence" if not details else
                    "compared" if len(compared) == len(details) else "partial"),
@@ -246,5 +315,6 @@ def probe_behavior_batch(model, llm, records, pad_id, eos_id=None, lora_request=
         "mean_abs": sum(row["mean_abs"] * row["n_tokens"] for row in compared) / tokens if tokens else None,
         "max_abs": max((row["max_abs"] for row in compared), default=None),
         "full_observed_tokens_checked": bool(details) and all(row.get("full_response_checked", False) for row in details),
+        "numerics": probe_numerics(model, llm, lora_request), "worst_token": worst_token,
         "details": details,
     }

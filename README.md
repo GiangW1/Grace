@@ -122,6 +122,8 @@ bash scripts/run_matched_cost_gpu.sh runs/minimal-matched-wall
 
 每个seed先运行Full-PG参考40步，再将其实际训练时长作为另外三方法的预算，按真实终点保存和评测。批次边界可能超额，报告保留实际耗时、真实步数和停止原因；不会把预算相同当作耗时严格相等。`RUN_WALL_SECONDS` 可显式给共同预算，`MAX_STEPS` 默认10000是步数上限。共享SFT、评测与审计成本另列。
 
+新链还会自动加评预算内最近的已发布checkpoint，输出 `cost_quality.json`，并列模型可用费用、整次作业费用、步数/starts和配对seed统计；`EVAL_STEPS=all` 可评全部保存点，评测费用另记。预算按时间选择，不择优分数；重复评测、缺失证据及跨seed协议冲突保持可见。它是截止前可用模型的事后比较，不是进程恰好按物理截止停止。
+
 `ABLATION_CONFIG=configs/experiments/baseline_prescan16.yaml` 提供baseline样本量对照；跨配置对照可设置 `SHARED_INIT_CHAIN=原链根目录` 复用每个seed的共同actor，并显式使用相同墙钟预算。`EXPERIMENT_CONFIG=configs/experiments/minimal_gpu_repaired.yaml` 可关闭第二轮覆盖，保留第一轮变体。
 
 附件评审吸收的独立对照同样通过`ABLATION_CONFIG`使用：`grace_full_completion.yaml`（全组件p=1）、`grace_no_cv.yaml`（只关闭补全，保留风险模型及辅助开销）、`allocation_uniform_shrink.yaml`（向同预计成本uniform收缩一半）、`baseline_fixed.yaml`（固定b=.5并跳过预扫）、`baseline_smoothed.yaml`（独立预扫加入先验平滑），均位于`configs/experiments/`。这些候选不会自动叠加，尚无GPU收益结论。GRPO/GRPO-short已移除不参与其组均值目标的prescan；批审计增加原始梯度、clip后梯度和Adam步的配对方向/误差，多前缀审计增加全空间基底遗漏与坐标预测误差分解。取舍和命令见[修复说明第6节](docs/GRACE_REMEDIATION_20260918.md#6-grace_reviewmd-的取舍与实现)。
@@ -140,6 +142,8 @@ SEEDS=17 COMMON_CONFIG=configs/experiments/minimal_gpu_signal_candidate.yaml \
 ```
 
 若目录自动加后缀，`SHARED_INIT_CHAIN`使用第一条链`mechanism.json`里的`arms.grace`实际路径。候选收集主反向的完成梯度、取消额外fresh采样、平滑独立prescan，并按留出预测与真实G的交叉矩建基；这些改动尚无新GPU收益证据。p1臂保留预测器开销，不能替代高效Full-PG的性能基线。真正的共同墙钟比较、无prescan消融、六个问题的根因与剩余边界见[本轮实现说明](docs/GRACE_EFFICIENCY_REMEDIATION_20260919.md)。
+
+[完整30项清单](docs/GRACE_ISSUE_CHECKLIST_20260919.md)已更新处理状态。[实现说明§10](docs/GRACE_EFFICIENCY_REMEDIATION_20260919.md#10-继续落实问题清单预算模型定位工具和同组机制统计)提供五份单因素候选、`check_eval_repeatability.py`同checkpoint重复评测、`summarize_training_dynamics.py`逐阶段定位及预算曲线命令。独立LAG现在报告同一前缀双条件联合统计，方差×token附冻结问题簇条件区间；这些工具的CPU通过不等于论文收益已获实证。
 
 作业结束后保留完整检查点归档：
 

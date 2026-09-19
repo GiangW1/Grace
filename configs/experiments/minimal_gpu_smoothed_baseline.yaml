@@ -1,0 +1,5 @@
+# One factor relative to deeper: independent prescan prior; same prescan count.
+experiment_variant: smoothed_baseline_only
+baseline:
+  prescan_prior_strength: 2.0
+  prescan_prior_mean: 0.5

@@ -5,12 +5,23 @@
 ## 本机最近一次结果（2026-09-19）
 
 ```text
-521 passed, 1 skipped in 69.48s
+575 passed, 1 skipped in 80.15s
 ```
 
-命令：`python -m pytest tests -q -o addopts=''`。这是9月19日数据/计时/归档/统计追加修复后的全量CPU回归，比此前471项增加50项；1项CUDA测试因本机无GPU跳过。requests仍报告既有可选依赖版本警告，未影响结果。
+命令：`python -m pytest tests -q -o addopts=''`。这是继续落实30项问题清单后的全量CPU回归，比上一轮521项增加54项；1项CUDA测试因本机无GPU跳过。requests仍报告既有可选依赖版本警告，未影响结果。
 
-本轮新增覆盖：
+本轮继续增加的覆盖：
+
+- `test_checkpoint_availability.py`、`test_cost_quality.py`：发布后时钟、命令起点传递、真实tiny训练→checkpoint→评测→成本曲线，预算按时间选择、重复评测冲突、缺失seed/方法、跨seed题集/硬件/配方与重复seed不混池。
+- `test_minimal_budget_wrapper.py`：真实Git Bash包装器、外层命令计时和汇总器；仅训练/评测子命令为合成替身。验证不含Full-PG的显式预算、自动加评预算内checkpoint、最终别名去重、全保存点评测和硬件配置传递。
+- `test_eval_repeatability.py`、`test_logprob_diagnostics.py`：actor/协议身份、逐token首分歧、串行回退、batch-size对照、失败子进程及数值误差位置/分段；另实际跑通两次全新CPU评测子进程，合成tiny输出逐token一致。
+- `test_lag_joint_evidence.py`、`test_variance_cost_uncertainty.py`：边际均值达标却无联合前缀反例、独立选择、有效配对/缺失分母、整问题簇重采样、原点估计与充分统计一致、零方差抽样不补0。
+- `test_training_dynamics.py`：PG与GRPO分开重算优势、停止者null、零/缺失G、题组与长度、辅助日志缺损和零生成证据；历史四方法原始日志已只读执行。
+- `test_version_metadata.py`：直接读取发行包版本不导入GPU包，以及模块回退/缺失来源。
+
+全量回归后仅将新成本字段改名为明确的“本链初始化+训练费用”（避免复用既有SFT时冒充完整部署费用），并同步文档；相关成本/时钟/包装器18项回归通过。
+
+上一轮新增覆盖：
 
 - `test_training_eval_exclusion.py`：外部评测题在SFT/采样前排除、不同题号/不同金标仍匹配、保留大小写及原split、来源报告不被eval读取覆盖、原文件不修改；过滤删空时仍保存排除证据。
 - `test_stage_cost_timing.py`：20项可控时钟测试，覆盖准备/环境/成功/失败/空prefix路径、结果保存异常只记一次和硬件标签。

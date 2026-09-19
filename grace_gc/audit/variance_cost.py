@@ -51,6 +51,85 @@ def variance_times_cost(
     }
 
 
+def cluster_bootstrap_variance_cost(g, m, p, prefix_cost, suffix_cost, cluster_ids,
+                                    *, samples=1000, seed=17) -> dict:
+    """Conditional percentile interval, resampling whole problems at fixed m/p.
+
+    Small per-problem sufficient statistics preserve every nested path, t and
+    continuation. No refitting/reallocation occurs inside this supplement.
+    """
+    g, m = np.asarray(g, dtype=float), np.asarray(m, dtype=float)
+    p, suffix = np.asarray(p, dtype=float).reshape(-1), np.asarray(suffix_cost, dtype=float).reshape(-1)
+    n = len(g)
+    prefix = np.broadcast_to(np.asarray(prefix_cost, dtype=float), (n,))
+    ids = list(dict.fromkeys(cluster_ids))
+    if g.ndim != 2 or m.shape != g.shape or len(p) != n or len(suffix) != n or len(cluster_ids) != n:
+        raise ValueError("variance-cost bootstrap row dimensions do not match")
+    if int(samples) != samples or samples < 0:
+        raise ValueError("bootstrap samples must be a nonnegative integer")
+    result = {"point_ratio": None, "ratio_ci95": None, "n_rows": n, "n_clusters": len(ids),
+              "cluster_unit": "problem_id", "samples_requested": int(samples), "seed": int(seed),
+              "replicates_drawn": 0, "valid_replicates": 0, "undefined_replicates": 0,
+              "cluster_sufficient_statistics": [], "unavailable_reason": None,
+              "scope": "95% percentile problem-cluster bootstrap of the pooled report-row variance-times-response-token proxy. Assumes sampled problems are exchangeable; all paths/t/continuations of a problem move together. Conditional on frozen actor, predictor, p, fit/report split and observed suffixes; no refitting or reallocation. Not training-seed uncertainty, a fixed-prompt training-batch variance, full-pipeline uncertainty, or GPU savings. Undefined zero-variance/cost draws are counted; finite-draw percentiles are conditional on a defined ratio and can be unstable for few problems."}
+    if not n or not all(np.all(np.isfinite(x)) for x in (g, m, p, prefix, suffix)):
+        result["unavailable_reason"] = "empty_or_nonfinite_report_rows"
+        return result
+    if np.any(p <= 0) or np.any(p > 1):
+        raise ValueError("bootstrap continuation probabilities must be in (0,1]")
+    origin = g[0]
+    clusters = []
+    for pid in ids:
+        ix = np.flatnonzero(np.asarray(cluster_ids) == pid)
+        differences, residual = g[ix] - g[ix[0]], g[ix] - m[ix]
+        local_mean = differences.mean(axis=0)
+        centered = differences - local_mean
+        clusters.append({"problem_id": pid, "n_rows": len(ix),
+                         "mean_centered_g": (g[ix[0]] - origin + local_mean).tolist(),
+                         "within_gradient_m2": float(np.einsum("ij,ij->", centered, centered)),
+                         "sum_extra_variance": float(np.dot(1. / p[ix] - 1., np.einsum("ij,ij->i", residual, residual))),
+                         "sum_full_cost": float(np.sum(prefix[ix] + suffix[ix])),
+                         "sum_actual_cost": float(np.sum(prefix[ix] + p[ix] * suffix[ix]))})
+    result["cluster_sufficient_statistics"] = clusters
+    counts = np.array([row["n_rows"] for row in clusters])
+    means = np.array([row["mean_centered_g"] for row in clusters])
+    within, extras, full_costs, actual_costs = (np.array([row[key] for row in clusters]) for key in
+        ("within_gradient_m2", "sum_extra_variance", "sum_full_cost", "sum_actual_cost"))
+    distances = np.zeros((len(ids), len(ids)))
+    for i in range(len(ids)):
+        difference = means[i + 1:] - means[i]
+        distances[i, i + 1:] = np.einsum("ij,ij->i", difference, difference)
+    distances += distances.T
+
+    def ratios(multiplicity):
+        total = multiplicity @ counts
+        weights = multiplicity * counts
+        # Within/between decomposition avoids subtracting two large moments,
+        # and keeps identical-gradient cluster draws exactly zero-variance.
+        variance = ((multiplicity @ within) / total +
+                    np.einsum("bi,ij,bj->b", weights, distances, weights) / (2. * total ** 2))
+        denominator = variance * (multiplicity @ full_costs) / total
+        numerator = (variance + (multiplicity @ extras) / total) * (multiplicity @ actual_costs) / total
+        return np.divide(numerator, denominator, out=np.full(len(total), np.nan), where=denominator > 0)
+
+    point = ratios(np.ones((1, len(ids))))[0]
+    result["point_ratio"] = float(point) if np.isfinite(point) else None
+    if len(ids) < 2 or samples == 0:
+        result["unavailable_reason"] = "fewer_than_two_problem_clusters" if len(ids) < 2 else "resampling_disabled"
+        return result
+    draws = np.random.default_rng(seed).integers(0, len(ids), size=(int(samples), len(ids)))
+    multiplicity = np.array([np.bincount(draw, minlength=len(ids)) for draw in draws])
+    values = ratios(multiplicity)
+    valid = values[np.isfinite(values)]
+    result.update(replicates_drawn=int(samples), valid_replicates=len(valid),
+                  undefined_replicates=int(samples) - len(valid))
+    if len(valid):
+        result["ratio_ci95"] = np.quantile(valid, [.025, .975]).tolist()
+    else:
+        result["unavailable_reason"] = "no_defined_bootstrap_ratios"
+    return result
+
+
 def fit_eval_split(
     n: int,
     rng: np.random.Generator,

@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import math
+import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -434,7 +437,23 @@ def _append_ledger(run: RunDirectory, ledger: ComputeLedger, n_before: int) -> N
     run.write_json("compute_ledger.json", ledger.summary())
 
 
-def _update_checkpoint_index(run: RunDirectory, step: int, sha: str | None) -> None:
+def checkpoint_availability(cfg):
+    controller = cfg.get("_cost_controller")
+    command_seconds = None
+    raw = os.environ.get("GRACE_COMMAND_START_MONOTONIC")
+    if raw and not cfg.get("resume"):
+        try:
+            value = time.monotonic() - float(raw)
+            command_seconds = value if math.isfinite(value) and value >= 0 else None
+        except ValueError:
+            pass
+    return {"available_at": utc_now(),
+            "available_global_wall_seconds": controller.snapshot()["global_wall_seconds"] if controller else None,
+            "available_command_wall_seconds": command_seconds,
+            "availability_scope": "Checkpoint published, copied and hashed; excludes index publication and subsequent work. Command clock includes launch/setup, is unavailable on resume without complete prior command history."}
+
+
+def _update_checkpoint_index(run: RunDirectory, step: int, sha: str | None, availability=None) -> None:
     path = run.root / "checkpoints.json"
     data: dict[str, Any] = {"steps": []}
     if path.is_file():
@@ -443,7 +462,8 @@ def _update_checkpoint_index(run: RunDirectory, step: int, sha: str | None) -> N
         except json.JSONDecodeError:
             data = {"steps": []}
     steps = [row for row in data.get("steps", []) if int(row.get("step", -1)) != int(step)]
-    steps.append({"step": int(step), "path": f"checkpoints/step_{step}.npz", "sha256": sha})
+    steps.append({"step": int(step), "path": f"checkpoints/step_{step}.npz", "sha256": sha,
+                  **(availability or {})})
     steps.sort(key=lambda row: int(row["step"]))
     run.write_json(
         "checkpoints.json",
@@ -487,7 +507,7 @@ def _publish_snapshot(run, cfg, state, actor_named, optimizer, actor_full=None, 
     hash_timer = Timer()
     sha = sha256_file(step_path)
     timings.update(hash_wall_seconds=hash_timer.elapsed(), hash_cpu_seconds=hash_timer.cpu_elapsed())
-    _update_checkpoint_index(run, int(state.step), sha)
+    _update_checkpoint_index(run, int(state.step), sha, checkpoint_availability(cfg))
     cfg["_last_saved_step"] = int(state.step)
     cfg["_last_checkpoint_sha"] = sha
     return timings, sha

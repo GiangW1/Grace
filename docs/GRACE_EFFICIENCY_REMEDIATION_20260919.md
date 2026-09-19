@@ -183,7 +183,7 @@ Full-PG先提供实际预算，GRACE按共同预算跑；包括训练入口后�
 
 | 表 | 真正需要比较的量 | 不能混用的口径 |
 |---|---|---|
-| 同算力质量 | 相同设备/外部负载与请求预算，各seed实际完整成本、步数、starts、终点评测和配对seed区间 | 请求40分钟不等于物理恰好40分钟；当前按完整batch停止，会有overshoot，CLI/退出另有成本。必须展示实际成本，超额不可忽略时不能声称严格同算力。当前没有自动选择物理截止前checkpoint的功能。 |
+| 同算力质量 | 相同设备/外部负载与请求预算，各seed实际完整成本、步数、starts、终点评测和配对seed区间 | 请求40分钟不等于物理恰好40分钟；当前按完整batch停止，会有overshoot，CLI/退出另有成本。§10已增加预算内已发布checkpoint选择和实际完整费用并列；这是事后可用模型比较，不能宣称进程恰好在截止时停止。 |
 | 端到端成本 | 增量RL、共同SFT费用加回后的单方法成本，以及实际整链成本分列；所有主/辅助生成、拟合、同步、保存、失败均记账 | 同墙钟可以因更多更新而生成更多token；同40步也可能N不同。不能同时把固定工作量净节省要求强加到固定时间吞吐表，更不能仅看停止比例。 |
 | 估计器收益 | 相同冻结状态、N、t、baseline、采样概率下GRACE对m0；同成本uniform；完整空间方差及token成本代理 | 在现有HT/CV设计下，完整梯度方差之外还有非负抽样项；补全应降低相对m0的额外项。表中Var=1.05等不是低于Full-PG单样本方差，而是方差×成本折中。token代理优于1也不等于GPU提速。 |
 | LAG与补全机制 | 相同checkpoint、t、horizon、baseline、题/路径集合和独立report协议下成对的ρ与联合事件；同时报告全体、筛选和有效分母 | 1.3408与.5333来自不同集合，不能拼成一对。联合率不能由两条总体均值推出；“未观测到联合成立”不等于真实概率为0。非零比例、γ或realized-G覆盖不能替代留出残差及效率。 |
@@ -214,3 +214,96 @@ Full-PG终点avg@4仍为0.712890625，GRACE仍为0.705078125，其余方法/阶�
 复判环境为math-verify 0.9.0、SymPy 1.14.0、NumPy 1.26.4，耗时601.0秒（本机评分复核时间，不是GPU训练成本）。当前reward源码与包内版本逐行一致；旧环境只记录present-no-version，不能独立证明依赖版本完全相同。这是同协议当前实现的完整一致性复核，不替代人工独立数学真值，也不能排除评分器的共同偏差；未扩展到训练/audit续写。
 
 本机完整报告和逐条证据保存在 `_minimal_review_20260918_063159/reward_rejudge_20260919*`，未加入Git；其中 `.md` 含12组对照表，`.json` 记录输入hash/环境，`_answers.jsonl` 为逐答案旧新结果，`_issues.json` 的差异/错误列表均为空。
+
+## 10. 继续落实问题清单：预算模型、定位工具和同组机制统计
+
+本节建立在 `29aaefd` 上。没有新的GPU训练，没有强制开启γ，也没有调整奖励、优势公式、停止者null、parse rate或既有ρ曲线来追求目标数字。
+
+### 10.1 同真实成本的模型选择（P19/P22/P28）
+
+旧checkpoint保存的是写盘前的内部时钟，不能据此判断模型何时可用于评测。现在 `checkpoints.json` 为每步保存记录增加写盘、最新副本复制及hash完成后的可用时刻；命令包装器把自身单调时钟起点传给训练子进程，包含启动和准备。内部训练入口时钟另存，不能无声替代外层命令时钟。索引自身发布和后续费用仍在完整命令账本中；续训缺少累计外层命令历史时该字段留null。
+
+`scripts/summarize_cost_quality.py` 输出 `cost_quality.json`：
+
+- 每个已评测checkpoint的分数、hash、可用费用、步数和完整步日志可核验的主starts。
+- 每个预算内最近的有效checkpoint；按时间选，不能择优分数、插值或默认采用超时终点。缺来源/hash/时钟、协议变化保持原值并列出问题。
+- 预算点跨seed的avg/pass/步数/starts/费用均值与SD，以及GRACE对各对照的配对seed差和Student-t区间。缺失seed/方法保留，核对实际seed；不同题集、硬件或已存训练配方不混入一个均值/区间。跨seed允许训练与引擎seed及起始checkpoint路径变化，不要求各seed SFT actor相同。单seed不能产生有效训练seed区间。
+- 同一checkpoint多个不同目录的重复评测不自动挑一次或择高值；原始点保留并标注，先用重复评测工具解释它们。最终别名指向同一目录不重复计入。
+- 指定目标精度时给出**已观察到的最早越线模型**，不是精确越线时间、持续达到目标或验证集调参许可。应预先确定目标；探索后选择须如实标明。
+- 整次作业实际命令费用、内部训练费用、本链共同初始化费用及本链初始化+训练之和分列。若通过SHARED_INIT_CHAIN导入既有SFT，本链只支付导入费用，原SFT费用需从源链另列，不能把该和当完整部署费用。不能把预算后工作免费抹掉；eval/audit成本另有命令账本，不与内部envelope重复相加。
+
+主链默认保留0/20/40与实际终点评测，并在wall模式加评预算内最近的已保存模型。`EVAL_STEPS=all` 可评全部保存点；全部评测收费。`HARDWARE_CONFIG` 可选择项目已有单卡硬件配置，多卡限制不变。
+
+```bash
+SEEDS="17 23 41" RUN_WALL_SECONDS=2400 EVAL_STEPS=all \
+bash scripts/run_matched_cost_gpu.sh runs/deeper-wall-2400 full_pg grace uniform_cv grpo
+
+# 对已完成的新链可查询多个预算；稀疏保存点的实际用时一并输出。
+python scripts/summarize_cost_quality.py runs/deeper-wall-2400 \
+  --budgets 1200 1800 2400 --target-avg 0.75
+```
+
+启动/退出、保存间距、超时完整批仍使实际费用不严格相等。该实现让偏差可见，并提供物理截止前确实已有的模型；它不把旧9/18链补造为40分钟公平实验。旧链缺可用时钟/hash时曲线只能保留未核实原分数。
+
+### 10.2 重复评测与HF/vLLM定位（P20/P29/P16）
+
+新增 `scripts/check_eval_repeatability.py`，既能只读比较现有目录，也能对同一checkpoint启动多个全新evaluate子进程。核对已记录actor身份、seed、题集、评测协议、模型/tokenizer/引擎配置、依赖及运行环境；逐样本报告token hash、首处分歧、长度、chunk与串行回退差异。batch size变化标为单因素对照，不能冒充同协议重复。子进程参数、日志、完整费用和失败结果保留。
+
+```bash
+python scripts/check_eval_repeatability.py compare EVAL_A EVAL_B --run-dir runs/eval-compare
+python scripts/check_eval_repeatability.py repeat --config TRAIN_RUN/config.yaml \
+  --backend gpu_verl --checkpoint TRAIN_RUN/checkpoint.npz --data-path "$EVAL_DATA" \
+  --model-path "$MODEL" --seed 17 --repeats 2 --batch-sizes 1 4 \
+  --run-dir runs/eval-repeatability
+```
+
+新评测记录checkpoint文件hash、checkpoint actor内容身份及GPU加载HF LoRA的数值配置。已有probe复用已经计算的逐token分数，补充有符号差、RMS、分位数、最差token/序列位置、prefix/continuation分段，以及HF精度/attention/LoRA和vLLM主机元数据；不额外生成或用诊断数值改变p、奖励和梯度。
+
+`collect_versions` 优先读取安装包元数据，可记录math-verify具体版本，避免只为查版本导入vLLM等包；没有distribution元数据时才回退到模块属性。来源一并记录。安装版本信息不是GPU依赖实际可执行的证明，CUDA环境检查仍保留。
+
+本机真实CPU两次独立评测子进程已跑通，合成tiny模型逐token相同；历史9/18初始评测再次只读比较仍是512对中374对token序列不同。两者都**不是GPU重复性已经解决**的证据。完整base权重和vLLM worker内张量未独立hash，kernel或批处理影响仍需服务器单因素定位。
+
+### 10.3 同组LAG与审计不确定性（P23/P08/P25）
+
+`independent_report.joint_lag` 新增逐前缀成对ρ及联合事件：同一checkpoint、位置、detect/report划分和report行索引，保留梯度/奖励分子分母、选择状态、缺失原因。按位置报告全部、可拆分、selected、有效配对、联合成立的数量，以及前缀联合比例、题均联合比例和同一有效集合的两项ρ均值。空集/无效分母留null；默认分析目标ρL≤.5、ρA≥.8可通过 `analysis.joint_lag` 改统计阈值，不影响训练运行。
+
+原有headline及ρ平均保持原样，汇总同时透传新的独立统计。CPU反例确认“两条总体均值各自达标，但没有任何一个前缀同时达标”确实可能，故不能再由边际均值推联合率。前缀共享题目，不给它们套独立Bernoulli置信区间。
+
+`variance_cost_uncertainty` 增加冻结审计数据上的整问题簇bootstrap，整个问题的路径、位置和续写一起重采样，保留可复算充分统计量、区间及未定义抽样次数。默认1000次、seed17，可用 `analysis.variance_cost_bootstrap` 调整；0仅关闭重采样。它假设问题可交换，不重拟合预测器/分配器，不是训练seed区间、固定题批方差、完整算法不确定性或GPU效率区间。问题少或无方差的重采样会不稳定，原样报告。
+
+本轮还实际复算了9/18 GRACE训练口径原始bundle：原path split完全一致，方差×token比 **1.1372756571** 精确重现。60条report行来自11个问题簇；1000次整问题重采样中965次比值有效、35次未定义，有限抽样条件下的percentile95区间为 **[1.09251,1.16293]**。同组LAG在t=512、horizon=2048时仅选中1个前缀，其4条report续写得到ρL=.45560、ρA=.53333，联合为0/1。没有新GPU运行，没有重建U或加载缺失权重，也没有把缺失多位置审计混入；完整来源及限制保存在 `_minimal_review_20260918_063159/lag_vc_supplement_20260919.json`。它继续支持“这份冻结审计尚未获益”，不能推广为完整训练显著失败或总体联合概率为0。
+
+### 10.4 基线退化及标签供应的逐轨迹复核（P17/P02/P03）
+
+新增 `scripts/summarize_training_dynamics.py`，按step×problem和warmup/正式阶段汇总，不重判答案。PG检查R−b，GRPO检查同组均值；停止者奖励、缺失G、单完成者组方差、截断、clip/参数更新及辅助生成均按真实可观测字段处理，缺失不补0。示例：
+
+```bash
+python scripts/summarize_training_dynamics.py FULL_PG_TRAIN GRACE_TRAIN UNIFORM_CV_TRAIN GRPO_TRAIN \
+  --output runs/training_dynamics.json
+```
+
+已对9/18日志实际执行，详细JSON及中文分析保存在本机 `_minimal_review_20260918_063159/training_dynamics_20260919.*`，未提交原始实验目录：
+
+- 160步、1308 starts、1257完成者的优势关系一致；51停止者reward均null。四方法题组顺序相同、每法160题无跨批重访，但前20步starts分别144/260/168/252，采样暴露不同。
+- GRACE的46条主审计标签仅10条非零，40条fresh仅15条非零；与86条中61条零G一致。最终fit10条仅2条非零仍是实际限制。
+- UCV在第11–20步已有27/40零优势及9/40截断；正式阶段29/53完成者截断，均长1512.75。前20步尚无停止/CV，因此其早期退化不能归因于补全。
+- GRPO每题实际3–4 starts，111/160组全零优势；没有group=1接线bug，后程也不是完全无信号。
+- 23个当前批梯度精确0的步中22个仍有参数更新，符合Adam历史状态可能继续产生更新的机制；没有optimizer原件，不能把它直接判成bug或确定动量的贡献。
+
+另修复 `summarize_mechanism.training_costs` 的可复现边界错误：辅助JSONL仅存部分条目时，原代码可能把可读token之和当完整费用。现在按逐步prescan题数×已存配置采样数、fresh条数/token事实核对，缺损留null并说明。历史9/18辅助日志在本次检查中完整；这个修复不能解释历史质量退化。
+
+### 10.5 把组合候选拆成可归因的实验（P02/P03/P04/P06/P14/P18）
+
+已有signal/cost组合候选继续保留；新增五份单因素配置，均叠在deeper之后：
+
+| 配置文件 | 改动 | 要回答的问题 |
+|---|---|---|
+| `minimal_gpu_audit_all.yaml` | 主完成轨迹audit_s=1 | 多标签收益能否覆盖拷贝、存储和拟合费用？ |
+| `minimal_gpu_no_fresh.yaml` | fresh_samples_per_problem=0 | 取消额外生成后是否仍有足够当前策略监督？ |
+| `minimal_gpu_signal_basis.yaml` | 交叉矩正谱建基 | 可预测方向是否改善独立残差，而不只是预测幅度？ |
+| `minimal_gpu_smoothed_baseline.yaml` | 相同4次prescan加入先验 | 增加非零优势是否带来有效信号而非噪声？ |
+| `minimal_gpu_fixed_baseline.yaml` | b=.5且无prescan | 辅助成本下降能否补偿baseline精度损失？ |
+
+例如 `SEEDS=17 COMMON_CONFIG=configs/experiments/minimal_gpu_audit_all.yaml bash scripts/run_mechanism_gpu.sh runs/audit-all`。四机制臂使用同一候选、固定N和共享actor。跨配置比较时用 `SHARED_INIT_CHAIN=已有链路径` 引用经过数据隔离的同一共享起点，并记录初始化导入费用；不要把不同SFT起点的差当配置效应。先保留单因素及原设置，组合优选依据开发证据并明确记录；最终论文评测须独立，不能反复按测试集挑配方。
+
+这些是可运行、可审计的候选，未获得GPU改善结果。若独立留出残差、同p的m0消融、净成本和同时间质量不能共同改善，论文核心主张仍然缺乏支持；代码完备不能保证自然数据中存在足够可预测的梯度信号。

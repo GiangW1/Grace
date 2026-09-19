@@ -291,7 +291,7 @@ def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, 
         ckpt = cfg.get("checkpoint") or cfg.get("resume")
         if not ckpt:
             raise ValueError("GPU evaluation needs a training checkpoint")
-        from grace_gc.backends.hf_actor import named_lora_params
+        from grace_gc.backends.hf_actor import actor_numerics, named_lora_params
         from grace_gc.backends.verl_trainer import build_vllm_engine, load_lora_actor
         from grace_gc.backends.weight_sync import apply_lora_request, make_lora_request, reset_vllm_prefix_cache, save_lora_adapter
         from grace_gc.data.tokenize import load_hf_tokenizer, tokenizer_inventory
@@ -315,6 +315,7 @@ def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, 
             "checkpoint": str(ckpt), "checkpoint_step": payload.get("step"),
             "method": payload.get("spec"), "actor_sha256": sha256_named(named_lora_params(actor)),
             "hash_stage": "loaded_checkpoint_before_generation", "layout": "all_qv_lora_A_B",
+            "numerics": actor_numerics(actor),
         }
         adapter = Path(run_dir) / "eval_lora"
         save_lora_adapter(actor, adapter)
@@ -369,8 +370,14 @@ def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path
         ckpt = cfg.get("checkpoint") or cfg.get("resume")
         if ckpt:
             from grace_gc.trainer.checkpoint import load_checkpoint
+            from grace_gc.versions import sha256_file, sha256_mapping
 
             payload = load_checkpoint(ckpt)
+            checkpoint_sha256 = sha256_file(ckpt)
+            actor_state = payload.get("actor_full") if backend == "cpu_tiny" else payload.get("actor")
+            checkpoint_identity = {"actor_state_sha256": sha256_mapping(actor_state),
+                "scope": "checkpoint_all_tiny_parameters" if backend == "cpu_tiny" else "checkpoint_lora_only",
+                "note": "Hash of checkpoint tensors before loading; GPU loaded HF LoRA hash is in actor_source.json. Does not hash full GPU base weights or vLLM worker tensors."}
             cfg["method"] = payload.get("spec") or cfg.get("method", "grace")
         n_source = len(records)
         math500 = looks_like_math500(records, path=cfg.get("data_path"), n_source=n_source)
@@ -399,6 +406,8 @@ def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path
             result["seed"] = int(cfg.get("seed", 17))
             result["checkpoint"] = cfg.get("checkpoint") or cfg.get("resume")
             result["checkpoint_step"] = payload.get("step") if ckpt else None
+            result["checkpoint_sha256"] = checkpoint_sha256 if ckpt else None
+            result["checkpoint_identity"] = checkpoint_identity if ckpt else None
             result["actor_source"] = "checkpoint" if result["checkpoint"] else "base_or_random"
             result["method"] = cfg.get("method")
             result["evaluation_manifest"] = manifest

@@ -143,3 +143,35 @@ def summarize_with_filters(values: np.ndarray, mask: np.ndarray) -> dict:
             else float(np.nanmean(values[mask])),
         },
     }
+
+
+def summarize_joint_lag(rows: list[dict]) -> list[dict]:
+    """Paired finite rows only, retaining both prefix and problem denominators.
+
+    These are descriptive joint events, not independent Bernoulli observations:
+    prefixes and nested path slices share a problem and its detection denominator.
+    """
+    curves = []
+    for t in sorted({row["t"] for row in rows}):
+        observed = [row for row in rows if row["t"] == t]
+        selected = [row for row in observed if row["selected"]]
+        paired = [row for row in selected if row["pair_defined"]]
+        problems = []
+        for pid in sorted({row["problem_id"] for row in paired}):
+            part = [row for row in paired if row["problem_id"] == pid]
+            problems.append({"problem_id": pid, "n_paired_valid": len(part),
+                             "rho_l": float(np.mean([row["rho_l"] for row in part])),
+                             "rho_a": float(np.mean([row["rho_a"] for row in part])),
+                             "joint_fraction": float(np.mean([row["joint"] for row in part]))})
+        curves.append({"t": t, "n_observed": len(observed),
+                       "n_split": sum(row["n_report"] > 0 for row in observed),
+                       "n_selected": len(selected), "n_paired_valid": len(paired),
+                       "n_selected_without_pair": len(selected) - len(paired),
+                       "n_problems_paired": len(problems),
+                       "n_joint": sum(row["joint"] for row in paired),
+                       "joint_fraction": float(np.mean([row["joint"] for row in paired])) if paired else None,
+                       "joint_fraction_problem_mean": float(np.mean([row["joint_fraction"] for row in problems])) if problems else None,
+                       "rho_l_paired_mean": float(np.mean([row["rho_l"] for row in problems])) if problems else None,
+                       "rho_a_paired_mean": float(np.mean([row["rho_a"] for row in problems])) if problems else None,
+                       "problems": problems})
+    return curves

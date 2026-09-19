@@ -744,6 +744,14 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
             analysis["max_new_tokens"] = max_new
             ckpt = cfg.get("checkpoint") or cfg.get("resume")
             payload = load_checkpoint(ckpt) if ckpt else {}
+            from grace_gc.versions import sha256_file
+
+            analysis["joint_lag_context"] = {
+                "checkpoint": str(ckpt) if ckpt else None,
+                "checkpoint_sha256": sha256_file(ckpt) if ckpt else None,
+                "checkpoint_step": payload.get("step"), "max_new_tokens": max_new,
+                "seed": seed, "audit_manifest": manifest,
+            }
             analysis["allocation_ready"] = allocation_ready_from_checkpoint(spec, payload, cfg)
             analysis["warmup"] = int(payload.get("step", 0)) < int((cfg.get("predictor") or {}).get("warmup_steps", 0))
             if cfg.get("audit", {}).get("jl_dim"):

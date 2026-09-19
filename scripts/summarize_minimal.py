@@ -223,7 +223,11 @@ def summarize(root):
             "audit_run_dir": str(audit_path.parent) if audit else None,
             "audit_selected": audit.get("n_gated"),
             "variance_cost_ratio": ratio if finite(ratio) else None,
+            "variance_cost_uncertainty": audit.get("variance_cost_uncertainty"),
+            "audit_independent_report": audit.get("independent_report"),
             "training_matched_audit_variance_cost_ratio": training_ratio if finite(training_ratio) else None,
+            "training_matched_audit_variance_cost_uncertainty": training_audit.get("variance_cost_uncertainty"),
+            "training_matched_audit_independent_report": training_audit.get("independent_report"),
             "training_matched_audit_bundles": training_audit.get("n_bundles"),
             "fixed_batch_audit": batch_audit or None,
         })
