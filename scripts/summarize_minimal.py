@@ -107,6 +107,17 @@ def number(value):
     return f"{value:.5g}" if finite(value) else "not available"
 
 
+def finite_json(value):
+    """Keep undefined nested audit statistics as JSON null, never as zero."""
+    if isinstance(value, dict):
+        return {key: finite_json(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [finite_json(item) for item in value]
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
+
+
 def paired_delta(left, right):
     l = {r["problem_id"]: r["avg"] for r in left.get("per_problem", [])}
     r = {r["problem_id"]: r["avg"] for r in right.get("per_problem", [])}
@@ -307,6 +318,8 @@ def summarize(root):
             "See RECOVERY.md for runtime memory changes."
         ),
     }
+    payload = finite_json(payload)
+    rows = payload["methods"]
     (root / "comparison.json").write_text(json.dumps(payload, indent=2, allow_nan=False) + "\n")
     if rows:
         with (root / "comparison.csv").open("w", newline="") as stream:
