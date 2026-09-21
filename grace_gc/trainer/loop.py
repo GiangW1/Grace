@@ -12,8 +12,7 @@ import numpy as np
 from grace_gc.config import default_config, load_config, merge_configs, validate_config
 from grace_gc.core.layout import collect_lora_layout
 from grace_gc.core.rng import IsolatedRNG, seed_all
-from grace_gc.data.format_prompt import apply_solve_instruction
-from grace_gc.data.math_data import MathRecord, last_load_report, load_math_records, split_records
+from grace_gc.data.math_data import MathRecord, load_training_data
 from grace_gc.data.reward import rule_reward
 from grace_gc.data.tokenize import encode_records_tiny
 from grace_gc.logging_util.forensics import persist_final_checkpoint, persist_initial_checkpoint, persist_training_step, record_effective_config, reset_run_artifacts, trajectory_row, write_data_inventory, write_failed
@@ -28,7 +27,7 @@ from grace_gc.trainer.baseline import baseline_from_config
 from grace_gc.trainer.cpu_tiny import TinyLoRAActor, TinyTrainConfig, run_tiny_batch
 from grace_gc.trainer.methods import apply_method_defaults, method_spec, start_group_size
 from grace_gc.trainer.state_io import restore_train_state
-from grace_gc.trainer.cost_control import cost_start_counts, ensure_cost_control, observe_batch_cost, restore_cost_control, start_cost_control
+from grace_gc.trainer.cost_control import cost_start_counts, ensure_cost_control, observe_batch_cost, restore_cost_control, start_cost_control, start_count_mode
 from grace_gc.trainer.tiny_engine import make_tiny_engines
 from grace_gc.versions import collect_environment
 
@@ -83,6 +82,8 @@ def resolve_start_counts(cfg: dict[str, Any], spec, n_start: int | None = None) 
 
 def resume_start_counts(cfg: dict[str, Any], spec, state: TrainState) -> tuple[int, int, int]:
     """First resumed batch uses the N that next_n already scheduled."""
+    if start_count_mode(cfg) == "fixed":
+        return resolve_start_counts(cfg, spec, state.n_ref or int(cfg.get("n_start", 8)))
     controller = cfg.get("_cost_controller")
     if controller is not None and controller.enabled and controller.state.get("next_n"):
         return cost_start_counts(cfg, spec, state, resolve_start_counts(cfg, spec, state.n_ref))
@@ -136,15 +137,15 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
     rng = IsolatedRNG.create(int(cfg.get("seed", 17)))
     data_source = "synthetic"
     if cfg.get("data_path"):
-        buckets = split_records(
-            apply_solve_instruction(load_math_records(cfg["data_path"])),
+        buckets, load_report = load_training_data(
+            cfg["data_path"], cfg.get("eval_data_path"),
             seed=int(cfg.get("split_seed", 17)),
         )
         train_recs = buckets["train"]
+        write_data_inventory(run, buckets, cfg.get("data_path"), source="file", load_report=load_report, split_seed=int(cfg.get("split_seed", 17)))
         if not train_recs:
             raise ValueError("training split is empty")
         data_source = "file"
-        write_data_inventory(run, buckets, cfg.get("data_path"), source="file", load_report=last_load_report(), split_seed=int(cfg.get("split_seed", 17)))
     else:
         train_recs = _synthetic_records()
         write_data_inventory(run, {"train": train_recs}, None, source="synthetic")
@@ -187,6 +188,8 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
         engines = make_tiny_engines(actor, actor.vocab)
         n_prompts, starts_per, n_start = resume_start_counts(cfg, spec, state)
         record_effective_config(run, cfg, state, opt)
+    from grace_gc.predictor.offline import attach_predictor
+    attach_predictor(state, cfg, run)
     steps = int(cfg.get("num_steps", 1))
     if ledger is None:
         ledger = ComputeLedger(n_gpu=0, hardware="cpu")
@@ -215,7 +218,7 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
             break
         if controller.enabled:
             n_prompts, starts_per, n_start = cost_start_counts(cfg, spec, state, (n_prompts, starts_per, n_start))
-        elif last.get("next_n"):
+        elif start_count_mode(cfg) != "fixed" and last.get("next_n"):
             n_prompts, starts_per, n_start = resolve_start_counts(cfg, spec, n_start=max(1, int(last["next_n"])))
         step_timer = Timer()
         batch = sample_starts(train_recs, n_prompts, starts_per, state.rng)
@@ -265,7 +268,7 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
         "cost_control": cost,
         "allocation_ready_last_batch": bool(last.get("allocation_ready", False)),
         "allocation_ready_steps_this_session": allocation_steps,
-        "post_warmup_steps": max(0, state.step - int((cfg.get("predictor") or {}).get("warmup_steps", 0))),
+        "post_warmup_steps": state.step if state.offline_predictor else max(0, state.step - int((cfg.get("predictor") or {}).get("warmup_steps", 0))),
         "step": state.step,
         "actor_moved": True,
         "n_audited": last.get("n_audited", 0),
@@ -459,7 +462,7 @@ def maybe_load_data(cfg: dict[str, Any]) -> dict[str, list] | None:
     path = cfg.get("data_path")
     if not path:
         return None
-    return split_records(apply_solve_instruction(load_math_records(path)), seed=int(cfg.get("split_seed", 17)))
+    return load_training_data(path, cfg.get("eval_data_path"), seed=int(cfg.get("split_seed", 17)))[0]
 
 
 def score_text(text: str | None, gold: str, truncated: bool = False) -> float | None:

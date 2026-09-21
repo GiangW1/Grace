@@ -2,7 +2,86 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
-## 本机最近一次结果（2026-09-18）
+## 离线对照审查修复（2026-09-19，本轮）
+
+全量 CPU/替身回归：`755 passed, 1 skipped in 95.43s`。命令：`D:\Anaconda\python.exe -m pytest tests -q -o addopts='' --tb=short`。真实 CUDA 项因本机无 GPU 跳过；requests 仍有既有依赖版本警告。
+
+新增10项覆盖两处审查问题：离线目录迁移后续训拒绝决策位置、生成上限和特征模式不兼容；墙钟矩阵的均值、pass、标准差及配对区间使用预算内检查点，同时保留实际结束分数和全部运行费用；预算不足、时间/hash/阶段证据缺失不回退最终分数；最终评测缺失不妨碍有效预算内结果。固定步数模式与原有迁移恢复、归档回归一起通过。上述矩阵记录均为合成数据，不是 GPU 实测。
+
+先以新增用例复现失败，修复后的相关测试得到 `37 passed in 18.67s`，随后补充最终评测缺失场景并完成全量回归。矩阵 CLI 帮助和 `git diff --check` 通过。输出字段说明见 [离线并行对照](OFFLINE_PARALLEL_CONTROL_20260919.md)。
+
+## 离线预测器与多卡 rollout 对照（2026-09-19，首次实现）
+
+最终全量 CPU/替身回归：`745 passed, 1 skipped in 91.68s`，命令 `D:\Anaconda\python.exe -m pytest tests -q -o addopts='' --tb=short`。1项真实 CUDA 测试因本机无 GPU 跳过；requests 有既有依赖版本警告。
+
+本轮覆盖完全离线权重/scaler/γ冻结、无 fresh/审计监督、p=1 与 Full-PG 相同 actor 更新、共享 actor 不变、calib 题隔离与 ChatML 保留、部署 beta 校准、artifact 校验及迁移恢复/归档。多卡侧使用 CPU 替身验证真实 spawn/Pipe 通信、并发分片、请求顺序/seed、兼容回退、同步失败、缺失输出、GPU入口资源清理；真实 Bash 包装器验证离线参数和评测配置传递、用户输入不被 setup 默认值覆盖。
+
+补充了重复 seed、TP 设备账本、CPU 不记录虚构 GPU 用量、方法特征/风险协议校验；三个新增测试文件先单独得到 `24 passed in 11.85s`，随后完成上面的最终全量回归。CLI 帮助、Bash 语法、单卡/四卡配置加载与 `git diff --check` 已检查；README、新实施文档和 STATE 的23个本地文件链接均存在。没有 GPU 性能、显存、质量或 LAG 成功证据。实现及服务器四组命令见 [离线并行对照](OFFLINE_PARALLEL_CONTROL_20260919.md)。
+
+## 此前在线固定 U 回归（2026-09-19）
+
+```text
+721 passed, 1 skipped in 80.39s
+```
+
+命令：`D:\Anaconda\python.exe -m pytest tests -q -o addopts=''`。本轮为固定基底在线监督及运行开销优化的全量 CPU/替身回归；1项真实CUDA测试因本机无GPU跳过，requests仍有既有依赖版本警告。没有新GPU训练、质量或加速数字。
+
+新增143项覆盖：
+
+- `test_feature_reduction.py`（85项）：legacy/response/decision、EOS/pad、批量和prompt特征与旧定义对照；CPU FP32/BF16/FP64输入，容差 `rtol=1e-6, atol=1e-7`。先复现完整hidden序列回传，再验证只回传最终特征；该样例传输元素数不代表GPU加速比。
+- `test_fixed_basis_supervision.py`（8项）：一般/秩亏Gram残差、零G、FP32标签范数舍入、IPW/γ/风险拟合对照；真实tiny训练固定U且在线更新预测头，连续训练与恢复状态一致，p=1与Full-PG actor一致，停止者null、固定N和无信号时不冻结占位基。
+- `test_basis_artifact.py`（23项）：固定U引用、旧内嵌格式、hash/维度/缺失文件、写失败保留旧状态、跨目录latest、目录迁移和归档依赖；显式包含NPZ也带同目录U，归档不解析pickle。
+- `test_rollout_observability.py`（22项）：不吞无关TypeError、兼容回退保seed/失败费用、cached tokens缺失为null、续写全局索引、同步失败；GPU入口用CPU替身验证失败落盘及正常同步日志，日志写失败不覆盖原异常，已恢复回退不误报为后续失败。
+- `test_array_hash_buffer.py`（5项）：直接连续buffer计算hash，不创建整份bytes副本；非连续/字节序/空数组/标量保持原hash协议。
+
+完整回归后仅更新文档。训练/归档CLI帮助、候选配置按实际层叠顺序加载和 `git diff --check` 通过。服务器仍需验证CUDA数值、显存、真实生成批次/缓存、完整费用及同成本质量。代码与命令见 [实施状态§9.1](GRACE_RESEARCH_IMPLEMENTATION_PLAN_20260919.md#91-首批实施状态2026-09-19)。
+
+同日知识收尾仅同步文档与忽略规则，未重跑全量 pytest。另核对仓库 Markdown 的本地文件链接、修改文档的锚点、README Bash 语法和六处手动训练示例的评测题排除参数；训练 CLI 帮助验证该参数有效。历史报告保留的机器绝对路径用于本机原件追溯，在 GitHub 上不能直接打开。
+
+## 本机上一轮结果（2026-09-19）
+
+```text
+578 passed, 1 skipped in 81.64s
+```
+
+命令：`python -m pytest tests -q -o addopts=''`。这是汇总一致性与重复实现收敛后的全量CPU回归，比上一轮575项增加3项；1项CUDA测试因本机无GPU跳过。requests仍报告既有可选依赖版本警告，未影响结果。
+
+本轮3项新增测试先复现失败，再修至通过：普通方法汇总对错配/缺失实际seed的过滤，以及实验名称不改变训练配方hash（学习率、保存频率、精度差异仍可检出）。已有训练动态、辅助成本缺损、配对统计、实际脚本入口和包装器回归同时覆盖共享函数迁移。四方法9/18历史all/post token总量重算均不变，两个baseline配置替换后的有效设置及预扫行为一致。末尾仅清理了fresh零生成判断中的未使用元组成员，另跑15项训练动态回归。
+
+此前继续落实清单时增加的覆盖：
+
+- `test_checkpoint_availability.py`、`test_cost_quality.py`：发布后时钟、命令起点传递、真实tiny训练→checkpoint→评测→成本曲线，预算按时间选择、重复评测冲突、缺失seed/方法、跨seed题集/硬件/配方与重复seed不混池。
+- `test_minimal_budget_wrapper.py`：真实Git Bash包装器、外层命令计时和汇总器；仅训练/评测子命令为合成替身。验证不含Full-PG的显式预算、自动加评预算内checkpoint、最终别名去重、全保存点评测和硬件配置传递。
+- `test_eval_repeatability.py`、`test_logprob_diagnostics.py`：actor/协议身份、逐token首分歧、串行回退、batch-size对照、失败子进程及数值误差位置/分段；另实际跑通两次全新CPU评测子进程，合成tiny输出逐token一致。
+- `test_lag_joint_evidence.py`、`test_variance_cost_uncertainty.py`：边际均值达标却无联合前缀反例、独立选择、有效配对/缺失分母、整问题簇重采样、原点估计与充分统计一致、零方差抽样不补0。
+- `test_training_dynamics.py`：PG与GRPO分开重算优势、停止者null、零/缺失G、题组与长度、辅助日志缺损和零生成证据；历史四方法原始日志已只读执行。
+- `test_version_metadata.py`：直接读取发行包版本不导入GPU包，以及模块回退/缺失来源。
+
+全量回归后仅将新成本字段改名为明确的“本链初始化+训练费用”（避免复用既有SFT时冒充完整部署费用），并同步文档；相关成本/时钟/包装器18项回归通过。
+
+上一轮新增覆盖：
+
+- `test_training_eval_exclusion.py`：外部评测题在SFT/采样前排除、不同题号/不同金标仍匹配、保留大小写及原split、来源报告不被eval读取覆盖、原文件不修改；过滤删空时仍保存排除证据。
+- `test_stage_cost_timing.py`：20项可控时钟测试，覆盖准备/环境/成功/失败/空prefix路径、结果保存异常只记一次和硬件标签。
+- `test_command_timing.py`：真实CPU子进程成功/非零退出/启动失败留证，阶段空隙不伪装成计算；四臂Bash替身测试验证最终独立审计也有外层计时。
+- `test_archive_evidence.py`：大JSONL/审计NPZ保留、adapter/指定checkpoint选择、基础模型默认不越过大小限制、流式hash、逐项归档来源与CLI。
+- `test_seed_summary_intervals.py`：配对seed Student-t区间、样本不足/缺SciPy的null、缺失错配可见、pass@4及完整starts汇总。
+
+脚本帮助、Git Bash语法和 `git diff --check` 检查通过。这里的子进程/时钟/四臂数据均为CPU或合成测试，不是GPU效率结果。历史回答重判另列修复文档，不计入pytest数量。
+
+此前9月19日已覆盖的效率实现：
+
+- `test_backward_reuse_20260919.py`：一次求导复用真实G，HT权重/梯度符号、p=1、审计掩码隔离、零优势、停止者和unused参数；FP32与旧加权反向数值比较。
+- `test_fixed_n_20260919.py`：关闭wall之外仍绕开旧token回收；固定N续训；四臂真实tiny训练的初始actor、warmup更新和输入序列一致，p1/m0/停止者null。
+- `test_cost_feedback_20260919.py`：固定开销摊销、主成本反馈、预算/保存/恢复和配置模式；checkpoint无损紧凑存储、旧格式兼容及原子发布。
+- `test_predictor_signal_fixes.py`：零残差冷启动风险尺度、Reward-CV当前q特征、γ诊断与监督组成；跨题预测交叉矩的反向预测反例、显式谱等价及退化输入。
+- `test_batch_interventions.py`：同完整G的p1/m0/uniform冻结干预、训练checkpoint对应N、原始梯度方差×主token代理及零分母；开启额外干预不改变原审计样本/统计。
+- `test_eval_execution_trace.py`：eval/audit引擎继承seed、显式覆盖、逐请求seed/token hash与batch回退轨迹。
+- `test_mechanism_summary.py`、`test_mechanism_wrapper.py`：配对统计的actor/seed/评测协议/终点/完整输入与N核对；完整及后warmup成本、缺证据与已观测零生成的区分；真实Git Bash运行四臂编排，昂贵训练/审计以替身命令代替。
+
+Git Bash分别对 `run_minimal_gpu.sh`、`run_mechanism_gpu.sh`、`run_matched_cost_gpu.sh` 做语法检查，批审计CLI帮助和 `git diff --check` 通过。没有新GPU训练、质量或端到端速度验证。确定修复、研究候选及服务器运行方法见 [9月19日实现说明](GRACE_EFFICIENCY_REMEDIATION_20260919.md)。
+
+## 历史本机结果（2026-09-18）
 
 ```text
 421 passed, 1 skipped in 47.24s
@@ -66,7 +145,7 @@
 命令：`python -m pytest tests -k "not complete_final_expression and not u6_gpu"`。  
 当时 `complete_final_expression` 在 Windows 上会踩 math-verify 的 WinError 6；该路径现已修复并纳入全量测试。`u6_gpu` 要 CUDA。有 stack 时 U6 会跑 FP64 对照。
 
-当时在 master：P0/P1 之后补上审查接线（同步门、审计就绪、γ 的 IPW、稳定去均值、缺失 logprob、λ 换算、账本不重叠）。这是历史记录；当前脚本会另外叠加 `minimal_gpu_repaired.yaml`，尚无该修订的真实GPU结果。
+当时在 master：P0/P1 之后补上审查接线（同步门、审计就绪、γ 的 IPW、稳定去均值、缺失 logprob、λ 换算、账本不重叠）。这是历史记录；后来的 `3c03ce9` 已有 [9月18日真实实验](MINIMAL_RESULTS_REVIEW_20260919.md)。9月19日的后续修复尚无新 GPU 结果，不能把修复前链的实测归到新代码。
 
 ## 如何跑
 

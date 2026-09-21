@@ -1,0 +1,12 @@
+# Same signal candidate with a fixed-baseline cost ablation.
+# b=.5 removes prescan generation but can change gradient variance/learning.
+# It is a baseline ablation, not evidence that LAG is baseline-independent.
+experiment_variant: cost_candidate_20260919
+predictor:
+  audit_s: 1.0
+  fresh_samples_per_problem: 0
+  basis_variant: predictable_crossfit_signal
+baseline:
+  mode: fixed
+  fixed_value: 0.5
+  prescan: 0

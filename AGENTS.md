@@ -22,17 +22,20 @@
 - 论文中用于分析的筛选条件和阈值作为可配置的统计选项，报告全部观测与所选子集；不作为启动/继续实验的条件。
 - 不新增最低样本量、置信区间宽度要求或自动 Go/No-Go 门槛。理论疑点记录在实现笔记，不能要求先完成理论重推才写代码或跑实验。
 - 简单记录哪些测试已跑、哪些需要 GPU。合成测试数据与真实实验结果分开；不能虚构测试或性能数字。
-- 当前 Windows 本机无真实实验条件。规划硬件是 4×A100，随后两组各 8×RTX5090；**现在能启动的只有单卡**（`a100_1.yaml` / `rtx5090_1.yaml`），`n_gpu>1` 会拒绝。
+- 当前 Windows 本机无真实实验条件。用户已授权离线对照与多卡 rollout 一起实现；单卡用 `a100_1.yaml` / `rtx5090_1.yaml`，多卡要求 `rollout.workers=n_gpu-1`、TP=1，第一张可见卡放 actor、其余放独立 vLLM worker。actor 的多卡归约尚未接入；并行路径尚待 GPU 验证，不承诺提速。
 - 一次 run 的配置、轨迹、健康事实和开始/结束时间写进 `--run-dir`。同名再跑（非续训）会加 UTC 后缀，不覆盖上一份。
+- 本地导入的 `_minimal_review_*/`、`_smoke_review_*/`、`_runs_results/` 是实验原件与复核材料，保留且不提交；历史结果不能当作新修复的实测。
 - 中文沟通，代码标识符使用英文。
 
 ## 项目文件
 
 - .planning/PROJECT.md：范围与优先级。
+- .planning/STATE.md：当前代码、PR、实测版本与下一步的交接入口。
 - .planning/ROADMAP.md：代码完成 → 最小证伪。
 - .planning/REQUIREMENTS.md：精简功能清单。
 - .planning/MINIMAL_FALSIFICATION.md：实验脚本的用法设想。
 - .planning/research/PITFALLS.md：数学与实现笔记，按实现需要查阅。
-- .planning/research/GRACE_FIDELITY.md：本分支保真/方差接线；以代码为准。
+- .planning/research/GRACE_FIDELITY.md：9月17日保真/方差接线的历史笔记；当前行为以代码为准。
 - docs/TEST_STATUS.md：已跑/未跑测试；不写虚构 GPU 数字。
+- docs/GRACE_ISSUE_CHECKLIST_20260919.md：问题状态；后续候选与实现边界见其链接的调研实施方案。
 - README.md：服务器全流程。GitHub 默认分支是 `master`。

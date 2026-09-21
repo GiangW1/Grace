@@ -6,6 +6,8 @@ is never substituted for the measured cost of this diagnostic experiment.
 from __future__ import annotations
 
 import copy
+import json
+from pathlib import Path
 
 import numpy as np
 from grace_gc.audit.mechanism import paired_geometry, summarize_geometries
@@ -112,9 +114,10 @@ class OptimizerReplay:
         return update, stats
 
 
-def _allocation(prefixes, lengths, finished, baselines, engines, predictor, u, spec, payload, cfg):
+def _allocation(prefixes, lengths, finished, baselines, engines, predictor, u, spec, payload, cfg,
+                *, return_raw_coordinates=False):
     n = len(prefixes)
-    warmup = int(payload.get("step", 0)) < int((cfg.get("predictor") or {}).get("warmup_steps", 0))
+    warmup = not payload.get("offline_predictor") and int(payload.get("step", 0)) < int((cfg.get("predictor") or {}).get("warmup_steps", 0))
     remaining = continuation_remainings(prefixes, lengths, finished, int(cfg["max_new_tokens"]))
     f = np.zeros((n, u.shape[1]))
     risk, cost = np.ones(n), incremental_token_costs(remaining, finished)
@@ -141,8 +144,105 @@ def _allocation(prefixes, lengths, finished, baselines, engines, predictor, u, s
     f[finished] = 0
     if not spec.use_ht_correction or warmup:
         f[:] = 0
+    raw_f = f.copy()
     f = control_variate_coordinates(f, enabled=bool((cfg.get("predictor") or {}).get("control_variate", True)))
-    return f, np.asarray(risk), np.asarray(cost), p, remaining, deviation
+    result = (f, np.asarray(risk), np.asarray(cost), p, remaining, deviation)
+    return (*result, raw_f) if return_raw_coordinates else result
+
+
+def resolve_batch_shape(cfg, payload):
+    """Match a recorded completed batch, never a scheduled next_n or initial N."""
+    audit = cfg.get("batch_audit") or {}
+    prompts = int(audit.get("n_prompts", cfg.get("n_prompts", 2)))
+    starts = int(audit.get("starts_per_prompt", max(1, int(cfg.get("n_start", 8))//max(prompts, 1))))
+    source, note = "configured", None
+    shape = audit.get("shape", "configured")
+    if shape not in {"configured", "training"}:
+        raise ValueError("batch_audit.shape must be configured or training")
+    if shape == "training":
+        step, row = payload.get("step"), None
+        checkpoint = Path(cfg.get("checkpoint") or cfg.get("resume") or ".")
+        root = Path(audit["training_run"]) if audit.get("training_run") else (
+            checkpoint.parent.parent if checkpoint.parent.name == "checkpoints" else checkpoint.parent)
+        path = root/"steps.jsonl"
+        if path.is_file():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                try:
+                    item = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if step is not None and item.get("step") == step and item.get("n"):
+                    row = item
+        if row is not None:
+            count = int(row["n"])
+            prompts = int(row.get("n_problems") or min(int((payload.get("run_config") or {}).get("n_prompts", prompts)), count))
+            source = "training_steps_at_checkpoint_step"
+        else:
+            cost = payload.get("cost_control") or {}
+            if step is not None and cost.get("last_step") == step and cost.get("last_n"):
+                count = int(cost["last_n"])
+                prompts = min(int((payload.get("run_config") or {}).get("n_prompts", prompts)), count)
+                source = "checkpoint_cost_control_last_n"
+            else:
+                count = prompts*starts
+                source = "configured_fallback_missing_matching_training_shape"
+                note = "No completed batch at checkpoint.step; next_n and stale last_n were not used."
+        if count % max(prompts, 1):
+            raise ValueError("recorded training N cannot form equal starts per prompt")
+        starts = count//max(prompts, 1)
+    if prompts <= 0 or starts <= 0:
+        raise ValueError("batch audit prompt/start counts must be positive")
+    return {"n_prompts": prompts, "starts_per_prompt": starts, "fixed_n": prompts*starts,
+            "source": source, "checkpoint_step": payload.get("step"), "note": note,
+            "scope": "Batch shape only; prompts and answers are newly drawn with the frozen checkpoint, not historical update reconstruction."}
+
+
+def _interventions(cfg):
+    options = (cfg.get("batch_audit") or {}).get("interventions") or {}
+    if not isinstance(options, dict):
+        raise ValueError("batch_audit.interventions must map names to scalar interventions")
+    for name, knobs in options.items():
+        if not isinstance(knobs, dict) or set(knobs)-{"beta", "control_variate", "uniform_shrink"}:
+            raise ValueError(f"invalid batch audit intervention {name!r}; only beta, control_variate, uniform_shrink")
+        if "control_variate" in knobs and not isinstance(knobs["control_variate"], bool):
+            raise ValueError("intervention control_variate must be boolean")
+        for key in ("beta", "uniform_shrink"):
+            if key in knobs and (not np.isfinite(float(knobs[key])) or not 0 <= float(knobs[key]) <= 1
+                                 or (key == "beta" and float(knobs[key]) == 0)):
+                raise ValueError(f"intervention {key} must be in {'(0,1]' if key == 'beta' else '[0,1]'}")
+    return options
+
+
+def token_proxy_efficiency(full_cov, actual_cov, mean_extra, expected_tokens, full_tokens):
+    """Fixed-batch raw-gradient variance times expected main-response token cost."""
+    ratio = float(expected_tokens/full_tokens) if full_tokens > 0 else None
+    valid = full_cov is not None and full_cov > 0
+    empirical = float(actual_cov/full_cov) if valid and actual_cov is not None else None
+    conditional = float((full_cov+mean_extra)/full_cov) if valid else None
+    return {"main_full_tokens": full_tokens, "main_expected_selected_tokens": expected_tokens,
+            "expected_token_ratio": ratio, "empirical_raw_covariance_ratio": empirical,
+            "conditional_formula_raw_covariance_ratio": conditional,
+            "empirical_raw_variance_times_expected_token_ratio": empirical*ratio if empirical is not None and ratio is not None else None,
+            "conditional_formula_raw_variance_times_expected_token_ratio": conditional*ratio if conditional is not None and ratio is not None else None,
+            "scope": "Main response tokens only; full denominator excludes prescan. Raw fixed-batch sample covariance across repeats, not clipped/Adam variance. Conditional formula estimates V_full + mean E_Z extra using complete observed G; finite-repeat V_full and extra are noisy. Zero/undefined V_full gives null. All diagnostic suffixes were actually paid; neither ratio is measured GPU speedup."}
+
+
+def _intervention_allocations(options, raw_f, risk, cost, finished, spec, payload, cfg, uniform):
+    alloc, pcfg = cfg.get("allocation") or {}, cfg.get("predictor") or {}
+    basis = payload.get("basis") or {}
+    warmup = not payload.get("offline_predictor") and int(payload.get("step", 0)) < int(pcfg.get("warmup_steps", 0))
+    ready = not spec.use_allocation or neyman_ready(basis.get("basis_id", 0), basis.get("predictor_synced_basis_id", -1))
+    arms = {}
+    for name, knobs in options.items():
+        p, deviation = decide_continuation(spec, risk, cost, finished,
+            float(knobs.get("beta", alloc.get("beta", .5))), float(alloc.get("p_min", .2)), warmup,
+            int(alloc.get("bisection_iters", 20)), basis_ready=ready,
+            uniform_shrink=float(knobs.get("uniform_shrink", alloc.get("uniform_shrink", 0.))))
+        z = (uniform < p).astype(float); z[finished] = 1.
+        f = control_variate_coordinates(raw_f, enabled=knobs.get("control_variate", bool(pcfg.get("control_variate", True))))
+        arms[name] = {"p": p, "z": z, "f": f, "deviation": deviation,
+                      "gradient": None, "extra": 0., "selected_tokens": 0., "expected_tokens": 0.}
+    return arms
 
 
 def audit_fixed_batches(records, engines, layout, encode, payload, predictor, u, spec, cfg, run):
@@ -150,6 +250,7 @@ def audit_fixed_batches(records, engines, layout, encode, payload, predictor, u,
     if spec.objective != "raw_pg":
         raise ValueError("fixed-batch R-b audit supports mechanism methods; GRPO has a different objective")
     audit = cfg.get("batch_audit") or {}
+    interventions = _interventions(cfg)
     repeats, starts = int(audit.get("replicates", 8)), int(audit.get("starts_per_prompt", 4))
     decision, horizon, seed = int(cfg.get("decision_tokens", 512)), int(cfg.get("max_new_tokens", 2048)), int(cfg.get("seed", 17))
     if repeats <= 0 or starts <= 0 or not records or not 0 <= decision <= horizon or horizon <= 0:
@@ -205,9 +306,14 @@ def audit_fixed_batches(records, engines, layout, encode, payload, predictor, u,
         raise ValueError("encoded starts do not match the predetermined batch size")
     frozen_b = [baseline[pid] for pid in pids]
     gradient, updates, clipped = PairedMoments(layout.dim), PairedMoments(layout.dim), PairedMoments(layout.dim)
+    arm_moments = {name: {key: PairedMoments(layout.dim) for key in ("gradient", "update", "clipped_gradient")}
+                   for name in interventions}
+    arm_totals = {name: {"extra": 0., "selected_tokens": 0., "expected_tokens": 0., "clip_count": 0,
+                        "geometry": {key: [] for key in ("raw_gradient", "clipped_gradient", "optimizer_update")}}
+                  for name in interventions}
     geometry_rows = {key: [] for key in ("raw_gradient", "clipped_gradient", "optimizer_update")}
     prescan_tokens = sum(len(x["token_ids"])-x["prompt_len"] for row in baseline_raw for x in row["samples"])
-    generated, teacher_forced, conditional_extra = prescan_tokens, 0, 0.
+    generated, teacher_forced, conditional_extra, expected_total = prescan_tokens, 0, 0., 0.
     clip_count = {"full": 0, "actual": 0}
     for rep in range(repeats):
         timer = Timer()
@@ -219,10 +325,14 @@ def audit_fixed_batches(records, engines, layout, encode, payload, predictor, u,
         if len(prefixes) != n or finished.shape != (n,):
             raise ValueError("prefix generator changed fixed batch cardinality")
         prefix_seeds, prefix_reasons = _request_seeds(engines, n), _prefix_finish_reasons(engines)
-        f, risk, cost, p, remaining, deviation = _allocation(prefixes, lengths, finished, frozen_b, engines,
-                                                            predictor, u, spec, payload, cfg)
+        f, risk, cost, p, remaining, deviation, raw_f = _allocation(prefixes, lengths, finished, frozen_b, engines,
+                                                            predictor, u, spec, payload, cfg, return_raw_coordinates=True)
         # Draw only from the prefix-measurable p before seeing full rewards.
-        z = rng.bernoulli("selection", p); z[finished] = 1.
+        uniform = rng.random("selection", p.shape)
+        z = (uniform < p).astype(float); z[finished] = 1.
+        arms = _intervention_allocations(interventions, raw_f, risk, cost, finished, spec, payload, cfg, uniform)
+        for arm in arms.values():
+            arm["gradient"] = np.zeros(layout.dim)
         phases = {"prefix_and_allocation_wall_seconds": timer.lap()}
         fulls = [list(x) for x in prefixes]
         suffix_seeds, suffix_reasons = [None]*n, [None]*n
@@ -258,6 +368,16 @@ def audit_fixed_batches(records, engines, layout, encode, payload, predictor, u,
             simulated_tokens += prefix_len+z[i]*suffix_len
             expected_tokens += prefix_len+p[i]*suffix_len
             teacher_forced += full_len
+            arm_rows = {}
+            for name, arm in arms.items():
+                pi, zi, mi = float(arm["p"][i]), float(arm["z"][i]), u @ arm["f"][i]
+                residual = float((g-mi) @ (g-mi))
+                arm["gradient"] += ht_estimate(g, mi, arm["p"][i:i+1], arm["z"][i:i+1])[0]/n
+                arm["extra"] += (1/pi-1)*residual/(n*n)
+                arm["selected_tokens"] += prefix_len+zi*suffix_len
+                arm["expected_tokens"] += prefix_len+pi*suffix_len
+                arm_rows[name] = {"p": pi, "z": zi, "f": arm["f"][i], "m_norm_sq": float(mi@mi),
+                                  "residual_norm_sq": residual, "selected_reward": reward if zi else None}
             run.append_jsonl("batch_audit_samples.jsonl", {
                 "replicate": rep, "replicate_seed": replicate_seed, "start": i, "problem_id": pids[i], "gold": golds[i],
                 "baseline": frozen_b[i], "p": float(p[i]), "z": float(z[i]), "r_hat": float(risk[i]), "c_hat": float(cost[i]),
@@ -267,8 +387,10 @@ def audit_fixed_batches(records, engines, layout, encode, payload, predictor, u,
                 "prefix_request_seed": prefix_seeds[i], "suffix_request_seed": suffix_seeds[i],
                 "prefix_finish_reason": prefix_reasons[i] if i < len(prefix_reasons) else None,
                 "suffix_finish_reason": suffix_reasons[i], "full_g_norm_sq": float(g@g), "m_norm_sq": float(m@m),
-                "residual_norm_sq": float((g-m)@(g-m)), "scope": "full diagnostic answer; selected_reward alone represents simulated training observation"})
-        generated += actual_tokens; conditional_extra += extra
+                "residual_norm_sq": float((g-m)@(g-m)), "selection_uniform": float(uniform[i]),
+                "interventions": arm_rows,
+                "scope": "full diagnostic answer; selected_reward alone represents simulated training observation"})
+        generated += actual_tokens; conditional_extra += extra; expected_total += expected_tokens
         phases["all_full_space_gradients_wall_seconds"] = timer.lap()
         full_update, full_stats, full_clip = replay.step(full_gradient, with_clipped=True)
         actual_update, actual_stats, actual_clip = replay.step(actual_gradient, with_clipped=True)
@@ -280,6 +402,23 @@ def audit_fixed_batches(records, engines, layout, encode, payload, predictor, u,
         for key, row in geometry.items():
             geometry_rows[key].append(row)
         clip_count["full"] += int(full_stats["clip_triggered"]); clip_count["actual"] += int(actual_stats["clip_triggered"])
+        arm_results = {}
+        for name, arm in arms.items():
+            update, stats, clip = replay.step(arm["gradient"], with_clipped=True)
+            for key, full, value in (("gradient", full_gradient, arm["gradient"]),
+                                     ("update", full_update, update), ("clipped_gradient", full_clip, clip)):
+                arm_moments[name][key].add(full, value)
+            geometry = {"raw_gradient": paired_geometry(full_gradient, arm["gradient"]),
+                        "clipped_gradient": paired_geometry(full_clip, clip),
+                        "optimizer_update": paired_geometry(full_update, update)}
+            for key, row in geometry.items():
+                arm_totals[name]["geometry"][key].append(row)
+            for key in ("extra", "selected_tokens", "expected_tokens"):
+                arm_totals[name][key] += arm[key]
+            arm_totals[name]["clip_count"] += int(stats["clip_triggered"])
+            arm_results[name] = {"paired_geometry": geometry, "optimizer_stats": stats,
+                "conditional_selection_extra_variance_trace": arm["extra"], "allocation_deviation": arm["deviation"],
+                "hypothetical_selected_tokens": arm["selected_tokens"], "hypothetical_expected_tokens": arm["expected_tokens"]}
         phases["cpu_optimizer_replays_wall_seconds"] = timer.lap()
         run.append_jsonl("batch_audit_replicates.jsonl", {
             "replicate": rep, "seed": replicate_seed, "fixed_n": n, "rng_before": rng_before, "rng_after": rng.state_dict(),
@@ -288,7 +427,8 @@ def audit_fixed_batches(records, engines, layout, encode, payload, predictor, u,
             "allocation_deviation": deviation, "full_update": full_stats, "actual_update": actual_stats,
             "gradient_difference_norm": float(np.linalg.norm(actual_gradient-full_gradient)),
             "update_difference_norm": float(np.linalg.norm(actual_update-full_update)),
-            "paired_geometry": geometry, "phases": phases})
+            "paired_geometry": {key: geometry_rows[key][-1] for key in geometry_rows},
+            "interventions": arm_results, "phases": phases})
         print(f"batch audit replicate={rep+1}/{repeats} N={n} all_generated_tokens={actual_tokens}", flush=True)
     source_after = sha256_named(engines.named_lora())
     frozen_after = sha256_mapping(frozen)
@@ -297,9 +437,23 @@ def audit_fixed_batches(records, engines, layout, encode, payload, predictor, u,
     np.savez_compressed(run.root / "batch_audit_means.npz", full_gradient=gradient.mean[0], actual_gradient=gradient.mean[1],
                         full_update=updates.mean[0], actual_update=updates.mean[1],
                         full_clipped_gradient=clipped.mean[0], actual_clipped_gradient=clipped.mean[1])
+    full_cov = gradient.summary()["full_trace_sample_cov"]
     return {"replicates": repeats, "fixed_n": n, "n_prompts": len(records), "starts_per_prompt": starts,
             "batch_design": "Configured fixed diagnostic N and prompt set, not a reconstruction of the last adaptive training batch.",
             "method": spec.name, "baseline_mode": mode, "gradient": gradient.summary(), "update": updates.summary(),
+            "token_proxy_efficiency": token_proxy_efficiency(full_cov, gradient.summary()["actual_trace_sample_cov"],
+                conditional_extra/repeats, expected_total, generated-prescan_tokens),
+            "interventions": {name: {**{key: value.summary() for key, value in moments.items()},
+                "parameters": interventions[name],
+                "conditional_selection_extra_variance_trace_mean": arm_totals[name]["extra"]/repeats,
+                "hypothetical_selected_tokens": arm_totals[name]["selected_tokens"],
+                "hypothetical_expected_tokens": arm_totals[name]["expected_tokens"],
+                "token_proxy_efficiency": token_proxy_efficiency(full_cov, moments["gradient"].summary()["actual_trace_sample_cov"],
+                    arm_totals[name]["extra"]/repeats, arm_totals[name]["expected_tokens"], generated-prescan_tokens),
+                "clip_count": arm_totals[name]["clip_count"],
+                "paired_geometry": {key: summarize_geometries(rows) for key, rows in arm_totals[name]["geometry"].items()}}
+                for name, moments in arm_moments.items()},
+            "intervention_scope": "Same complete G, frozen actor/U/heads/baseline/optimizer and coupled uniform selection draws. Scalar interventions are applied after checkpoint settings are restored. All generation/gradient costs are paid once; extra CPU optimizer replays are included in the audit envelope. Not independent training runs or measured savings.",
             "estimator_ablation": {"control_variate": bool((cfg.get("predictor") or {}).get("control_variate", True)),
                                    "uniform_shrink": float((cfg.get("allocation") or {}).get("uniform_shrink", 0.)),
                                    "note": "CV switch changes only m; risk predictions are retained."},
@@ -319,36 +473,35 @@ def audit_fixed_batches(records, engines, layout, encode, payload, predictor, u,
                                  for group in replay.snapshot["param_groups"]],
                 "note": "Fresh copies per arm and replicate; same shared clip function and torch optimizer. Not bitwise CUDA execution validation."},
             "scope": "Full-space fixed-N R-b batch gradients; frozen prompts/actor/U/heads/baseline/optimizer. All full suffixes and gradients are paid. HT/CV selection is a simulation, not measured training savings.",
-            "memory": "O(D) online moments plus frozen U and optimizer snapshots; no replicate-by-D array",
+            "memory": "O((1+number_of_interventions)*D) online moments plus frozen U and optimizer snapshots; no replicate-by-D array",
             "rng_design": "SeedSequence([seed, 0xBA7C2026, index]); index=0 prescan, index=1..replicates independent batches. Separate token/continuation/selection streams; full RNG states persisted.",
             "uncertainty": "A single replicate produces point values with covariance unavailable; no minimum sample gate. Independent prefixes and suffixes across replicates, conditional on this one prompt set."}
 
 
 def run_batch_audit(records, cfg, run_dir):
+    timer = Timer()
+    started = utc_now()
     cfg = copy.deepcopy(cfg)
-    cfg.setdefault("max_new_tokens", 2048 if cfg.get("backend") == "gpu_verl" else 8)
-    cfg.setdefault("decision_tokens", min(512, int(cfg["max_new_tokens"])))
-    ckpt = cfg.get("checkpoint") or cfg.get("resume")
-    if not ckpt:
-        raise ValueError("batch audit requires a frozen training checkpoint")
     backend = cfg.get("backend", "cpu_tiny")
     n_gpu = int((cfg.get("hardware") or {}).get("n_gpu", 1 if backend == "gpu_verl" else 0))
-    if backend == "gpu_verl" and n_gpu != 1:
-        raise ValueError("batch audit GPU backend currently supports exactly one GPU")
-    audit = cfg.setdefault("batch_audit", {})
-    n_prompts = int(audit.get("n_prompts", cfg.get("n_prompts", 2)))
-    if n_prompts <= 0:
-        raise ValueError("batch audit n_prompts must be positive")
-    audit.setdefault("starts_per_prompt", max(1, int(cfg.get("n_start", 8))//max(n_prompts, 1)))
-    selected = select_records(apply_solve_instruction(list(records)), n_prompts,
-                              str(audit.get("selection", "seeded")), int(audit.get("selection_seed", cfg.get("seed", 17))))
+    hardware = str((cfg.get("hardware") or {}).get("name", "gpu" if backend == "gpu_verl" else "cpu"))
     run = RunDirectory(resolve_run_dir(run_dir))
-    started, timer = utc_now(), Timer()
-    ledger = ComputeLedger(n_gpu=n_gpu if backend == "gpu_verl" else 0, hardware=backend)
-    run.write_run_meta(kind="batch_audit", started=started, requested=run_dir)
-    run.write_yaml("config.yaml", cfg)
-    versions = collect_environment(cfg); run.write_json("environment.json", versions)
+    ledger = ComputeLedger(n_gpu=n_gpu if backend == "gpu_verl" else 0, hardware=hardware)
+    versions, status = {}, "failed"
     try:
+        cfg.setdefault("max_new_tokens", 2048 if backend == "gpu_verl" else 8)
+        cfg.setdefault("decision_tokens", min(512, int(cfg["max_new_tokens"])))
+        ckpt = cfg.get("checkpoint") or cfg.get("resume")
+        if not ckpt:
+            raise ValueError("batch audit requires a frozen training checkpoint")
+        if backend == "gpu_verl" and n_gpu != 1:
+            raise ValueError("batch audit GPU backend currently supports exactly one GPU")
+        audit = cfg.setdefault("batch_audit", {})
+        run.write_run_meta(kind="batch_audit", started=started, requested=run_dir)
+        run.write_yaml("config.yaml", cfg)
+        versions = collect_environment(cfg)
+        versions["started"] = started
+        run.write_json("environment.json", versions)
         payload = load_checkpoint(ckpt)
         spec = _audit_method_spec(cfg, payload)
         cfg["method"] = spec.name
@@ -362,6 +515,11 @@ def run_batch_audit(records, cfg, run_dir):
                 source[key] = "checkpoint.run_config"
             else:
                 source[key] = "requested_config_fallback_legacy_checkpoint"
+        shape = resolve_batch_shape(cfg, payload)
+        n_prompts = shape["n_prompts"]
+        audit.update(n_prompts=n_prompts, starts_per_prompt=shape["starts_per_prompt"])
+        selected = select_records(apply_solve_instruction(list(records)), n_prompts,
+                                  str(audit.get("selection", "seeded")), int(audit.get("selection_seed", cfg.get("seed", 17))))
         run.write_yaml("config.yaml", cfg)
         if backend == "gpu_verl":
             cache = {}
@@ -382,18 +540,22 @@ def run_batch_audit(records, cfg, run_dir):
         manifest.update(checkpoint=str(ckpt), checkpoint_sha256=sha256_file(ckpt), checkpoint_step=payload.get("step"),
                         method=spec.name, reward_protocol_version=REWARD_PROTOCOL_VERSION,
                         requested_n_prompts=n_prompts, actual_n_prompts=len(selected),
+                        batch_shape_source=shape,
                         training_settings_sources=source, diagnostic_batch_settings=audit,
                         horizon=int(cfg.get("max_new_tokens", 2048)), decision_tokens=int(cfg.get("decision_tokens", 512)))
         run.write_json("batch_audit_manifest.json", manifest); persist_load_report(run, data_path=cfg.get("data_path"))
         result = audit_fixed_batches(selected, engines, layout, encode, payload, predictor, u, spec, cfg, run)
         result.update(status="completed", started=started, finished=utc_now(), run_dir=str(run.root), manifest=manifest)
-        ledger.add("batch_audit", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status="completed")
-        result["cost_scope"] = "Whole audit envelope: initialization, optional full prescan, every prefix/suffix, every full gradient, CPU optimizer replay and evidence persistence. GPU time is reserved envelope, not utilization."
+        result["cost_scope"] = "Audit function envelope: initialization, optional full prescan, every prefix/suffix, every full gradient, CPU optimizer replay and evidence persistence. Excludes final ledger publication and caller-side CLI/data loading. GPU time is reserved envelope, not utilization."
         run.write_json("batch_audit_summary.json", result)
-        run.write_json("compute_ledger.json", ledger.summary()); run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])
+        status = "completed"
         return result
     except Exception as exc:
-        ledger.add("batch_audit", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status="failed")
-        run.write_json("compute_ledger.json", ledger.summary()); run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])
+        status = "failed"
         write_failed(run, exc, versions, started)
         raise
+    finally:
+        ledger.add("batch_audit", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status=status,
+                   timing_scope="Function entry through setup, computation and result/failure persistence; excludes final ledger publication and caller-side CLI/data loading.")
+        run.write_json("compute_ledger.json", ledger.summary())
+        run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])

@@ -1,0 +1,5 @@
+# Single-factor overlay: freeze the learned U after predictor warmup.
+# Online coordinate/risk/shrink updates continue; historical G becomes
+# (U.T @ G, ||G||^2). No prescan/fresh/baseline settings are changed here.
+predictor:
+  fixed_basis: true

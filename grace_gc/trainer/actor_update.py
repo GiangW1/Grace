@@ -62,6 +62,53 @@ def real_stream_backward_each(logprob_fn, advantages: np.ndarray, p: np.ndarray,
     return total
 
 
+def real_stream_backward_and_audit(logprob_fn, advantages, p, z, n, chosen,
+                                   named_params, layout, audit_mask):
+    """Accumulate -Z*G/(N*p) and retain sampled, unweighted G in one pass.
+
+    Every completed nonzero-advantage trajectory has the same gradient path,
+    regardless of whether it is audited. Only audited G is copied to the host;
+    extra label storage and fitting still cost time. No suffix is bought here.
+    """
+    torch = _torch()
+    scales = real_stream_loss_scale(advantages, p, z, n)
+    chosen = np.asarray(chosen, dtype=bool).reshape(-1)
+    audit_mask = np.asarray(audit_mask, dtype=bool).reshape(-1)
+    if chosen.size != n or audit_mask.size != n:
+        raise ValueError("chosen/audit mask dimension does not match N")
+    params = [param for _name, param in named_params]
+    total, audits = None, {}
+    for i in range(n):
+        if not chosen[i] or float(z[i]) < 1.0:
+            continue
+        if float(advantages[i]) == 0.0:
+            if audit_mask[i]:
+                audits[i] = np.zeros(layout.dim, dtype=np.float64)
+            continue
+        lp = logprob_fn(i)
+        if lp is None:
+            raise ValueError("completed nonzero-advantage start has no logprob")
+        scalar = lp * float(advantages[i])
+        grads = (torch.autograd.grad(scalar, params, allow_unused=True)
+                 if scalar.requires_grad else [None] * len(params))
+        weight = -float(z[i]) / (n * float(p[i]))
+        for param, grad in zip(params, grads):
+            if grad is not None:
+                if param.grad is None:
+                    param.grad = grad.detach().mul(weight)
+                else:
+                    param.grad.add_(grad.detach(), alpha=weight)
+        if audit_mask[i]:
+            audits[i] = pack_grads([
+                (name, np.zeros(tuple(param.shape), dtype=np.float64) if grad is None
+                 else grad.detach().cpu().numpy())
+                for (name, param), grad in zip(named_params, grads)
+            ], layout)
+        term = lp.detach() * float(scales[i])
+        total = term if total is None else total + term
+    return (torch.zeros(()) if total is None else total), audits
+
+
 def snapshot_grads(params) -> list:
     out = []
     for param in params:

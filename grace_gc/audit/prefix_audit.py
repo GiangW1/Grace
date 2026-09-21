@@ -14,10 +14,11 @@ from grace_gc.audit.stats import (
     plc,
     rho_ucb,
     summarize_with_filters,
+    summarize_joint_lag,
     t_answer,
     t_learn,
 )
-from grace_gc.audit.variance_cost import fit_eval_split, match_observed_cost, variance_times_cost
+from grace_gc.audit.variance_cost import cluster_bootstrap_variance_cost, fit_eval_split, match_observed_cost, variance_times_cost
 from grace_gc.audit.mechanism import full_space_decomposition, summarize_decompositions
 from grace_gc.predictor.risk import full_space_residual
 from grace_gc.trainer.grace_step import control_variate_coordinates, decide_continuation
@@ -391,6 +392,7 @@ def audit_bundles(
         "variance_cost_oracle": vc["oracle"],
         "variance_cost_note": vc.get("note"),
         "variance_cost_diagnostics": vc.get("diagnostics"),
+        "variance_cost_uncertainty": vc.get("uncertainty"),
         "orthogonal_energy": None if not u.size or n_g == 0 else float(ortho),
         "orthogonal_energy_space": "stored gradient coordinates; projected-space span if gradients are sketched",
         "full_orthogonal_energy": (
@@ -489,8 +491,70 @@ def independent_report_statistics(bundles: list[PrefixBundle], analysis: dict) -
         "n_selected": len(selected),
         "selected": [{"problem_id": b.problem_id, "path_id": b.path_id, "t": b.t} for b in selected],
         "curve": curves,
+        "joint_lag": _joint_lag_evidence(bundles, mask, vg, vr, analysis),
         "note": "conditional on sampled prefixes; finite detection denominators remain noisy; no minimum sample gate and no replacement of the headline",
     }
+
+
+def _joint_lag_evidence(bundles, mask, vg, vr, analysis):
+    """Both rho values use the identical held-out continuation row indices."""
+    options = analysis.get("joint_lag") or {}
+    thresholds = {"rho_l_max": float(options.get("rho_l_max", .5)),
+                  "rho_a_min": float(options.get("rho_a_min", .8))}
+    if not all(np.isfinite(value) for value in thresholds.values()):
+        raise ValueError("joint LAG analysis thresholds must be finite")
+    selected_by_index = dict(zip((i for i, b in enumerate(bundles) if len(b.grads) >= 8), mask))
+    rows = []
+    for index, bundle in enumerate(bundles):
+        n = len(bundle.grads)
+        split = index in selected_by_index
+        mid = n // 2 if split else n
+        row = {"bundle_index": index, "problem_id": bundle.problem_id,
+               "path_id": bundle.path_id, "t": int(bundle.t),
+               "selected": bool(selected_by_index.get(index, False)),
+               "n_total": n, "n_detect": mid if split else 0, "n_report": n - mid,
+               "report_row_indices": list(range(mid, n)),
+               "gradient_denominator": None, "reward_denominator": None,
+               "gradient_numerator": None, "reward_numerator": None,
+               "rho_l": None, "rho_a": None, "pair_defined": False,
+               "joint": None, "missing_reasons": [], "gradient_projection": bundle.projection}
+        if not split:
+            row["missing_reasons"].append("independent_report_split_unavailable")
+        elif len(bundle.rewards) != n:
+            row["missing_reasons"].append("gradient_reward_row_count_mismatch")
+        else:
+            for label, numerator, denominator, output in (
+                ("gradient", _cond_var(bundle.grads[mid:], finished=bool(bundle.finished)),
+                 vg.get(bundle.problem_id), "rho_l"),
+                ("reward", float(np.var(bundle.rewards[mid:], ddof=1)),
+                 vr.get(bundle.problem_id), "rho_a"),
+            ):
+                valid_num = numerator is not None and np.isfinite(numerator)
+                valid_den = denominator is not None and np.isfinite(denominator) and denominator > 0
+                row[label + "_numerator"] = float(numerator) if valid_num else None
+                row[label + "_denominator"] = float(denominator) if denominator is not None and np.isfinite(denominator) else None
+                if not valid_num:
+                    row["missing_reasons"].append("nonfinite_" + label + "_numerator")
+                if not valid_den:
+                    row["missing_reasons"].append("nonpositive_or_nonfinite_" + label + "_denominator")
+                if valid_num and valid_den:
+                    value = float(numerator / denominator)
+                    if np.isfinite(value):
+                        row[output] = value
+                    else:
+                        row["missing_reasons"].append("nonfinite_" + output)
+            row["pair_defined"] = row["rho_l"] is not None and row["rho_a"] is not None
+            if row["selected"] and row["pair_defined"]:
+                row["joint"] = row["rho_l"] <= thresholds["rho_l_max"] and row["rho_a"] >= thresholds["rho_a_min"]
+        rows.append(row)
+    context = dict(analysis.get("joint_lag_context") or {})
+    context.setdefault("max_new_tokens", analysis.get("max_new_tokens"))
+    return {"thresholds": thresholds, "context": context,
+            "context_missing": [key for key in ("checkpoint_sha256", "max_new_tokens") if context.get(key) is None],
+            "context_scope": "Caller-supplied context applies to this one audit invocation; merged files are not independently source-verified here.",
+            "rows": rows, "curve": summarize_joint_lag(rows), "cluster_unit": "problem_id",
+            "unit": "selected prefix bundle at each t, with both finite rho values on the same report rows",
+            "scope": "Joint fractions use per-prefix events, never thresholds on two marginal means. Paired rho means use the same finite prefix set, within problem then across problems; existing headline means are unchanged. Prefixes/path slices share problem-level detection denominators and are not independent Bernoulli trials. Fractions are descriptive point estimates conditional on detection selection; no binomial or training-seed confidence claim. Gradient statistics use stored coordinates and inherit any recorded projection."}
 
 
 def _token_plc_fields(bundles: list[PrefixBundle], prompt_var_g_by: dict[str, float], eps: float) -> dict:
@@ -737,7 +801,9 @@ def _restricted_variance_cost(
             "actual_p_product": float("nan"),
             "ratio": None,
         }
-        return {"oracle": empty, "actual": empty, "note": "token_proxy_cost; no independent same-prefix rows"}
+        return {"oracle": empty, "actual": empty, "note": "token_proxy_cost; no independent same-prefix rows",
+                "uncertainty": {"point_ratio": None, "ratio_ci95": None, "n_rows": 0,
+                                "unavailable_reason": "no_independent_same_prefix_report_rows"}}
     if use_pred and analysis.get("control_variate", True) and any(b.m_pred is not None for b in eval_b):
         note = "token_proxy_cost; frozen_predictor; same-prefix oracle"
     elif used_within:
@@ -751,6 +817,10 @@ def _restricted_variance_cost(
     suffix = np.asarray(suffix)
     diagnostics = _allocation_diagnostics(eval_b, row_bundle, g_rows, m_rows, p_rows,
                                          prefix_rows, suffix, float(analysis.get("p_min", .2)))
+    bootstrap = analysis.get("variance_cost_bootstrap") or {}
+    uncertainty = cluster_bootstrap_variance_cost(
+        g_rows, m_rows, p_rows, prefix_rows, suffix, [eval_b[i].problem_id for i in row_bundle],
+        samples=bootstrap.get("samples", 1000), seed=int(bootstrap.get("seed", 17)))
     return {
         "oracle": variance_times_cost(
             g_rows, np.stack(m_oracle, axis=0), np.asarray(p_rows), prefix_cost=np.asarray(prefix_rows), suffix_cost=np.asarray(suffix)
@@ -760,6 +830,7 @@ def _restricted_variance_cost(
         ),
         "note": note,
         "diagnostics": diagnostics,
+        "uncertainty": uncertainty,
     }
 
 

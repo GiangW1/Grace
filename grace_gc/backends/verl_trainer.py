@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import atexit
 from pathlib import Path
+import sys
 from typing import Any
 
 import numpy as np
@@ -14,8 +15,7 @@ from grace_gc.backends.gpu_engine import make_gpu_engines
 from grace_gc.backends.hf_actor import actor_numerics, named_lora_params
 from grace_gc.core.layout import collect_lora_layout
 from grace_gc.core.rng import IsolatedRNG, seed_all
-from grace_gc.data.format_prompt import apply_solve_instruction
-from grace_gc.data.math_data import last_load_report, load_math_records, split_records
+from grace_gc.data.math_data import load_training_data
 from grace_gc.data.tokenize import encode_records_hf, load_hf_tokenizer, tokenizer_inventory
 from grace_gc.trainer.format_warmup import format_warmup_steps, run_format_warmup_hf
 from grace_gc.logging_util.forensics import persist_final_checkpoint, persist_initial_checkpoint, persist_training_step, write_data_inventory
@@ -28,7 +28,7 @@ from grace_gc.trainer.baseline import baseline_from_config
 from grace_gc.trainer.loop import resolve_start_counts, resume_start_counts, sample_prompt_indices, sample_starts
 from grace_gc.trainer.methods import apply_method_defaults, method_spec
 from grace_gc.trainer.state_io import restore_train_state
-from grace_gc.trainer.cost_control import cost_start_counts, ensure_cost_control, observe_batch_cost, start_cost_control
+from grace_gc.trainer.cost_control import cost_start_counts, ensure_cost_control, observe_batch_cost, start_cost_control, start_count_mode
 
 
 def _ensure_bf16(model):
@@ -167,14 +167,27 @@ def build_vllm_engine(model_path: str, cfg: dict[str, Any], lora_rank: int):
 
 
 def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None = None) -> dict[str, Any]:
+    resources = {}
+    try:
+        return _train(cfg, run, ledger, resources)
+    finally:
+        pool = resources.get("pool")
+        if pool is not None:
+            pool.close()
+
+
+def _train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None, resources) -> dict[str, Any]:
     start_cost_control(cfg, Timer())
     n_gpu = int(cfg.get("hardware", {}).get("n_gpu", 1))
-    if n_gpu > 1:
-        raise RuntimeError(
-            "n_gpu>1 needs a real distributed reduce that is not wired. "
-            "Set hardware.n_gpu=1 until FSDP allreduce writes .grad once."
-        )
+    from grace_gc.backends.rollout_pool import RolloutPool, validate_layout
+    try:
+        workers = validate_layout(cfg)
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
     versions = require_gpu_stack()
+    if workers:
+        import torch
+        torch.cuda.set_device(0)
     cfg = apply_method_defaults(cfg)
     spec = method_spec(cfg.get("method", "grace"))
     if spec.max_new_tokens:
@@ -205,14 +218,12 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         packed = None
         if not data_path:
             raise ValueError("data_path or prompt_token_ids is required for GPU training")
-        loaded = apply_solve_instruction(load_math_records(data_path))
-        buckets = split_records(loaded, seed=int(cfg.get("split_seed", 17)))
+        buckets, report = load_training_data(data_path, cfg.get("eval_data_path"), seed=int(cfg.get("split_seed", 17)))
         train_recs = buckets["train"]
+        write_data_inventory(run, buckets, data_path, source="file", load_report=report,
+                             split_seed=int(cfg.get("split_seed", 17)))
         if not train_recs:
             raise ValueError("training split is empty")
-        write_data_inventory(run, buckets, data_path, source="file", load_report=last_load_report(),
-                             split_seed=int(cfg.get("split_seed", 17)))
-        report = last_load_report()
         if report and int(report.get("n_conflict_groups") or 0) > 0:
             print(
                 f"dropped {report['n_conflict_groups']} conflicting prompt groups; "
@@ -226,7 +237,7 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
     if ledger is None:
         ledger = ComputeLedger(n_gpu=max(n_gpu, 1), hardware=str(cfg.get("hardware", {}).get("name", "gpu")))
     actor = load_lora_actor(str(model_path), cfg.get("lora", {}))
-    actor = maybe_wrap_fsdp(actor, n_gpu)
+    actor = maybe_wrap_fsdp(actor, 1)
     from grace_gc.trainer.initialization import initialize_actor
 
     initial_actor = initialize_actor(actor, cfg, run)
@@ -237,10 +248,53 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
     vllm_cfg = dict(cfg.get("vllm") or {})
     vllm_cfg.setdefault("seed", int(cfg.get("seed", 17)))
     vllm_cfg["max_model_len"] = vllm_needed_max_model_len(cfg)
-    llm = build_vllm_engine(str(model_path), vllm_cfg, int(cfg.get("lora", {}).get("rank", 16)))
-    if getattr(build_vllm_engine, "last", None):
+    if workers:
+        llm = RolloutPool.launch(str(model_path), vllm_cfg, int(cfg.get("lora", {}).get("rank", 16)), n_gpu)
+        resources["pool"] = llm
+        run.write_json("vllm_engine.json", llm.metadata)
+    else:
+        llm = build_vllm_engine(str(model_path), vllm_cfg, int(cfg.get("lora", {}).get("rank", 16)))
+    if not workers and getattr(build_vllm_engine, "last", None):
         run.write_json("vllm_engine.json", build_vllm_engine.last)
     engines, extra = make_gpu_engines(actor, llm, tokenizer, cfg, Path(run.root) / "lora")
+    def observed_call(phase, step, action):
+        timer = Timer()
+        try:
+            return action()
+        except Exception as exc:
+            roll = engines.last_rollout or {}
+            failed_attempt = None
+            if phase == "algorithm_step":
+                phases = [("prefix", 1, roll.get("prefix_execution") or {})]
+                phases.extend(("continue", i + 1, item)
+                              for i, item in enumerate(roll.get("continue_execution") or []))
+                for name, index, item in phases:
+                    calls = item.get("generate_calls") or []
+                    if calls and calls[-1].get("status") == "failed":
+                        failed_attempt = {**calls[-1], "phase": name, "phase_call_index": index,
+                                          "generate_call_index": len(calls),
+                                          "request_indices": item.get("request_indices")}
+            payload = {
+                "step": int(step), "phase": phase,
+                "error_type": type(exc).__name__, "error": str(exc),
+                "phase_attempt_wall_seconds": timer.elapsed(),
+                "failed_attempt": failed_attempt,
+                "rollout_execution": {key: roll[key] for key in (
+                    "prefix_execution", "continue_execution", "prefix_num_cached_tokens",
+                    "continue_num_cached_tokens") if key in roll},
+                "last_sync": extra.get("last_sync"),
+                "scope": "Failure observations only; timings remain included in failed-run costs; call indices are one-based",
+            }
+            try:
+                run.write_json("failed_execution.json", payload)
+            except Exception as write_error:
+                note = f"failed_execution.json could not be written: {write_error}"
+                if hasattr(exc, "add_note"):
+                    exc.add_note(note)
+                else:
+                    print(note, file=sys.stderr)
+            raise
+
     from grace_gc.backends.logprob_probe import probe_behavior_batch
 
     engines.before_update = lambda records: probe_behavior_batch(
@@ -249,7 +303,7 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         max_sequences=(cfg.get("diagnostics") or {}).get("probe_sequences", 1),
         include_stopped=bool((cfg.get("diagnostics") or {}).get("probe_stopped_prefixes", True)),
     )
-    extra["sync"]()
+    observed_call("initial_sync", 0, extra["sync"])
     print(
         "phase=post_sync implementation=gpu_vllm_hf "
         f"adapter={extra.get('adapter_path')} lora_id={extra.get('lora_id')} "
@@ -318,13 +372,15 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         from grace_gc.logging_util.forensics import record_effective_config
 
         record_effective_config(run, cfg, state, opt)
-        extra["sync"]()
+        observed_call("resume_sync", state.step, extra["sync"])
         print(
             f"phase=resume_sync adapter={extra.get('adapter_path')} lora_id={extra.get('lora_id')}",
             flush=True,
         )
         n_prompts, starts_per, n_start = resume_start_counts(cfg, spec, state)
 
+    from grace_gc.predictor.offline import attach_predictor
+    attach_predictor(state, cfg, run)
     run.write_json(
         "startup.json",
         {
@@ -368,7 +424,7 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
             break
         if controller.enabled:
             n_prompts, starts_per, n_start = cost_start_counts(cfg, spec, state, (n_prompts, starts_per, n_start))
-        elif last.get("next_n"):
+        elif start_count_mode(cfg) != "fixed" and last.get("next_n"):
             n_prompts, starts_per, n_start = resolve_start_counts(cfg, spec, n_start=max(1, int(last["next_n"])))
         step_timer = Timer()
         prompts, pids, golds, prompt_meta = _batch_ids(state.rng)
@@ -377,9 +433,10 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
             f"n_prompts={n_prompts} starts_per={starts_per}",
             flush=True,
         )
-        last = run_algorithm1_step(engines, state, prompts, pids, golds, cfg, opt, prompt_meta=prompt_meta)
+        last = observed_call("algorithm_step", state.step + 1, lambda: run_algorithm1_step(
+            engines, state, prompts, pids, golds, cfg, opt, prompt_meta=prompt_meta))
         sync_timer = Timer()
-        extra["sync"]()
+        observed_call("step_sync", state.step, extra["sync"])
         last["timings"]["sync"] = sync_timer.elapsed()
         last["force_final_checkpoint"] = controller.stop_reason() is not None
         persist_training_step(
@@ -395,6 +452,7 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
                 "lora": dict(cfg.get("lora") or {}),
                 "adapter_path": None if extra.get("adapter_path") is None else str(extra.get("adapter_path")),
                 "lora_id": extra.get("lora_id"),
+                "last_sync": extra.get("last_sync"),
             },
             wall_s=step_timer.elapsed(),
             cpu_s=step_timer.cpu_elapsed(),
@@ -428,7 +486,7 @@ def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None =
         "cost_control": cost,
         "allocation_ready_last_batch": bool(last.get("allocation_ready", False)),
         "allocation_ready_steps_this_session": allocation_steps,
-        "post_warmup_steps": max(0, state.step - int((cfg.get("predictor") or {}).get("warmup_steps", 0))),
+        "post_warmup_steps": state.step if state.offline_predictor else max(0, state.step - int((cfg.get("predictor") or {}).get("warmup_steps", 0))),
         "step": state.step,
         "status": "gpu_loop_ran",
         "checkpoint": str(Path(run.root) / "checkpoint.npz"),

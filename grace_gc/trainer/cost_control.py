@@ -9,10 +9,21 @@ from pathlib import Path
 from grace_gc.logging_util.ledger import Timer
 
 
+def start_count_mode(cfg):
+    options = cfg.get("cost_control") or {}
+    mode = options.get("mode")
+    if mode is None:
+        mode = "wall" if options.get("enabled", False) else "token"
+    if mode not in {"fixed", "wall", "token"}:
+        raise ValueError("cost_control.mode must be fixed, wall or token")
+    return mode
+
+
 class CostControl:
     def __init__(self, cfg, timer=None, restored=None, prior_seconds=0.0, recovery_source="new_run"):
         options = cfg.get("cost_control") or {}
-        self.enabled = bool(options.get("enabled", False))
+        self.mode = start_count_mode(cfg)
+        self.enabled = self.mode == "wall"
         self.alpha = float(options.get("ema_alpha", 0.3))
         self.max_n = options.get("max_n")
         self.run_budget = cfg.get("run_wall_seconds")
@@ -39,7 +50,7 @@ class CostControl:
     def snapshot(self):
         session = float(self.timer.elapsed())
         total = self.prior_seconds + session
-        return {**self.state, "enabled": self.enabled, "global_wall_seconds": total,
+        return {**self.state, "mode": self.mode, "enabled": self.enabled, "global_wall_seconds": total,
                 "session_wall_seconds": session, "prior_wall_seconds": self.prior_seconds,
                 "run_wall_seconds_budget": self.run_budget, "session_wall_seconds_budget": self.session_budget,
                 "run_overshoot_seconds": max(0., total - float(self.run_budget)) if self.run_budget is not None else None,
@@ -57,9 +68,11 @@ class CostControl:
             return "session_wall_seconds"
         return None
 
-    def observe(self, n, wall_seconds, step, group=1, minimum_n=None):
-        if wall_seconds <= 0 or n <= 0:
+    def observe(self, n, wall_seconds, step, group=1, minimum_n=None, *, main_seconds=None):
+        if not math.isfinite(wall_seconds) or wall_seconds <= 0 or n <= 0:
             raise ValueError("observed batch wall time and N must be positive")
+        if main_seconds is not None and (not math.isfinite(main_seconds) or not 0 <= main_seconds <= wall_seconds):
+            raise ValueError("main_seconds must be finite and within the complete batch wall time")
         self.state.update(last_step=int(step), last_n=int(n), last_batch_wall_seconds=float(wall_seconds))
         if not self.enabled:
             return None
@@ -67,16 +80,35 @@ class CostControl:
         minimum = max(group, int(minimum_n or group))
         if self.max_n is not None and int(self.max_n) < minimum:
             raise ValueError("cost_control.max_n cannot form the required prompt group")
-        per_start = float(wall_seconds) / int(n)
+        model = ("main_work_plus_amortized_fixed_seconds" if main_seconds is not None
+                 else "complete_batch_wall_seconds_per_start_ema")
         previous = self.state.get("ema_seconds_per_start")
+        if self.state.get("model", "complete_batch_wall_seconds_per_start_ema") != model:
+            # An old complete-batch slope cannot initialize a marginal slope.
+            previous = None
+            self.state.update(main_observations=0, fixed_seconds_sum=0.)
+        fixed_mean = 0.
+        if main_seconds is not None:
+            fixed = float(wall_seconds) - float(main_seconds)
+            count = int(self.state.get("main_observations", 0)) + 1
+            fixed_sum = float(self.state.get("fixed_seconds_sum", 0.)) + fixed
+            fixed_mean = fixed_sum / count
+            self.state.update(main_observations=count, fixed_seconds_sum=fixed_sum,
+                              mean_fixed_seconds=fixed_mean, last_main_seconds=float(main_seconds),
+                              last_fixed_seconds=fixed,
+                              feedback_note="Main phase seconds/N is an approximate marginal cost; remaining measured wall is amortized across observed batches. No linear throughput guarantee; every second remains in the run budget.")
+        per_start = float(wall_seconds if main_seconds is None else main_seconds) / int(n)
         ema = per_start if previous is None else self.alpha * per_start + (1 - self.alpha) * float(previous)
         if self.state.get("target_step_seconds") is None:
             self.state.update(target_step_seconds=float(wall_seconds), target_source="first_observed_complete_batch")
-        next_n = max(minimum, int(float(self.state["target_step_seconds"]) / ema / group) * group)
+        available = max(0., float(self.state["target_step_seconds"]) - fixed_mean)
+        # The tolerance only avoids rounding a mathematically integral group
+        # down by one after subtracting the measured fixed component.
+        next_n = max(minimum, math.floor(available / ema / group + 1e-12) * group) if ema > 0 else max(minimum, int(n))
         if self.max_n is not None:
             next_n = min(next_n, (int(self.max_n) // group) * group)
         self.state.update(ema_seconds_per_start=ema, observations=int(self.state["observations"]) + 1,
-                          next_n=next_n, group_size=group, model="complete_batch_wall_seconds_per_start_ema")
+                          next_n=next_n, group_size=group, model=model)
         return next_n
 
     def record(self, run, event, *, state=None, cfg=None, **extra):
@@ -121,7 +153,9 @@ def restore_cost_control(cfg, timer, checkpoint_payload=None):
                         float(old.get("cumulative_wall_seconds", 0.0)))
     # External records contain metadata, not additional controller parameters.
     keys = ("target_step_seconds", "target_source", "observations", "next_n", "ema_seconds_per_start",
-            "last_step", "last_n", "last_batch_wall_seconds", "group_size", "model")
+            "last_step", "last_n", "last_batch_wall_seconds", "group_size", "model",
+            "main_observations", "fixed_seconds_sum", "mean_fixed_seconds", "last_main_seconds",
+            "last_fixed_seconds", "feedback_note")
     return CostControl(cfg, timer, {key: restored[key] for key in keys if key in restored}, prior, source)
 
 
@@ -174,7 +208,13 @@ def observe_batch_cost(controller, cfg, state, last, seconds):
     else:
         group = min(int(cfg.get("n_prompts", 4)), state.n_ref)
         minimum = group * (2 if state.spec.objective == "grpo" else 1)
-    nxt = controller.observe(int(last["n"]), seconds, state.step, group, minimum)
+    timings = last.get("timings")
+    # These phases operate on main trajectories. Prescan, fresh supervision,
+    # predictor fitting, update/sync and persistence stay in the fixed account.
+    # This grouping is a scheduling approximation, not a GPU kernel model.
+    main = None if not timings else sum(float(timings.get(name, 0.)) for name in
+                                       ("prefix", "allocate", "continue", "backward", "audit", "behavior_probe"))
+    nxt = controller.observe(int(last["n"]), seconds, state.step, group, minimum, main_seconds=main)
     if nxt is not None:
         last["next_n"] = nxt
     state.cost_control = controller.snapshot()

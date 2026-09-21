@@ -1,6 +1,6 @@
 # Requirements: GRACE-GC
 
-**Updated:** 2026-09-17
+**Updated:** 2026-09-19
 
 按用户最新要求：先完成全部核心代码，再运行最小证伪。以下是功能清单，不是实验准入规则；替代此前43项形式化需求。
 
@@ -12,11 +12,11 @@
 - [x] **CODE-02**: 实现全空间 HT 估计器、双流等价形式、p=1 回归和负损失符号；用 NumPy FP64/小模型检查 U1–U4。
 - [x] **CODE-03**: 实现包含 p_min 的续写成本分配与边界处理，返回实际 p 和预算偏差；非法概率或无法计算的输入明确报错。
 - [x] **CODE-04**: 实现 CPU tiny LoRA 自回归训练，涵盖 token-sum、固定 N、RNG 隔离、自然 EOS、零幸存和信息泄漏负例 U5。
-- [x] **CODE-05**: 实现 step 前的完整 q/v LoRA per-sample 梯度审计、独立抽样 s 和完整历史梯度 reservoir。
+- [x] **CODE-05**: 实现 step 前的完整 q/v LoRA per-sample 梯度审计、独立抽样 s 和历史梯度 reservoir；动态 U 保留完整 G，固定 U 候选改存坐标与完整范数，主更新仍使用全空间 G。
 - [x] **CODE-06**: 实现低秩 basis/刷新重投影、前缀特征、坐标头、全空间风险头、Gram 残差与成本头/常数成本选项。
 - [x] **CODE-07**: 实现历史数据和问题级拆分上的 IPW 预测器训练，使用 1/(p*s) 并按当前 basis/预测器重算风险标签。
 - [x] **CODE-08**: 实现批内冻结、历史 baseline、warmup p=1、批后学习与基于历史成本决定下一批固定起步数。
-- [x] **CODE-09**: 实现真实两阶段 rollout（配置名 `gpu_verl`，实现是 HF actor + vLLM，不是 verl PPO）：相同快照、原始 token IDs、只续写被选者、明确 RNG/缓存处理；避免占位后端。FSDP 包装已写，`n_gpu>1` 仍拒绝。
+- [x] **CODE-09**: 实现真实两阶段 rollout（配置名 `gpu_verl`，实现是 HF actor + vLLM，不是 verl PPO）：相同快照、原始 token IDs、只续写被选者、明确 RNG/缓存处理。新增一张 actor 卡＋n_gpu−1 个 rollout worker，待 GPU 验证；actor allreduce 未接入。
 - [x] **CODE-10**: 实现分布式固定全局 N、完整参数布局、负预测校正、AMP/归约/clip 顺序，以及 FP64 对照和 U6/U7 测试入口。
 - [x] **CODE-11**: 保存和恢复 actor、optimizer、预测器、baseline、basis/reservoir 与 RNG 等实际续训状态。
 - [x] **CODE-12**: 实现 Full-PG、Uniform-HT、Uniform-CV、Reward-CV、Prompt-CV、GRACE；提供独立实用轨道 GRPO、GRPO-short 配置。
@@ -25,13 +25,15 @@
 - [x] **CODE-15**: 实现独立完整作答评测：论文数学基准配置、avg/pass@k、解析/截断率、time-to-target 和真实验证的困难题首次成功 HVD。
 - [x] **CODE-16**: 实现可调规模的同前缀独立续写审计、全空间/JL 核对、正交补诊断、rho_L/rho_A、t_L/t_A、ELF/LAG/PLC 与区间统计。
 - [x] **CODE-17**: 实现审计的独立拟合/评估划分，以及 Oracle/实际预测器在实际受限 p 下的方差成本计算；不把理论闭式写成实验开关。
-- [x] **CODE-18**: 提供最小实验、完整 Pilot 参数、单卡 A100/5090 启动配置与 README 全流程（先 smoke Full-PG，再 Pilot）；4×A100/8×5090 yaml 保留但 `n_gpu>1` 会拒绝。记录已跑测试、未跑项目和必要实现差异，结果不足照常输出。
+- [x] **CODE-18**: 提供最小实验、完整 Pilot 参数、单卡 A100/5090 配置与 README 全流程；另有离线预测器四组对照和 `a100_rollout_4.yaml`。旧多卡配置须补齐 worker 布局，不能当作多卡 actor 训练。记录已跑测试、未跑项目和必要实现差异，结果不足照常输出。
 
 ### Phase 2 — 最小证伪实验
 
-- [ ] **RUN-01**: 代码完成后，在目标 GPU 上按 README 安装依赖并短跑完整训练链路（当前入口单卡；4 卡未接线）。实际遇到设备/数值错误就定位修复。
-- [ ] **RUN-02**: 用可调的小规模配置运行同前缀审计及核心方法比较，保存所有观测；允许直接使用已有 checkpoint。
-- [ ] **RUN-03**: 汇总梯度误差、解题结果、实际成本及不确定性，判断后续实验方向；无需满足额外自动 Go/No-Go 条件。
+- [x] **RUN-01**: 在目标 GPU 上短跑完整训练链路（9月18日四方法链，单卡；4 卡未接线）。
+- [x] **RUN-02**: 运行小规模同前缀审计及核心方法比较并保存观测（9月18日链；归档明确排除的大文件仍有证据缺口）。
+- [x] **RUN-03**: 汇总梯度误差、解题结果、实际成本及不确定性，判断后续方向（9月19日复核；负结果正常报告，无自动 Go/No-Go）。
+
+以上完成状态限于 `3c03ce9` 的 [9月18日实测与复核](../docs/MINIMAL_RESULTS_REVIEW_20260919.md)，不表示后续修复或论文效果已验证。新候选与未完成项见 [问题清单](../docs/GRACE_ISSUE_CHECKLIST_20260919.md)。
 
 ## 不建设的额外机制
 
@@ -59,7 +61,7 @@
 | CODE-06 | Phase 1 | Code complete |
 | CODE-07 | Phase 1 | Code complete |
 | CODE-08 | Phase 1 | Code complete |
-| CODE-09 | Phase 1 | Wired: vLLM two-phase + HF logprob/backward/LoRA sync; GPU unverified |
+| CODE-09 | Phase 1 | 单卡旧版已实跑；后续修复待 GPU 回归；多卡未接线 |
 | CODE-10 | Phase 1 | CPU reduce/clip done; U6 GPU pending |
 | CODE-11 | Phase 1 | Code complete |
 | CODE-12 | Phase 1 | Code complete |
@@ -69,8 +71,8 @@
 | CODE-16 | Phase 1 | Code complete |
 | CODE-17 | Phase 1 | Code complete |
 | CODE-18 | Phase 1 | Code complete |
-| RUN-01 | Phase 2 | Pending |
-| RUN-02 | Phase 2 | Pending |
-| RUN-03 | Phase 2 | Pending |
+| RUN-01 | Phase 2 | 9月18日单卡链已完成 |
+| RUN-02 | Phase 2 | 9月18日审计与比较已完成；归档缺件另列 |
+| RUN-03 | Phase 2 | 9月19日逐文件复核已完成 |
 
-21项需求均已映射。Phase 1 的 18 项代码已落地；Phase 2 的 3 项实验未跑。GPU 集成测试待服务器。
+21项原始需求均已映射，首轮实现和最小证伪已完成；后续迭代仍在进行。当前 CPU 测试与 GPU 待验证范围见 [TEST_STATUS.md](../docs/TEST_STATUS.md)。

@@ -1,4 +1,4 @@
-# First runnable GPU config. n_gpu>1 is rejected until allreduce is wired.
+# Single actor + colocated vLLM. Multi-card rollout uses a100_rollout_4.yaml.
 hardware:
   name: a100
   n_gpu: 1

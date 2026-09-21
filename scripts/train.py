@@ -23,6 +23,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--backend", default=None, help="cpu_tiny or gpu_verl")
     parser.add_argument("--model-path", dest="model_path", default=None)
     parser.add_argument("--data-path", dest="data_path", default=None)
+    parser.add_argument("--eval-data-path", default=None, help="exclude this evaluation corpus from all training pools before SFT/sampling")
     parser.add_argument("--run-dir", dest="run_dir", default=None, help="default: runs/train-UTC")
     parser.add_argument("--num-steps", dest="num_steps", type=int, default=None)
     parser.add_argument("--run-wall-seconds", type=float, default=None, help="cumulative run budget; stop at a batch boundary")
@@ -30,6 +31,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--target-step-seconds", type=float, default=None, help="enable measured-cost feedback for the next batch N")
     parser.add_argument("--resume", default=None)
     parser.add_argument("--init-checkpoint", default=None, help="load shared actor only; start a new method")
+    parser.add_argument("--offline-predictor", default=None, help="load a frozen predictor artifact; {seed} is expanded")
     args = parser.parse_args(argv)
     overrides = {}
     if args.method:
@@ -42,6 +44,8 @@ def main(argv: list[str] | None = None) -> int:
         overrides["model_path"] = args.model_path
     if args.data_path:
         overrides["data_path"] = args.data_path
+    if args.eval_data_path:
+        overrides["eval_data_path"] = args.eval_data_path
     if args.num_steps is not None:
         overrides["num_steps"] = args.num_steps
     if args.run_wall_seconds is not None:
@@ -54,6 +58,8 @@ def main(argv: list[str] | None = None) -> int:
         overrides["resume"] = args.resume
     if args.init_checkpoint:
         overrides["init_checkpoint"] = args.init_checkpoint
+    if args.offline_predictor:
+        overrides["offline_predictor"] = args.offline_predictor
     cfg = build_run_config(args.config, overrides)
     run_dir = args.run_dir or str(default_run_dir("train"))
     payload = run_training(cfg, run_dir)

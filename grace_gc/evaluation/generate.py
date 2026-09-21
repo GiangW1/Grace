@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
+import json
 from typing import Any
 
 from grace_gc.data.format_prompt import apply_solve_instruction
@@ -111,6 +113,7 @@ def generate_answers_vllm(
     lora_request=None,
     max_prompt: int = 1024,
     sample_batch_size: int = 1,
+    request_recorder=None,
 ) -> list[EvalItem]:
     from grace_gc.backends.vllm_two_phase import (
         _require_known_finish,
@@ -125,6 +128,7 @@ def generate_answers_vllm(
     _require_vllm()
     items = []
     sample_i = 0
+    chunk_i = 0
     eos_id = collect_stop_token_ids(tokenizer)
     for rec in records:
         prompt_meta: list = []
@@ -139,6 +143,7 @@ def generate_answers_vllm(
         vllm_finish_reasons = []
         fulls = []
         generated = []
+        execution = []
         request_seeds = [int(seed) + sample_i + i for i in range(len(prompts))]
         sample_i += len(prompts)
         batch_size = max(int(sample_batch_size), 1)
@@ -149,17 +154,24 @@ def generate_answers_vllm(
             gen_kwargs = {"use_tqdm": False}
             if lora_request is not None:
                 gen_kwargs["lora_request"] = lora_request
+            fallback = None
             try:
                 outputs = llm.generate(_vllm_prompts(chunk),
                                        sampling_params=params[0] if len(chunk) == 1 else params, **gen_kwargs)
-            except TypeError:
+            except TypeError as exc:
+                fallback = str(exc)
                 outputs = []
                 for prompt, param in zip(chunk, params):
                     outputs.extend(llm.generate(_vllm_prompts([prompt]), sampling_params=param, **gen_kwargs))
             if len(outputs) != len(chunk):
                 raise ValueError(f"vLLM returned {len(outputs)} outputs for {len(chunk)} prompts")
             generated.extend(outputs)
-        for prompt, output, request_seed in zip(prompts, generated, request_seeds):
+            execution.extend({"chunk_index": chunk_i, "requested_batch_size": len(chunk),
+                              "execution_batch_size": 1 if fallback is not None else len(chunk),
+                              "serial_fallback": fallback is not None, "serial_fallback_reason": fallback}
+                             for _ in outputs)
+            chunk_i += 1
+        for local_i, (prompt, output, request_seed) in enumerate(zip(prompts, generated, request_seeds)):
             out_prompt = getattr(output, "prompt_token_ids", None)
             if out_prompt is None:
                 raise ValueError("vLLM output is missing prompt_token_ids; cannot verify request order")
@@ -188,6 +200,16 @@ def generate_answers_vllm(
             vllm_finish_reasons.append(None if finish_reason is None else str(finish_reason))
             token_ids.append([int(x) for x in gen])
             sample_seeds.append(request_seed)
+            if request_recorder is not None:
+                token_hash = lambda ids: hashlib.sha256(json.dumps([int(x) for x in ids], separators=(",", ":")).encode()).hexdigest()
+                request_recorder({"problem_id": rec.problem_id, "sample_index": local_i,
+                    "request_index": sample_i-len(prompts)+local_i, "request_seed": request_seed,
+                    "request_id": None if getattr(output, "request_id", None) is None else str(output.request_id),
+                    "prompt_token_count": len(prompt), "prompt_token_sha256": token_hash(prompt),
+                    "response_token_count": len(gen), "response_token_sha256": token_hash(gen),
+                    "finish_reason": finish_reason, "stop_reason": getattr(completion, "stop_reason", None),
+                    **execution[local_i],
+                    "scope": "Observed execution metadata; identical prompts alone cannot verify the order of duplicate requests. No bitwise determinism claim."})
         # Equal answers are valid independent samples; keep their request seeds.
         items.append(
             EvalItem(
@@ -253,6 +275,15 @@ def limit_eval_records(records: list[MathRecord], cfg: dict[str, Any]) -> list[M
                           int(ev.get("selection_seed", cfg.get("split_seed", cfg.get("seed", 17)))))
 
 
+def eval_engine_config(cfg, max_new):
+    from grace_gc.backends.verl_trainer import vllm_needed_max_model_len
+
+    options = dict(cfg.get("vllm") or {})
+    options.setdefault("seed", int(cfg.get("seed", 17)))
+    options["max_model_len"] = vllm_needed_max_model_len(cfg, max_new)
+    return options
+
+
 def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, run_dir):
     if backend == "gpu_verl":
         if not cfg.get("model_path"):
@@ -260,8 +291,8 @@ def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, 
         ckpt = cfg.get("checkpoint") or cfg.get("resume")
         if not ckpt:
             raise ValueError("GPU evaluation needs a training checkpoint")
-        from grace_gc.backends.hf_actor import named_lora_params
-        from grace_gc.backends.verl_trainer import build_vllm_engine, load_lora_actor, vllm_needed_max_model_len
+        from grace_gc.backends.hf_actor import actor_numerics, named_lora_params
+        from grace_gc.backends.verl_trainer import build_vllm_engine, load_lora_actor
         from grace_gc.backends.weight_sync import apply_lora_request, make_lora_request, reset_vllm_prefix_cache, save_lora_adapter
         from grace_gc.data.tokenize import load_hf_tokenizer, tokenizer_inventory
         from grace_gc.data.reward import require_math_verify
@@ -269,28 +300,35 @@ def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, 
         from grace_gc.trainer.state_io import check_snapshot_identity, load_numpy_module_state
 
         require_math_verify()
+        from grace_gc.core.rng import seed_all
+
+        seed_all(int(cfg.get("seed", 17)))
         tok = load_hf_tokenizer(str(cfg["model_path"]))
         RunDirectory(run_dir).write_json("tokenizer.json", tokenizer_inventory(tok))
         actor = load_lora_actor(str(cfg["model_path"]), cfg.get("lora", {}))
         payload = load_checkpoint(ckpt)
         check_snapshot_identity(payload, cfg)
         load_numpy_module_state(named_lora_params(actor), payload.get("actor") or {})
-        from grace_gc.versions import sha256_named
+        from grace_gc.versions import sha256_named, sha256_file
 
-        RunDirectory(run_dir).write_json("actor_source.json", {
+        actor_source = {
             "checkpoint": str(ckpt), "checkpoint_step": payload.get("step"),
             "method": payload.get("spec"), "actor_sha256": sha256_named(named_lora_params(actor)),
             "hash_stage": "loaded_checkpoint_before_generation", "layout": "all_qv_lora_A_B",
-        })
+            "numerics": actor_numerics(actor),
+        }
         adapter = Path(run_dir) / "eval_lora"
         save_lora_adapter(actor, adapter)
+        actor_source["exported_adapter_files"] = {path.name: {"sha256": sha256_file(path), "bytes": path.stat().st_size}
+                                                   for path in sorted(adapter.iterdir()) if path.is_file()}
+        actor_source["identity_scope"] = "Loaded HF LoRA tensors and exported adapter files; no independent vLLM worker tensor hash or full base-weight hash."
+        RunDirectory(run_dir).write_json("actor_source.json", actor_source)
         del actor
         import torch
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        vllm_cfg = dict(cfg.get("vllm") or {})
-        vllm_cfg["max_model_len"] = vllm_needed_max_model_len(cfg, max_new)
+        vllm_cfg = eval_engine_config(cfg, max_new)
         llm = build_vllm_engine(str(cfg["model_path"]), vllm_cfg, int(cfg.get("lora", {}).get("rank", 16)))
         if getattr(build_vllm_engine, "last", None):
             RunDirectory(run_dir).write_json("vllm_engine.json", build_vllm_engine.last)
@@ -309,6 +347,7 @@ def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, 
             lora_request=lora_request,
             max_prompt=int(cfg.get("prompt_max_tokens", 1024)),
             sample_batch_size=int((cfg.get("eval") or {}).get("sample_batch_size", 1)),
+            request_recorder=lambda row: RunDirectory(run_dir).append_jsonl("eval_requests.jsonl", row),
         )
     else:
         items = generate_answers_tiny(records, n, max_new, int(cfg.get("seed", 17)), cfg=cfg)
@@ -316,41 +355,48 @@ def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, 
 
 
 def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path) -> dict:
+    timer = Timer()
+    started = utc_now()
     cfg = dict(cfg)
-    ckpt = cfg.get("checkpoint") or cfg.get("resume")
-    if ckpt:
-        from grace_gc.trainer.checkpoint import load_checkpoint
-
-        payload = load_checkpoint(ckpt)
-        cfg["method"] = payload.get("spec") or cfg.get("method", "grace")
     backend = cfg.get("backend", "cpu_tiny")
-    n_source = len(records)
-    math500 = looks_like_math500(records, path=cfg.get("data_path"), n_source=n_source)
-    records = apply_solve_instruction(records)
-    records = limit_eval_records(records, cfg)
-    k, n, max_new, temperature, top_p = _eval_hparams(cfg)
     requested = Path(run_dir)
     run_dir = resolve_run_dir(run_dir)
     run = RunDirectory(run_dir)
-    started = utc_now()
-    versions = collect_environment(cfg)
-    versions["started"] = started
-    run.write_run_meta(kind="eval", started=started, requested=requested)
-    run.write_yaml("config.yaml", cfg)
-    run.write_json("environment.json", versions)
-    ev = cfg.get("eval") or {}
-    manifest = selection_manifest(records, str(ev.get("selection", "first")),
-                                  int(ev.get("selection_seed", cfg.get("split_seed", cfg.get("seed", 17)))))
-    manifest.update(sample_seed_start=int(cfg.get("seed", 17)), samples_per_problem=n,
-                    temperature=temperature, top_p=top_p, max_new_tokens=max_new,
-                    sample_batch_size=int(ev.get("sample_batch_size", 1)),
-                    reward_protocol_version=REWARD_PROTOCOL_VERSION)
-    run.write_json("evaluation_manifest.json", manifest)
     n_gpu = int((cfg.get("hardware") or {}).get("n_gpu", 1 if backend == "gpu_verl" else 0))
     hardware = str((cfg.get("hardware") or {}).get("name", "gpu" if backend == "gpu_verl" else "cpu"))
     ledger = ComputeLedger(n_gpu=n_gpu, hardware=hardware)
-    timer = Timer()
+    versions, status = {}, "failed"
     try:
+        ckpt = cfg.get("checkpoint") or cfg.get("resume")
+        if ckpt:
+            from grace_gc.trainer.checkpoint import load_checkpoint
+            from grace_gc.versions import sha256_file, sha256_mapping
+
+            payload = load_checkpoint(ckpt)
+            checkpoint_sha256 = sha256_file(ckpt)
+            actor_state = payload.get("actor_full") if backend == "cpu_tiny" else payload.get("actor")
+            checkpoint_identity = {"actor_state_sha256": sha256_mapping(actor_state),
+                "scope": "checkpoint_all_tiny_parameters" if backend == "cpu_tiny" else "checkpoint_lora_only",
+                "note": "Hash of checkpoint tensors before loading; GPU loaded HF LoRA hash is in actor_source.json. Does not hash full GPU base weights or vLLM worker tensors."}
+            cfg["method"] = payload.get("spec") or cfg.get("method", "grace")
+        n_source = len(records)
+        math500 = looks_like_math500(records, path=cfg.get("data_path"), n_source=n_source)
+        records = apply_solve_instruction(records)
+        records = limit_eval_records(records, cfg)
+        k, n, max_new, temperature, top_p = _eval_hparams(cfg)
+        versions = collect_environment(cfg)
+        versions["started"] = started
+        run.write_run_meta(kind="eval", started=started, requested=requested)
+        run.write_yaml("config.yaml", cfg)
+        run.write_json("environment.json", versions)
+        ev = cfg.get("eval") or {}
+        manifest = selection_manifest(records, str(ev.get("selection", "first")),
+                                      int(ev.get("selection_seed", cfg.get("split_seed", cfg.get("seed", 17)))))
+        manifest.update(sample_seed_start=int(cfg.get("seed", 17)), samples_per_problem=n,
+                        temperature=temperature, top_p=top_p, max_new_tokens=max_new,
+                        sample_batch_size=int(ev.get("sample_batch_size", 1)),
+                        reward_protocol_version=REWARD_PROTOCOL_VERSION)
+        run.write_json("evaluation_manifest.json", manifest)
         with RunLog(run.root / "run.log"):
             print(f"eval start {started} backend={backend} n_problems={len(records)} n={n} k={k} dir={run.root}")
             if Path(run.root).resolve() != requested.resolve():
@@ -360,6 +406,8 @@ def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path
             result["seed"] = int(cfg.get("seed", 17))
             result["checkpoint"] = cfg.get("checkpoint") or cfg.get("resume")
             result["checkpoint_step"] = payload.get("step") if ckpt else None
+            result["checkpoint_sha256"] = checkpoint_sha256 if ckpt else None
+            result["checkpoint_identity"] = checkpoint_identity if ckpt else None
             result["actor_source"] = "checkpoint" if result["checkpoint"] else "base_or_random"
             result["method"] = cfg.get("method")
             result["evaluation_manifest"] = manifest
@@ -392,15 +440,16 @@ def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path
                 },
             )
             print(f"eval done avg={result.get('avg')} pass_at_k={result.get('pass_at_k')}")
-        ledger.add("eval", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status="completed")
         result["finished"] = utc_now()
         run.write_json("eval_summary.json", result)
-        run.write_json("compute_ledger.json", ledger.summary())
-        run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])
+        status = "completed"
         return result
     except Exception as exc:
-        ledger.add("eval", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status="failed")
-        run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])
+        status = "failed"
         write_failed(run, exc, versions, started)
-        run.write_json("compute_ledger.json", ledger.summary())
         raise
+    finally:
+        ledger.add("eval", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status=status,
+                   timing_scope="Function entry through setup, computation and result/failure persistence; excludes final ledger publication and caller-side CLI/data loading.")
+        run.write_json("compute_ledger.json", ledger.summary())
+        run.append_jsonl("compute_ledger.jsonl", ledger.rows[-1])

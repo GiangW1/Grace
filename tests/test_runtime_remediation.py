@@ -44,11 +44,11 @@ def test_interrupted_checkpoint_preserves_previous_archive(tmp_path, monkeypatch
     save_checkpoint(path, {"step": 1})
     old = path.read_bytes()
 
-    def interrupt(stream, **kwargs):
+    def interrupt(stream, payload):
         stream.write(b"partial archive")
         raise OSError("disk interrupted")
 
-    monkeypatch.setattr("grace_gc.trainer.checkpoint.np.savez_compressed", interrupt)
+    monkeypatch.setattr("grace_gc.trainer.checkpoint._write_archive", interrupt)
     with pytest.raises(OSError, match="interrupted"):
         save_checkpoint(path, {"step": 2})
     assert path.read_bytes() == old
@@ -58,13 +58,13 @@ def test_interrupted_checkpoint_preserves_previous_archive(tmp_path, monkeypatch
 
 def test_one_dump_per_step_and_no_published_step_on_save_failure(tmp_path, tiny_config, monkeypatch):
     import grace_gc.trainer.checkpoint as checkpoint
-    original, calls = checkpoint.np.savez_compressed, []
+    original, calls = checkpoint._write_archive, []
 
     def count(*args, **kwargs):
         calls.append(1)
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(checkpoint.np, "savez_compressed", count)
+    monkeypatch.setattr(checkpoint, "_write_archive", count)
     root = tmp_path / "success"
     run_training(tiny_config, root)
     assert len(calls) == 1
@@ -78,7 +78,7 @@ def test_one_dump_per_step_and_no_published_step_on_save_failure(tmp_path, tiny_
     def fail(*args, **kwargs):
         raise OSError("cannot save")
 
-    monkeypatch.setattr(checkpoint.np, "savez_compressed", fail)
+    monkeypatch.setattr(checkpoint, "_write_archive", fail)
     failed = tmp_path / "failed"
     with pytest.raises(OSError, match="cannot save"):
         run_training(tiny_config, failed)

@@ -1,0 +1,15 @@
+# Shared by Full-PG and frozen GRACE, at both GPU counts.
+n_start: 16
+n_prompts: 4
+cost_control:
+  mode: fixed
+  enabled: false
+baseline:
+  mode: fixed
+  fixed_value: 0.5
+  prescan: 0
+predictor:
+  fixed_basis: true
+  audit_s: 1.0
+  fresh_samples_per_problem: 0
+  basis_variant: predictable_crossfit_signal

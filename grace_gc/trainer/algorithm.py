@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Callable
+import copy
+import time
 
 import numpy as np
 
@@ -18,13 +20,11 @@ from grace_gc.predictor.basis import align_basis, refresh_basis, should_refresh_
 from grace_gc.predictor.update import diagnose_frozen_predictor, prepare_predictor_split, update_predictor_from_reservoir
 from grace_gc.trainer.actor_update import (
     apply_correction_clip_step,
-    audit_one,
-    real_stream_backward_each,
-    restore_grads,
-    snapshot_grads,
+    real_stream_backward_and_audit,
 )
 from grace_gc.trainer.advantages import advantages_for_method
 from grace_gc.trainer.baseline import HistoricalBaseline
+from grace_gc.trainer.cost_control import start_count_mode
 from grace_gc.trainer.grace_step import (
     StartRecord,
     answer_first_token,
@@ -73,6 +73,7 @@ class TrainState:
     history_costs: list[float] = field(default_factory=list)
     step: int = 0
     cost_control: dict = field(default_factory=dict)
+    offline_predictor: dict | None = None
 
 
 def ensure_prescan_rng(state: TrainState) -> IsolatedRNG:
@@ -313,17 +314,23 @@ def run_algorithm1_step(
         state.n_ref = n
     alloc = cfg.get("allocation", {})
     pred_cfg = cfg.get("predictor", {})
+    if state.reservoir.fixed_basis_id is not None:
+        if not pred_cfg.get("fixed_basis", False):
+            raise ValueError("compact supervision requires predictor.fixed_basis=true on resume")
+        if state.reservoir.fixed_basis_id != state.basis_id:
+            raise ValueError("compact supervision does not match the actor basis")
     from grace_gc.versions import sha256_array, sha256_mapping, sha256_named
 
     behavior_context = {
         "snapshot_sha": sha256_named(engines.named_lora()),
-        "basis_sha": sha256_array(state.u),
+        "basis_sha": (state.offline_predictor or {}).get('basis_sha') or sha256_array(state.u),
         "predictor_sha": None if state.predictor is None else sha256_mapping(state.predictor),
         "rng_counters": dict(state.rng.counters),
         "timing": "before_rollout_and_update",
     }
     new_audit_items = []
-    warmup = state.step < int(pred_cfg.get("warmup_steps", 0))
+    frozen = state.offline_predictor is not None
+    warmup = not frozen and state.step < int(pred_cfg.get("warmup_steps", 0))
     audit_s = float(pred_cfg.get("audit_s", 0.125))
     n_prescan = int((cfg.get("baseline") or {}).get("prescan", 0) or 0)
     if state.spec.objective == "grpo" or not state.baseline.uses_prescan:
@@ -345,13 +352,16 @@ def run_algorithm1_step(
         _gpu_progress(cfg, f"phase=prescan_done n_prescanned={n_prescanned} wall_s={timings['prescan']:.1f}")
     _gpu_progress(cfg, f"phase=prefix n={n} decision={decision}")
 
+    detail_started = time.perf_counter()
     prefixes, finished = engines.generate_prefix(prompt_ids, decision, state.rng, "token")
+    timing_details = {"prefix_generate": time.perf_counter() - detail_started}
     finished = np.asarray(finished, dtype=bool).reshape(-1)
     if len(prefixes) != n or finished.shape[0] != n:
         raise ValueError(f"generate_prefix returned {len(prefixes)} sequences for {n} starts")
     prompt_lens = np.array([len(p) for p in prompt_ids], dtype=np.int64)
     k = int(state.u.shape[1])
     need_features = state.spec.use_predictor or state.spec.feature_mode != "none"
+    detail_started = time.perf_counter()
     if need_features:
         feat_bundle = engines.prefix_features(
             prefixes, prompt_lens, [state.baseline.get(pid) for pid in problem_ids]
@@ -365,7 +375,9 @@ def run_algorithm1_step(
     else:
         feat = np.zeros((n, max(k, 1)), dtype=np.float64)
         cost_feat = None
+    timing_details["prefix_features"] = time.perf_counter() - detail_started
 
+    detail_started = time.perf_counter()
     remainings = continuation_remainings(prefixes, prompt_lens, finished, max_new)
     if state.predictor is not None and not warmup and state.spec.use_predictor:
         pred = state.predictor.forward_numpy(feat, cost_feat)
@@ -392,6 +404,7 @@ def run_algorithm1_step(
         reward_feats = np.stack(
             [_reward_features(state.baseline.get(problem_ids[i]), lengths[i]) for i in range(n)]
         )
+    timing_details["predictor_forward"] = time.perf_counter() - detail_started
     timings["prefix"] = timer.lap()
 
     basis_at_allocate = int(state.basis_id)
@@ -421,6 +434,7 @@ def run_algorithm1_step(
     timings["allocate"] = timer.lap()
 
     selected = (z >= 1.0) & (~finished) & (remainings > 0)
+    detail_started = time.perf_counter()
     full_ids: list[list[int] | None] = [None] * n
     for rem in sorted({int(remainings[i]) for i in range(n) if selected[i]}):
         mask = selected & (remainings == rem)
@@ -433,6 +447,12 @@ def run_algorithm1_step(
     for i in range(n):
         if z[i] >= 1.0 and full_ids[i] is None:
             full_ids[i] = prefixes[i]
+    timing_details["suffix_generate"] = time.perf_counter() - detail_started
+    # Read only after selection, and snapshot before auxiliary rollouts.
+    rollout = engines.last_rollout or {}
+    rollout_execution = {key: copy.deepcopy(rollout[key]) for key in (
+        "prefix_execution", "continue_execution", "prefix_num_cached_tokens", "continue_num_cached_tokens"
+    ) if key in rollout}
     rewards: list[float | None] = []
     texts: list[str | None] = []
     traj_finished: list[bool] = []
@@ -491,26 +511,27 @@ def run_algorithm1_step(
 
     adv = advantages_for_method(state.spec.objective, rewards, problem_ids, state.baseline)
     named = engines.named_lora()
-    params = engines.trainable_params()
     optimizer.zero_grad()
     chosen = z >= 1.0
-    loss = real_stream_backward_each(
+    audit_draw = (
+        state.rng.bernoulli("audit", np.full(n, audit_s))
+        if state.spec.use_predictor and not frozen
+        else np.zeros(n, dtype=np.float64)
+    )
+    loss, audited_gradients = real_stream_backward_and_audit(
         lambda i: None if full_ids[i] is None else engines.logprob_one(full_ids[i], int(prompt_lens[i])),
         adv,
         p,
         z,
         n,
         chosen,
+        named,
+        state.layout,
+        audit_draw >= 1.0,
     )
-    saved = snapshot_grads(params)
     timings["backward"] = timer.lap()
 
     audited = 0
-    audit_draw = (
-        state.rng.bernoulli("audit", np.full(n, audit_s))
-        if state.spec.use_predictor
-        else np.zeros(n, dtype=np.float64)
-    )
     records = []
     for i in range(n):
         rec = StartRecord(
@@ -562,11 +583,7 @@ def run_algorithm1_step(
                     engines.logprob_one(full_ids[i], int(prompt_lens[i]))
                 )
         if state.spec.use_predictor and rec.z >= 1.0 and rec.reward is not None and audit_draw[i] >= 1.0:
-            if float(adv[i]) == 0.0:
-                rec.g = np.zeros(state.layout.dim, dtype=np.float64)
-            else:
-                scalar = adv[i] * engines.logprob_one(full_ids[i], int(prompt_lens[i]))
-                rec.g = audit_one(scalar, params, [nm for nm, _p in named], state.layout)
+            rec.g = audited_gradients[i]
             rec.audited = True
             rec.g_norm_sq = float(np.dot(rec.g, rec.g))
             audited += 1
@@ -587,28 +604,27 @@ def run_algorithm1_step(
                     remaining_cost=float(max(remainings[i], 1)),
                     prefix_finished=bool(finished[i]),
                 )
-            state.reservoir.add(item)
+            state.reservoir.add(item, u=state.u)
             new_audit_items.append(item)
         records.append(rec)
-    restore_grads(params, saved)
     timings["audit"] = timer.lap()
 
     from grace_gc.trainer.supervision import collect_fresh_supervision
 
-    fresh_items, fresh_rows, fresh_metrics = collect_fresh_supervision(
+    fresh_items, fresh_rows, fresh_metrics = ([], [], {"n": 0, "generated_tokens": 0}) if frozen else collect_fresh_supervision(
         engines, state, prompt_ids, problem_ids, golds, cfg,
     )
     for item in fresh_items:
-        state.reservoir.add(item)
+        state.reservoir.add(item, u=state.u)
     new_audit_items.extend(fresh_items)
     for row in fresh_rows:
         row["behavior_context"] = behavior_context
     timings["fresh_supervision"] = timer.lap()
 
     logprob_probe = None if engines.before_update is None else engines.before_update(records)
-    frozen_predictor = (None if state.predictor is None else
+    frozen_predictor = (None if state.predictor is None or frozen else
                         diagnose_frozen_predictor(state.predictor, new_audit_items, state.u,
-                                                  risk_mode=state.spec.risk_mode))
+                                                  risk_mode=state.spec.risk_mode, basis_id=state.basis_id))
     if frozen_predictor is not None:
         frozen_predictor["used_in_actor_update"] = bool(state.spec.use_ht_correction and not warmup and control_variate_enabled)
         frozen_predictor["basis_id"] = int(state.basis_id)
@@ -648,23 +664,24 @@ def run_algorithm1_step(
     pred_metrics = {"coord_loss": None, "risk_loss": None}
     basis_rank = None
     basis_changed = False
-    if state.spec.use_predictor and state.predictor is not None and len(state.reservoir.items) >= 2:
+    if not frozen and state.spec.use_predictor and state.predictor is not None and len(state.reservoir.items) >= 2:
         variant = str(pred_cfg.get("basis_variant", "pca"))
-        if variant not in {"pca", "predictable_crossfit"}:
-            raise ValueError("basis_variant must be pca or predictable_crossfit")
+        if variant not in {"pca", "predictable_crossfit", "predictable_crossfit_signal"}:
+            raise ValueError("basis_variant must be pca, predictable_crossfit or predictable_crossfit_signal")
+        crossfit_basis = variant in {"predictable_crossfit", "predictable_crossfit_signal"}
         split = prepare_predictor_split(
             state.predictor, state.reservoir, state.rng.generator("predictor"),
-            basis_fit_only=bool(pred_cfg.get("basis_fit_only", False)) or variant == "predictable_crossfit",
+            basis_fit_only=bool(pred_cfg.get("basis_fit_only", False)) or crossfit_basis,
             current_step=state.step + 1, max_age_steps=pred_cfg.get("max_age_steps"),
             age_half_life=pred_cfg.get("age_half_life"),
             missing_step_policy=pred_cfg.get("missing_step_policy", "exclude"),
         )
-        basis_mask = split["fit"] if variant == "predictable_crossfit" else split["basis"]
+        basis_mask = split["fit"] if crossfit_basis else split["basis"]
         basis_items = [it for it, keep in zip(state.reservoir.items, basis_mask) if keep]
         basis_metrics = {"variant": variant, "refreshed": False}
-        if should_refresh_basis(
+        if state.reservoir.fixed_basis_id is None and should_refresh_basis(
             len(basis_items),
-            min(k, len(basis_items)) if variant == "predictable_crossfit" else k,
+            min(k, len(basis_items)) if crossfit_basis else k,
             state.step,
             state.basis_id,
             int(pred_cfg.get("refresh_every", 32)),
@@ -679,12 +696,13 @@ def run_algorithm1_step(
             basis_args = dict(grads=np.stack([it.g for it in basis_items]), k=k,
                               basis_id=state.basis_id + 1,
                               problem_ids=[it.problem_id for it in basis_items], weights=basis_weights)
-            if variant == "predictable_crossfit":
+            if crossfit_basis:
                 from grace_gc.predictor.basis import refresh_predictable_basis
 
                 basis, details = refresh_predictable_basis(
                     **basis_args, features=np.stack([it.features for it in basis_items]),
                     ridge_l2=float(pred_cfg.get("basis_ridge_l2", pred_cfg.get("ridge_l2", 1.))),
+                    objective="cross_moment" if variant == "predictable_crossfit_signal" else "prediction_energy",
                 )
                 basis_metrics.update(details)
             else:
@@ -702,6 +720,11 @@ def run_algorithm1_step(
                 basis_rank = int(basis.rank)
                 basis_metrics["refreshed"] = True
                 state.reservoir.stamp_basis_id(state.basis_id)
+        if (pred_cfg.get("fixed_basis", False) and state.reservoir.fixed_basis_id is None
+                and state.step + 1 >= int(pred_cfg.get("warmup_steps", 0)) and state.basis_id > 0):
+            state.reservoir.compact(state.u, state.basis_id)
+        basis_metrics.update(fixed=state.reservoir.fixed_basis_id is not None,
+                             fixed_basis_id=state.reservoir.fixed_basis_id)
         pred_metrics = update_predictor_from_reservoir(
             state.predictor,
             state.reservoir,
@@ -716,6 +739,7 @@ def run_algorithm1_step(
                                      for it in state.reservoir.items]) if not state.spec.use_allocation else None),
             calibration_risk_mode=state.spec.risk_mode,
             calibration_uniform_shrink=float(alloc.get("uniform_shrink", 0.0)),
+            basis_id=state.basis_id,
         )
         pred_metrics["frozen_new_problems"] = frozen_predictor
         pred_metrics["basis"] = basis_metrics
@@ -735,7 +759,8 @@ def run_algorithm1_step(
     from grace_gc.trainer.methods import start_group_size
 
     group = start_group_size(state.spec, int(cfg.get("n_prompts", 4)), state.n_ref or n)
-    next_n = next_start_count(state.history_costs, state.n_ref or n, c_full=1.0, group=group)
+    next_n = (state.n_ref or n) if start_count_mode(cfg) == "fixed" else next_start_count(
+        state.history_costs, state.n_ref or n, c_full=1.0, group=group)
     prefix_done = np.asarray(finished, dtype=bool).reshape(-1)
     n_continued = int(
         sum(
@@ -770,10 +795,12 @@ def run_algorithm1_step(
         "deviation": deviation,
         "loss": float(loss.detach()) if hasattr(loss, "detach") else float(loss),
         "n_audited": audited,
+        "audit_gradient_source": "mandatory_actor_backward",
         "clip_triggered": clipped,
         "next_n": next_n,
         "texts": texts,
         "predictor": pred_metrics,
+        "predictor_frozen": frozen,
         "warmup": warmup,
         "n_prescan": n_prescanned,
         "token_cost_used": float(used),
@@ -791,6 +818,9 @@ def run_algorithm1_step(
         "predictor_synced_basis_id": int(state.predictor_synced_basis_id),
         "basis_rank": basis_rank,
         "timings": timings,
+        "timing_details": {"wall_seconds": timing_details,
+                           "scope": "nested in prefix/continue phases; not additional ledger charges"},
+        "rollout_execution": rollout_execution or None,
         "u_frozen": u_frozen,
         "grad_norm": update_stats.get("grad_norm"),
         "grad_norm_preclip": update_stats.get("grad_norm_preclip"),

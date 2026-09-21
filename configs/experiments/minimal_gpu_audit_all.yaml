@@ -1,0 +1,4 @@
+# One factor relative to deeper: collect every completed main trajectory label.
+experiment_variant: audit_all_only
+predictor:
+  audit_s: 1.0

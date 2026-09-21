@@ -2,7 +2,7 @@
 
 Qwen3-4B-Base 上的 GRACE 训练、评测和前缀审计。本机先做 CPU 检查；服务器按下面全流程做。
 
-显示名用 **GRACE-GC**，避免和另外两篇同名工作混淆。多卡 allreduce 还没接上，**先单卡**。
+显示名用 **GRACE-GC**，避免和另外两篇同名工作混淆。主流程先单卡；另有“一张 actor 卡＋多张 rollout 卡”的离线对照，见 [实现与用法](docs/OFFLINE_PARALLEL_CONTROL_20260919.md)。actor allreduce 尚未接入。
 
 下面是一条能按顺序做完的全流程。第 1–7 节是同一条线的细节，卡住时再翻。
 
@@ -10,7 +10,9 @@ Qwen3-4B-Base 上的 GRACE 训练、评测和前缀审计。本机先做 CPU 检
 
 顺序：**环境 → 资源 → 绑卡/tmux → smoke Full-PG → 最小比较 → Pilot Full-PG → Pilot GRACE → 其余对照**。先看 Full-PG 会不会学，再跑 GRACE。不要一上来就用 `grace` 做第一份 GPU 作业。
 
-GitHub 默认分支是 `master`。clone 后确认 `git log -1` 含保真接线，不要停在只训推理开头的 `37fbcb2`。
+仓库为 [GiangW1/Grace](https://github.com/GiangW1/Grace)，默认分支 `master`。截至 2026-09-19，本轮修复已提交 [PR #2](https://github.com/GiangW1/Grace/pull/2)，尚未合并；直接 clone 的 `master` 不含这些修复。下面 B 节给出新 clone 后切换到 PR 代码的命令。
+
+最新已复核实测是 [9月18日链](docs/MINIMAL_RESULTS_REVIEW_20260919.md)，不能作为本轮修复的收益证据。当前交接见 [STATE](.planning/STATE.md)，问题状态见 [30项清单](docs/GRACE_ISSUE_CHECKLIST_20260919.md)。
 
 5090 把下面所有 `configs/hardware/a100_1.yaml` 换成 `configs/hardware/rtx5090_1.yaml`。两种卡分别记时，不要折成 A100-hours。
 
@@ -33,8 +35,10 @@ conda activate grace
 先装 vLLM（或 `pip install "verl[vllm]==0.9.0"`），再进仓库：
 
 ```bash
-git clone https://github.com/yiweinanzi/Grace.git
+git clone https://github.com/GiangW1/Grace.git
 cd Grace
+git fetch origin pull/2/head:codex/grace-efficiency-20260919
+git switch codex/grace-efficiency-20260919
 pip install -e ".[gpu,dev]"
 pip install pyarrow
 python -c "import torch, vllm, transformers, peft, math_verify; print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), torch.version.cuda); print('vllm', vllm.__version__); print('gpu', torch.cuda.get_device_name(0) if torch.cuda.is_available() else None)"
@@ -75,6 +79,7 @@ python scripts/train.py \
   --backend gpu_verl \
   --model-path "$MODEL" \
   --data-path "$TRAIN_DATA" \
+  --eval-data-path "$EVAL_DATA" \
   --num-steps 4 \
   --run-dir runs/smoke-fullpg
 
@@ -122,11 +127,54 @@ bash scripts/run_matched_cost_gpu.sh runs/minimal-matched-wall
 
 每个seed先运行Full-PG参考40步，再将其实际训练时长作为另外三方法的预算，按真实终点保存和评测。批次边界可能超额，报告保留实际耗时、真实步数和停止原因；不会把预算相同当作耗时严格相等。`RUN_WALL_SECONDS` 可显式给共同预算，`MAX_STEPS` 默认10000是步数上限。共享SFT、评测与审计成本另列。
 
+新链还会自动加评预算内最近的已发布checkpoint，输出 `cost_quality.json`，并列模型可用费用、整次作业费用、步数/starts和配对seed统计；`EVAL_STEPS=all` 可评全部保存点，评测费用另记。预算按时间选择，不择优分数；重复评测、缺失证据及跨seed协议冲突保持可见。它是截止前可用模型的事后比较，不是进程恰好按物理截止停止。
+
 `ABLATION_CONFIG=configs/experiments/baseline_prescan16.yaml` 提供baseline样本量对照；跨配置对照可设置 `SHARED_INIT_CHAIN=原链根目录` 复用每个seed的共同actor，并显式使用相同墙钟预算。`EXPERIMENT_CONFIG=configs/experiments/minimal_gpu_repaired.yaml` 可关闭第二轮覆盖，保留第一轮变体。
 
 附件评审吸收的独立对照同样通过`ABLATION_CONFIG`使用：`grace_full_completion.yaml`（全组件p=1）、`grace_no_cv.yaml`（只关闭补全，保留风险模型及辅助开销）、`allocation_uniform_shrink.yaml`（向同预计成本uniform收缩一半）、`baseline_fixed.yaml`（固定b=.5并跳过预扫）、`baseline_smoothed.yaml`（独立预扫加入先验平滑），均位于`configs/experiments/`。这些候选不会自动叠加，尚无GPU收益结论。GRPO/GRPO-short已移除不参与其组均值目标的prescan；批审计增加原始梯度、clip后梯度和Adam步的配对方向/误差，多前缀审计增加全空间基底遗漏与坐标预测误差分解。取舍和命令见[修复说明第6节](docs/GRACE_REMEDIATION_20260918.md#6-grace_reviewmd-的取舍与实现)。
 
-评估质量和实际成本，停止者比例不表示加速。40 步比较不代表 equal-compute；新结果不能覆盖 2026-09-17 的负结果，2026-09-16 也不是现役结果。完整修复与待验证事项见 [修复说明](docs/GRACE_REMEDIATION_20260918.md)。
+评估质量和实际成本，停止者比例不表示加速。40 步比较不代表 equal-compute；各次实验按源码版本独立保留，9月16/17日结果不能混入9月18日链或新候选。完整修复与待验证事项见 [问题清单](docs/GRACE_ISSUE_CHECKLIST_20260919.md)。
+
+### E3. 9月18日结果之后的机制定位
+
+[逐文件实测审查](docs/MINIMAL_RESULTS_REVIEW_20260919.md)仍不支持“补全带来实际训练效率提升”。后续已接通固定N=16、共享actor的GRACE/p1/m0/uniform四臂训练，终点在同一冻结状态下另做一次多臂审计：
+
+```bash
+SEEDS=17 bash scripts/run_mechanism_gpu.sh runs/mechanism-fixed
+SEEDS=17 COMMON_CONFIG=configs/experiments/minimal_gpu_signal_candidate.yaml \
+  SHARED_INIT_CHAIN=runs/mechanism-fixed/grace \
+  bash scripts/run_mechanism_gpu.sh runs/mechanism-signal
+```
+
+若目录自动加后缀，`SHARED_INIT_CHAIN`使用第一条链`mechanism.json`里的`arms.grace`实际路径。候选收集主反向的完成梯度、取消额外fresh采样、平滑独立prescan，并按留出预测与真实G的交叉矩建基；这些改动尚无新GPU收益证据。p1臂保留预测器开销，不能替代高效Full-PG的性能基线。真正的共同墙钟比较、无prescan消融、六个问题的根因与剩余边界见[本轮实现说明](docs/GRACE_EFFICIENCY_REMEDIATION_20260919.md)。
+
+[完整30项清单](docs/GRACE_ISSUE_CHECKLIST_20260919.md)已更新处理状态。[实现说明§10](docs/GRACE_EFFICIENCY_REMEDIATION_20260919.md#10-继续落实问题清单预算模型定位工具和同组机制统计)提供五份单因素候选、`check_eval_repeatability.py`同checkpoint重复评测、`summarize_training_dynamics.py`逐阶段定位及预算曲线命令。独立LAG现在报告同一前缀双条件联合统计，方差×token附冻结问题簇条件区间；这些工具的CPU通过不等于论文收益已获实证。
+
+### E4. 固定基底与在线紧凑监督候选
+
+已实现调研方案的首批代码：特征在 actor 设备归约后回传、生成/同步细分观测，以及 `predictor.fixed_basis`。后者在 warmup 结束后固定已学得的 U，历史监督保存 `U.T @ G` 与 `||G||²`，预测头仍在批末在线更新。默认动态基底路径保留。
+
+```bash
+SEEDS=17 COMMON_CONFIG=configs/experiments/minimal_gpu_cost_candidate.yaml \
+  ABLATION_CONFIG=configs/experiments/minimal_gpu_fixed_basis.yaml \
+  bash scripts/run_minimal_gpu.sh runs/minimal-fixed-basis full_pg grace
+```
+
+与动态 U 对照时，去掉 `ABLATION_CONFIG`，其余设置相同；跨链使用 `SHARED_INIT_CHAIN` 复用同 seed 初始 actor。这里是开发 seed 的固定步数诊断，不能据此宣称同算力胜出。配置只固定基底，不强制 γ、不改变风险/ρ、不额外生成；上述 cost candidate 的固定 baseline 和无 fresh 设置应作为另一项已明确的实验选择。实现边界和后续验证见 [调研方案与实施状态](docs/GRACE_RESEARCH_IMPLEMENTATION_PLAN_20260919.md#91-首批实施状态2026-09-19)。
+
+`steps.jsonl` 新增 `timing_details`、`rollout_execution`、`sync_details`；生成/同步失败会写 `failed_execution.json`。子时间均已计入阶段总时间。缓存计数缺失记 null，提交批次不代表 GPU 内部调度批次，也不代表加速。固定 U 的 NPZ 依赖同目录 `basis-*.npy`；迁移时一并复制，恢复继续启用相同 overlay。只复制 NPZ 不足以恢复。
+
+### E5. 完全离线预测器与多卡对照
+
+```bash
+python scripts/run_offline_comparison_gpu.py \
+  --devices 0,1,2,3 --seeds 17 23 41 --steps 40 --fit-steps 40 \
+  --run-dir runs/offline-parallel-controls
+```
+
+复用上面设置的 MODEL/TRAIN_DATA/EVAL_DATA。每 seed 共用一次 SFT、一次仅使用 calib 题集的离线拟合，运行单卡/多卡 × Full-PG/离线 GRACE；N=16、固定 b=0.5、prescan=0。多卡是第一张卡放 actor，其余三个 vLLM worker；评测/审计统一单卡。配置/恢复/费用说明见 [离线并行对照](docs/OFFLINE_PARALLEL_CONTROL_20260919.md)。
+
+`matrix_summary.json` 列出配对 seed 结果、实际训练进程墙钟、GPU 秒，以及计入离线拟合和 SFT 的 cold 总成本。`--wall-seconds 2400` 对齐消费阶段预算；不能把它称为相同 cold 总预算。此变体尚无真实 GPU 结果。
 
 作业结束后保留完整检查点归档：
 
@@ -149,6 +197,7 @@ python scripts/train.py \
   --backend gpu_verl \
   --model-path "$MODEL" \
   --data-path "$TRAIN_DATA" \
+  --eval-data-path "$EVAL_DATA" \
   --num-steps 30 \
   --run-dir runs/fullpg-seed17
 
@@ -192,6 +241,7 @@ python scripts/train.py \
   --backend gpu_verl \
   --model-path "$MODEL" \
   --data-path "$TRAIN_DATA" \
+  --eval-data-path "$EVAL_DATA" \
   --num-steps 30 \
   --run-dir runs/grace-seed17
 
@@ -277,14 +327,7 @@ source .venv/bin/activate
 pip install "verl[vllm]==0.9.0"
 ```
 
-这会装上该版本指定的 vLLM 和 PyTorch。然后再进本仓库：
-
-```bash
-git clone https://github.com/yiweinanzi/Grace.git
-cd Grace
-pip install -e ".[gpu,dev]"
-pip install pyarrow
-```
+这会装上该版本指定的 vLLM 和 PyTorch。随后按 [全流程 B](#b-服务器环境)克隆本仓库、切换到待测 PR 分支并安装本项目与 `pyarrow`。
 
 **做法 B（不装 verl）**
 
@@ -304,7 +347,7 @@ python -c "import torch, vllm, transformers, peft, math_verify; print('torch', t
 
 ```bash
 pip install -e ".[cpu,dev]"
-python -m pytest tests -k "not complete_final_expression and not u6_gpu"
+python -m pytest tests -q -o addopts=''
 ```
 
 ## 2. 准备模型和数据
@@ -341,6 +384,7 @@ export EVAL_DATA=$(find "$PWD/data/math500" \( -name '*.parquet' -o -name '*.jso
 
 - 训练文件是官方 DAPO 的 JSONL 或 parquet。`prompt` 可以是对话列表，答案读 `reward_model.ground_truth`。官方 parquet 可直接加载；同一题面金标冲突的整组会丢掉，并写入 `data_conflicts.json`（大约 12 组）。
 - 评测必须是单独的 MATH-500，字段用 `problem`/`prompt` 和 `answer`。不要把 DAPO 再切 10% 当考卷。MATH-500 会套上与 DAPO 相同的 `Answer:` 格式指令。
+- 手动训练时传入 `--eval-data-path "$EVAL_DATA"`，在 SFT 和采样前从训练、校准、审计池中排除评测题；包装脚本已传入该参数。只把评测文件用于后续 `evaluate.py` 不会触发训练侧排除。
 - 未标记且够大的 DAPO 会按 seed 17 切出校准 256、审计 240，其余训练。缺金标会报错。
 - `format_warmup` 是论文要求的共享格式 SFT：只训推理开头，不训 `Answer:`、金标和 EOS。默认 256 步；续训会跳过。看 `mean_response_tokens`：经常小于 16 是交卷，不是学会了。
 
@@ -393,6 +437,7 @@ python scripts/train.py \
   --backend gpu_verl \
   --model-path "$MODEL" \
   --data-path "$TRAIN_DATA" \
+  --eval-data-path "$EVAL_DATA" \
   --num-steps 4 \
   --run-dir runs/smoke-grace
 ```
@@ -425,7 +470,7 @@ python scripts/audit.py --generate \
 
 ## 5. 最小证伪（Pilot 规模、单卡）
 
-GRACE 的 warmup 是 20 步，`--num-steps` 必须大于 20。对照把 `--method` 和 `--run-dir` 一起换。续训的 `--num-steps` 是再跑多少步，不是累计到多少。
+此配置的 GRACE predictor warmup 是 20 步；观察启用选择与补全后的行为需要继续运行，20 步以内也可正常用于调试。对照把 `--method` 和 `--run-dir` 一起换。续训的 `--num-steps` 是再跑多少步，不是累计到多少。
 
 ```bash
 export CUDA_VISIBLE_DEVICES=0
@@ -438,6 +483,7 @@ python scripts/train.py \
   --backend gpu_verl \
   --model-path "$MODEL" \
   --data-path "$TRAIN_DATA" \
+  --eval-data-path "$EVAL_DATA" \
   --num-steps 30 \
   --run-dir runs/grace-seed17
 ```
@@ -486,6 +532,7 @@ python scripts/train.py \
   --backend gpu_verl \
   --model-path "$MODEL" \
   --data-path "$TRAIN_DATA" \
+  --eval-data-path "$EVAL_DATA" \
   --num-steps 30 \
   --resume runs/grace-seed17/checkpoint.npz \
   --run-dir runs/grace-seed17
@@ -521,7 +568,7 @@ python scripts/plot.py --summary runs/eval-grace-seed17/eval_summary.json --out 
 
 ## 不要做的事
 
-- 不要用 `configs/hardware/a100_4.yaml` 或 `rtx5090_8.yaml` 启动，`n_gpu>1` 会直接失败。
+- 不要单独用旧 `a100_4.yaml` 或 `rtx5090_8.yaml` 启动。多卡必须显式设置 `rollout.workers=n_gpu-1`、TP=1；可使用 `a100_rollout_4.yaml` 或离线四组脚本，不能当作多卡 actor 训练。
 - 不要在没设 `CUDA_VISIBLE_DEVICES` 的 4 卡机器上直接开训。
 - 不要漏 `--num-steps`。默认是 1，GRACE 出不了 warmup。
 - 不要拿别人的 answers/bundles 当这个方法的结果。
@@ -535,11 +582,11 @@ python scripts/plot.py --summary runs/eval-grace-seed17/eval_summary.json --out 
 | `configs/default.yaml` | 论文默认超参 |
 | `configs/experiments/smoke.yaml` | 服务器短跑 |
 | `configs/experiments/minimal.yaml` | 本机 CPU 冒烟 |
-| `configs/experiments/minimal_gpu.yaml` | 单卡 16 题比较；经 `scripts/run_minimal_gpu.sh` 与 default 合并 |
+| `configs/experiments/minimal_gpu.yaml` | 保留的原始 16 题配方；当前包装脚本默认叠加 repaired/deeper，实际配置见 E2 |
 | `configs/experiments/pilot.yaml` | Pilot 规模 |
 | `configs/hardware/a100_1.yaml` | 单卡 A100（先用这个） |
 | `configs/hardware/rtx5090_1.yaml` | 单卡 5090 |
 | `configs/hardware/a100_4.yaml` | 4 卡，现在不能跑 |
 | `configs/hardware/rtx5090_8.yaml` | 8 卡，现在不能跑 |
 
-已跑/未跑测试见 `docs/TEST_STATUS.md`。
+已跑/未跑测试见 [TEST_STATUS](docs/TEST_STATUS.md)。

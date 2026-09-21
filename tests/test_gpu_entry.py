@@ -740,8 +740,8 @@ def test_eval_writes_lora_before_starting_vllm():
     assert src.index("save_lora_adapter") < src.index("llm = build_vllm_engine")
     assert src.index("del actor") < src.index("llm = build_vllm_engine")
     assert src.index("apply_lora_request") < src.index("generate_answers_vllm")
-    assert "max_model_len" in src
-    assert src.index("vllm_needed_max_model_len") < src.index("llm = build_vllm_engine")
+    assert src.index("eval_engine_config(cfg, max_new)") < src.index("llm = build_vllm_engine")
+    assert generate.eval_engine_config({"prompt_max_tokens": 1024}, 4096)["max_model_len"] >= 5120
     assert "prompt_max_tokens" in src
 
 
@@ -791,7 +791,7 @@ def test_gpu_train_seeds_before_lora_init():
 
     from grace_gc.backends import verl_trainer
 
-    src = inspect.getsource(verl_trainer.train)
+    src = inspect.getsource(verl_trainer._train)
     assert src.index("seed_all") < src.index("load_lora_actor")
     assert src.index("apply_method_defaults") < src.index("resolve_start_counts")
 

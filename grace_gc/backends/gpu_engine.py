@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from time import perf_counter
 from typing import Any  # noqa: F401
 
 import numpy as np
@@ -33,6 +34,11 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
     box: dict[str, Any] = {}
 
     def generate_prefix(prompt_ids, max_new, rng, stream: str):
+        execution: dict = {}
+        engines = box.get("engines")
+        if engines is not None:
+            # The local dict is updated even when generate raises.
+            engines.last_rollout = {"prefix_execution": execution}
         phase = generate_phase(
             llm,
             prompt_ids,
@@ -42,10 +48,12 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
             rng,
             stream,
             lora_request=extra.get("lora_request"),
+            execution=execution,
         )
-        engines = box.get("engines")
         if engines is not None:
             engines.last_rollout = {
+                "prefix_execution": execution,
+                "prefix_num_cached_tokens": list(phase.num_cached_tokens or []),
                 "prefix_finish_reasons": list(phase.finish_reasons or []),
                 "prefix_stop_reasons": list(phase.stop_reasons or []),
                 "prefix_logprob_sums": list(phase.logprob_sums or []),
@@ -57,6 +65,12 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
         return phase.token_ids, phase.natural_finish
 
     def continue_fn(prefixes, selected, max_new, rng):
+        execution: dict = {}
+        engines = box.get("engines")
+        if engines is not None:
+            roll = dict(engines.last_rollout or {})
+            roll["continue_execution"] = [*(roll.get("continue_execution") or []), execution]
+            engines.last_rollout = roll
         out = continue_selected(
             llm,
             prefixes,
@@ -66,6 +80,7 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
             eos_id,
             rng,
             lora_request=extra.get("lora_request"),
+            execution=execution,
         )
         phase = getattr(continue_selected, "last_phase", None)
         idx = getattr(continue_selected, "last_idx", None) or []
@@ -77,6 +92,7 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
             logprob_map = dict(roll.get("continue_logprob_sums") or {})
             token_lp_map = dict(roll.get("continue_token_logprobs") or {})
             seed_map = dict(roll.get("continue_request_seeds") or {})
+            cache_map = dict(roll.get("continue_num_cached_tokens") or {})
             if phase is not None:
                 for j, i in enumerate(idx):
                     if phase.finish_reasons:
@@ -87,6 +103,8 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
                         logprob_map[i] = phase.logprob_sums[j]
                     if phase.token_logprobs:
                         token_lp_map[i] = phase.token_logprobs[j]
+                    if phase.num_cached_tokens is not None:
+                        cache_map[i] = phase.num_cached_tokens[j]
                     request_seeds = (phase.sampling or {}).get("request_seeds") or []
                     if j < len(request_seeds):
                         seed_map[i] = request_seeds[j]
@@ -97,6 +115,7 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
             roll["continue_logprob_sums"] = logprob_map
             roll["continue_token_logprobs"] = token_lp_map
             roll["continue_request_seeds"] = seed_map
+            roll["continue_num_cached_tokens"] = cache_map
             roll["has_generate_logprobs"] = True
             engines.last_rollout = roll
         return out
@@ -140,14 +159,35 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
 
 
 def _sync(actor, adapter_dir: Path, extra: dict[str, Any]):
+    detail = {"timings": {}, "status": "running",
+              "scope": "Subtimings already included in sync wall time; do not add to the compute ledger"}
+    extra["last_sync"] = detail
+
+    def timed(name, action):
+        started = perf_counter()
+        try:
+            return action()
+        except Exception as exc:
+            detail.update(status="failed", failed_stage=name, error_type=type(exc).__name__, error=str(exc))
+            raise
+        finally:
+            detail["timings"][name] = perf_counter() - started
+            if hasattr(extra.get("llm"), "last_execution") and name != "adapter_save":
+                detail.setdefault("workers", {})[name] = extra["llm"].last_execution
+
     prev_id = int(extra["lora_id"]) if extra.get("lora_request") is not None else None
     extra["lora_id"] = int(extra["lora_id"]) + 1
     dest = Path(adapter_dir) / f"step-{extra['lora_id']}"
-    save_lora_adapter(actor, dest)
+    timed("adapter_save", lambda: save_lora_adapter(actor, dest))
     extra["adapter_path"] = dest
-    extra["lora_request"] = make_lora_request(dest, extra["lora_id"])
-    apply_lora_request(extra.get("llm"), extra["lora_request"], remove_id=prev_id)
-    reset_vllm_prefix_cache(extra.get("llm"))
+
+    def load_adapter():
+        extra["lora_request"] = make_lora_request(dest, extra["lora_id"])
+        apply_lora_request(extra.get("llm"), extra["lora_request"], remove_id=prev_id)
+
+    timed("adapter_load", load_adapter)
+    timed("prefix_cache_reset", lambda: reset_vllm_prefix_cache(extra.get("llm")))
+    detail["status"] = "complete"
     return extra["lora_request"]
 
 

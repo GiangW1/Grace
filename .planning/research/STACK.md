@@ -1,7 +1,7 @@
 # Stack Research — GRACE-GC
 
 **Researched:** 2026-09-15
-**Status:** 官方资料核查与实现建议；未安装/验证 GPU 栈。写对应模块时按需查阅，不要求先完成依赖认证流程。
+**Status:** 9月15日的官方资料核查与实现建议；调研时未安装/验证 GPU 栈。表中的 verl/FSDP 是当时建议，当前实际后端为单卡 HF actor + vLLM；安装以 [README](../../README.md) 为准，实测版本见 [STATE](../STATE.md)。不要求先完成依赖认证流程。
 
 ## Recommended Stack
 

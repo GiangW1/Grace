@@ -56,10 +56,17 @@ class FeatureScaler:
             return y
         return y * self.coord_scale
 
-    def fit_risk_scale(self, residuals: np.ndarray) -> None:
+    def fit_risk_scale(self, residuals: np.ndarray) -> bool:
+        """Return whether labels supplied a usable scale, rather than the fallback.
+
+        Zero residuals still train the risk head. Their temporary unit scale
+        must not permanently lock a fixed scaler before nonzero labels arrive.
+        """
         e = np.asarray(residuals, dtype=np.float64).reshape(-1)
-        mean = float(np.mean(e)) if e.size else 1.0
-        self.risk_scale = mean if np.isfinite(mean) and mean > 1e-8 else 1.0
+        mean = float(np.mean(e)) if e.size else 0.0
+        fitted = bool(np.isfinite(mean) and mean > 1e-8)
+        self.risk_scale = mean if fitted else 1.0
+        return fitted
 
     def scale_risk(self, residuals: np.ndarray) -> np.ndarray:
         e = np.asarray(residuals, dtype=np.float64)
@@ -182,18 +189,29 @@ def design_shrink_gamma(
 
 def design_shrink_from_projections(coords, f, gram, p, weights=None) -> float | None:
     """Same full-space γ using GᵀU and UᵀU, without an n×D prediction array."""
+    gamma = design_shrink_diagnostics(coords, f, gram, p, weights)["raw_gamma"]
+    return None if gamma is None else float(np.clip(gamma, 0.0, 2.0))
+
+
+def design_shrink_diagnostics(coords, f, gram, p, weights=None) -> dict:
+    """Report the existing calibration objective, including unclipped γ.
+
+    These statistics explain clipping or a missing estimate; they add no
+    sample-count or confidence requirement to calibration.
+    """
     coords = np.asarray(coords, dtype=np.float64)
     f = np.asarray(f, dtype=np.float64)
     p = np.asarray(p, dtype=np.float64).reshape(-1)
-    w = np.ones(p.shape[0]) if weights is None else np.asarray(weights, dtype=np.float64)
+    w = np.ones(p.shape[0]) if weights is None else np.asarray(weights, dtype=np.float64).reshape(-1)
     if np.any(p <= 0) or np.any(p > 1) or not np.all(np.isfinite(p)):
         raise ValueError("p must be finite and in (0, 1]")
     a = w * ((1.0 / p) - 1.0)
     num = float(np.sum(a * np.sum(coords * f, axis=1)))
     den = float(np.sum(a * np.sum((f @ gram) * f, axis=1)))
-    if not np.isfinite(den) or den <= 1e-12:
-        return None
-    gamma = num / den
-    if not np.isfinite(gamma):
-        return None
-    return float(np.clip(gamma, 0.0, 2.0))
+    gamma = num / den if np.isfinite(den) and den > 1e-12 else None
+    if gamma is not None and not np.isfinite(gamma):
+        gamma = None
+    return {"n": len(p), "numerator": num if np.isfinite(num) else None,
+            "denominator": den if np.isfinite(den) else None,
+            "raw_gamma": gamma, "design_positive_n": int(np.count_nonzero(a > 0)),
+            "design_effective_n": float(a.sum() ** 2 / np.dot(a, a)) if np.any(a > 0) else 0.}

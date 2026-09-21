@@ -12,3 +12,8 @@ venv/
 .idea/
 .vscode/
 .planning/phases/
+
+# Local imported experiment evidence; retain on disk, exclude from commits.
+/_minimal_review_*/
+/_smoke_review_*/
+/_runs_results/

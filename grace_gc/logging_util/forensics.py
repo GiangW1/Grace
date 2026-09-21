@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import math
+import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -80,7 +83,7 @@ def step_context(run: RunDirectory, cfg: dict[str, Any], state, last: dict[str, 
         "rng_counters": dict(getattr(state.rng, "counters", {})),
         "rng_counters_before_rollout": (last.get("behavior_context") or {}).get("rng_counters"),
         "snapshot_sha": (last.get("behavior_context") or {}).get("snapshot_sha"),
-        "basis_sha": (last.get("behavior_context") or {}).get("basis_sha", None if u is None else sha256_array(u)),
+        "basis_sha": (last.get("behavior_context") or {}).get("basis_sha") or (None if u is None else sha256_array(u)),
         "predictor_sha": (last.get("behavior_context") or {}).get("predictor_sha"),
         "post_update_snapshot_sha": None if named is None else sha256_named(named),
         "post_update_predictor_sha": None if predictor is None else sha256_mapping(predictor),
@@ -225,6 +228,8 @@ def write_data_inventory(run: RunDirectory, records_or_buckets, data_path=None, 
         manifest["selection_seed"] = split_seed
         payload["splits"][name] = manifest
     if report:
+        if report.get("eval_exclusion") is not None:
+            run.write_json("data_exclusions.json", report["eval_exclusion"])
         payload["load"] = {
             "n_raw": report.get("n_raw"),
             "n_kept": report.get("n_kept"),
@@ -396,6 +401,8 @@ def step_metrics_row(state, last: dict[str, Any], ctx: dict[str, Any], wall_s: f
         "n_completed": last.get("n_completed"),
         "n_stopped": last.get("n_stopped", sum(1 for r in records if r.z < 1.0)),
         "n_audited": last.get("n_audited"),
+        "audit_gradient_source": last.get("audit_gradient_source"),
+        "predictor_frozen": bool(last.get("predictor_frozen", False)),
         "n_prescan": last.get("n_prescan"),
         "mean_p": _mean(r.p for r in records),
         "mean_reward": _mean(r.reward for r in records),
@@ -415,6 +422,9 @@ def step_metrics_row(state, last: dict[str, Any], ctx: dict[str, Any], wall_s: f
         "wall_seconds": float(wall_s),
         "written_at": utc_now(),
         "phases": last.get("timings") or {},
+        "timing_details": last.get("timing_details"),
+        "rollout_execution": last.get("rollout_execution"),
+        "sync_details": last.get("sync_details"),
         "snapshot_sha": ctx.get("snapshot_sha"),
         "post_update_snapshot_sha": ctx.get("post_update_snapshot_sha"),
         "post_update_predictor_sha": ctx.get("post_update_predictor_sha"),
@@ -431,7 +441,23 @@ def _append_ledger(run: RunDirectory, ledger: ComputeLedger, n_before: int) -> N
     run.write_json("compute_ledger.json", ledger.summary())
 
 
-def _update_checkpoint_index(run: RunDirectory, step: int, sha: str | None) -> None:
+def checkpoint_availability(cfg):
+    controller = cfg.get("_cost_controller")
+    command_seconds = None
+    raw = os.environ.get("GRACE_COMMAND_START_MONOTONIC")
+    if raw and not cfg.get("resume"):
+        try:
+            value = time.monotonic() - float(raw)
+            command_seconds = value if math.isfinite(value) and value >= 0 else None
+        except ValueError:
+            pass
+    return {"available_at": utc_now(),
+            "available_global_wall_seconds": controller.snapshot()["global_wall_seconds"] if controller else None,
+            "available_command_wall_seconds": command_seconds,
+            "availability_scope": "Checkpoint published, copied and hashed; excludes index publication and subsequent work. Command clock includes launch/setup, is unavailable on resume without complete prior command history."}
+
+
+def _update_checkpoint_index(run: RunDirectory, step: int, sha: str | None, availability=None) -> None:
     path = run.root / "checkpoints.json"
     data: dict[str, Any] = {"steps": []}
     if path.is_file():
@@ -440,7 +466,8 @@ def _update_checkpoint_index(run: RunDirectory, step: int, sha: str | None) -> N
         except json.JSONDecodeError:
             data = {"steps": []}
     steps = [row for row in data.get("steps", []) if int(row.get("step", -1)) != int(step)]
-    steps.append({"step": int(step), "path": f"checkpoints/step_{step}.npz", "sha256": sha})
+    steps.append({"step": int(step), "path": f"checkpoints/step_{step}.npz", "sha256": sha,
+                  **(availability or {})})
     steps.sort(key=lambda row: int(row["step"]))
     run.write_json(
         "checkpoints.json",
@@ -480,11 +507,13 @@ def _publish_snapshot(run, cfg, state, actor_named, optimizer, actor_full=None, 
     payload_extra = {**(extra or {}), "run_config": effective, "identity": cfg.get("_run_identity")}
     step_path = run.root / "checkpoints" / f"step_{int(state.step)}.npz"
     timings = dump_train_state(step_path, state, actor_named, optimizer, actor_full=actor_full, extra=payload_extra)
-    timings.update(copy_checkpoint(step_path, run.root / "checkpoint.npz"))
+    timings.update(copy_checkpoint(step_path, run.root / "checkpoint.npz",
+                                   basis_artifact=timings.get("basis_artifact"),
+                                   offline_predictor=timings.get("offline_predictor")))
     hash_timer = Timer()
     sha = sha256_file(step_path)
     timings.update(hash_wall_seconds=hash_timer.elapsed(), hash_cpu_seconds=hash_timer.cpu_elapsed())
-    _update_checkpoint_index(run, int(state.step), sha)
+    _update_checkpoint_index(run, int(state.step), sha, checkpoint_availability(cfg))
     cfg["_last_saved_step"] = int(state.step)
     cfg["_last_checkpoint_sha"] = sha
     return timings, sha
@@ -530,6 +559,7 @@ def persist_training_step(
     if extra:
         last.setdefault("adapter_path", None if extra.get("adapter_path") is None else str(extra.get("adapter_path")))
         last.setdefault("lora_id", extra.get("lora_id"))
+        last.setdefault("sync_details", extra.get("last_sync"))
     every = int(cfg.get("checkpoint_every", 1))
     if every <= 0:
         raise ValueError("checkpoint_every must be positive")
@@ -566,10 +596,15 @@ def persist_training_step(
     health = {"step": int(state.step), "written_at": utc_now(), **step_health(state, last, cfg)}
     health.update(checkpoint_saved=save_now, last_saved_step=ctx["last_saved_step"])
     step_row = step_metrics_row(state, last, ctx, wall_s, health=health)
-    if (cfg.get("cost_control") or {}).get("enabled", False):
+    from grace_gc.trainer.cost_control import start_count_mode
+
+    if start_count_mode(cfg) == "wall":
         step_row["token_proxy_next_n"] = step_row["next_n"]
         step_row["next_n"] = None
         step_row["next_n_source"] = "post_save_cost_control.jsonl"
+    elif start_count_mode(cfg) == "fixed":
+        step_row["next_n"] = int(state.n_ref or n)
+        step_row["next_n_source"] = "fixed_n_ref"
     step_row["checkpoint_sha256"] = checkpoint_sha
     step_row["checkpoint_timings"] = timings
     run.append_jsonl("steps.jsonl", step_row)

@@ -1,0 +1,4 @@
+# One factor relative to deeper: remove extra fresh generation; keep main audit rate.
+experiment_variant: no_fresh_only
+predictor:
+  fresh_samples_per_problem: 0

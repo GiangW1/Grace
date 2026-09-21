@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.metadata
 import os
 import platform
 import shutil
@@ -45,7 +46,7 @@ def sha256_file(path: str | Path) -> str:
 
 def sha256_array(arr) -> str:
     data = np.ascontiguousarray(np.asarray(arr))
-    return hashlib.sha256(data.tobytes()).hexdigest()
+    return hashlib.sha256(data).hexdigest()
 
 
 def sha256_named(named) -> str:
@@ -71,7 +72,7 @@ def _update_digest(digest, value) -> None:
             _update_digest(digest, value[key])
         return
     if hasattr(value, "tobytes"):
-        digest.update(np.ascontiguousarray(np.asarray(value)).tobytes())
+        digest.update(np.ascontiguousarray(np.asarray(value)))
         return
     digest.update(repr(value).encode("utf-8"))
 
@@ -279,6 +280,7 @@ def collect_versions(
         "python": sys.version.split()[0],
         "platform": platform.platform(),
         "packages": {},
+        "package_version_sources": {},
         "file_hashes": {},
         "missing": [],
     }
@@ -287,12 +289,19 @@ def collect_versions(
     if info["git"]["head"] is None:
         info["missing"].append("git")
     for name in extra_modules:
+        distribution = {"yaml": "PyYAML", "math_verify": "math-verify", "huggingface_hub": "huggingface-hub"}.get(name, name)
         try:
-            mod = __import__(name)
-            info["packages"][name] = getattr(mod, "__version__", "present-no-version")
-        except Exception:
-            info["packages"][name] = None
-            info["missing"].append(name)
+            info["packages"][name] = importlib.metadata.version(distribution)
+            info["package_version_sources"][name] = "distribution_metadata"
+        except importlib.metadata.PackageNotFoundError:
+            try:
+                mod = __import__(name)
+                info["packages"][name] = getattr(mod, "__version__", "present-no-version")
+                info["package_version_sources"][name] = "module_attribute" if hasattr(mod, "__version__") else "unknown"
+            except Exception:
+                info["packages"][name] = None
+                info["package_version_sources"][name] = "unknown"
+                info["missing"].append(name)
     for label, path in (files_to_hash or {}).items():
         p = Path(path)
         if not p.is_file():

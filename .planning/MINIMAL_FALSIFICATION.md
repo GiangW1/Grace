@@ -1,7 +1,9 @@
 # 最小证伪：代码完成后直接用小配置运行
 
-**当前状态：** 训练/评测/审计脚本已在仓库；本机 CPU 可跑；现役工作树上的真实 GPU 实验未跑。
+**当前状态（2026-09-19）：** [9月18日四方法链](../docs/MINIMAL_RESULTS_REVIEW_20260919.md)已完成，未支持实际效率主张。后续修复已做 CPU 验证，真实 GPU 再验证仍待运行；发布与交接状态见 [STATE.md](STATE.md)。
 **顺序：** 当前分支先单卡 `scripts/run_minimal_gpu.sh`（Full-PG / GRACE / Uniform-CV / GRPO）。论文规模仍按 README：smoke Full-PG → Pilot Full-PG → Pilot GRACE。完整 4 卡尚未接线。
+
+新候选的固定步数机制定位、同物理预算比较和固定 U 单因素用法见 [README E2–E4](../README.md#e2-最小比较现役工作树)。具体层叠配置以实际保存的 `config.yaml` 为准，不能把下面的论文默认值当作所有候选的有效参数。
 
 ## 简单使用方式
 
