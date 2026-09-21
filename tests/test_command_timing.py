@@ -1,5 +1,10 @@
 import json
+import os
+from pathlib import Path
+from queue import Queue
+import subprocess
 import sys
+from threading import Thread
 
 import pytest
 
@@ -37,3 +42,26 @@ def test_launch_error_is_recorded_and_reraised(tmp_path):
         measure_command([str(tmp_path / "no-such-program")], log, "train")
     row = json.loads(log.read_text())
     assert row["exit_code"] is None and row["error_type"] == "FileNotFoundError"
+
+
+def test_replaced_scheduler_waits_before_launch(tmp_path):
+    marker = tmp_path / "scheduler_handoff.json"
+    marker.write_text(json.dumps({"replaced_pid": os.getpid()}))
+    output = tmp_path / "child.txt"
+    command = [sys.executable, str(Path(__file__).resolve().parents[1] / "scripts/measure_command.py"),
+               "--log", str(tmp_path / "timing.jsonl"), "--stage", "train", "--",
+               sys.executable, "-c", "from pathlib import Path; import sys; Path(sys.argv[1]).touch()", str(output)]
+    child = subprocess.Popen(command, stdout=subprocess.PIPE, text=True)
+    try:
+        ready = Queue()
+        Thread(target=lambda: ready.put(child.stdout.readline()), daemon=True).start()
+        assert ready.get(timeout=5).startswith("scheduler_handoff:")
+        assert not output.exists()
+        # A marker for another scheduler must not hold up this command.
+        marker.write_text(json.dumps({"replaced_pid": -1}))
+        assert child.wait(timeout=5) == 0
+        assert output.is_file()
+    finally:
+        if child.poll() is None:
+            child.kill()
+            child.wait()

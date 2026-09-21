@@ -2,6 +2,14 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
+## GPU 运行修复交接（2026-09-21）
+
+服务器执行 `python -m pytest -q`，全量回归退出码 0，1 项跳过。
+覆盖嵌套 NaN/Infinity 报告转 null 且保留审计原件、显式清理与 atexit
+重复调用时仅关闭一次 vLLM，以及旧调度器交接期间不得启动子任务。
+`git diff --check` 通过。测试使用既有 CPU/替身路径；真实实验结果、完成
+范围和用户暂停状态见 [本轮交接](OFFLINE_ROLLOUT_RESULTS_20260921.md)。
+
 ## 离线对照审查修复（2026-09-19，本轮）
 
 全量 CPU/替身回归：`755 passed, 1 skipped in 95.43s`。命令：`D:\Anaconda\python.exe -m pytest tests -q -o addopts='' --tb=short`。真实 CUDA 项因本机无 GPU 跳过；requests 仍有既有依赖版本警告。

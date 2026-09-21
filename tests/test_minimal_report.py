@@ -43,6 +43,36 @@ def test_report_uses_completed_audit_retry(tmp_path):
     assert row["audit_run_dir"] == str(retry)
 
 
+def test_report_preserves_nested_undefined_audit_statistics(tmp_path):
+    original = json.dumps({
+        "n_bundles": 1,
+        "independent_report": {"rows": [{"rho_l": float("nan"), "rho_a": 0.25}]},
+        "variance_cost_uncertainty": {"ci95": [float("-inf"), float("inf")]},
+    })
+    for stage in ("audit", "audit-training"):
+        folder = tmp_path / "full_pg" / stage
+        folder.mkdir(parents=True)
+        (folder / "audit_summary.json").write_text(original)
+    batch = tmp_path / "full_pg/batch-audit"
+    batch.mkdir()
+    (batch / "batch_audit_summary.json").write_text(json.dumps({
+        "diagnostics": {"ratio": float("nan"), "n": 0},
+    }))
+
+    summarize(tmp_path)
+
+    def reject_constant(value):
+        raise AssertionError(f"Nonfinite JSON constant: {value}")
+
+    payload = json.loads((tmp_path / "comparison.json").read_text(), parse_constant=reject_constant)
+    row = payload["methods"][0]
+    assert row["audit_independent_report"]["rows"] == [{"rho_l": None, "rho_a": 0.25}]
+    assert row["training_matched_audit_independent_report"]["rows"][0]["rho_l"] is None
+    assert row["variance_cost_uncertainty"]["ci95"] == [None, None]
+    assert row["fixed_batch_audit"]["diagnostics"] == {"ratio": None, "n": 0}
+    assert (tmp_path / "full_pg/audit/audit_summary.json").read_text() == original
+
+
 def test_report_includes_failed_training_time(tmp_path):
     train = tmp_path / "grace/train"
     archived = train / "attempts/first"

@@ -25,6 +25,22 @@ def timing_summary(rows):
             "note": "Includes subprocess startup, data loading and shutdown. Gaps are unclassified orchestration/idle time, not measured GPU compute. Do not add inner ledger totals."}
 
 
+def wait_for_scheduler_handoff(log):
+    marker = Path(log).parent / "scheduler_handoff.json"
+    parent = os.getppid()
+    announced = False
+    while marker.is_file():
+        handoff = json.loads(marker.read_text(encoding="utf-8"))
+        if handoff.get("replaced_pid") != parent:
+            return
+        if os.getppid() != parent:
+            raise SystemExit("Replaced scheduler exited before command launch")
+        if not announced:
+            print("scheduler_handoff: waiting for replacement coordinator", flush=True)
+            announced = True
+        time.sleep(1)
+
+
 def measure_command(command, log, stage):
     log = Path(log)
     log.parent.mkdir(parents=True, exist_ok=True)
@@ -62,4 +78,5 @@ if __name__ == "__main__":
     command = args.command[1:] if args.command[:1] == ["--"] else args.command
     if not command:
         parser.error("a subprocess command is required")
+    wait_for_scheduler_handoff(args.log)
     raise SystemExit(measure_command(command, args.log, args.stage))

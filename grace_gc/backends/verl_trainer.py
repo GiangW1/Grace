@@ -89,6 +89,8 @@ class VLLMWorkerCleanup:
 
 
 def _shutdown_vllm_engine(llm) -> None:
+    if getattr(llm, "_grace_shutdown_done", False):
+        return
     core = llm.llm_engine.engine_core
     try:
         rpc = getattr(llm, "collective_rpc", None)
@@ -96,6 +98,7 @@ def _shutdown_vllm_engine(llm) -> None:
             rpc("grace_destroy_process_groups")
     finally:
         core.shutdown()
+        llm._grace_shutdown_done = True
 
 
 def vllm_needed_max_model_len(cfg: dict[str, Any], max_new: int | None = None) -> int:

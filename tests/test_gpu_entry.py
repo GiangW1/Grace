@@ -630,6 +630,7 @@ def test_vllm_registers_worker_shutdown(monkeypatch):
     assert not events
     assert len(callbacks) == 1
     callback, args = callbacks[0]
+    vt._shutdown_vllm_engine(llm)
     callback(*args)
     assert events == ["grace_destroy_process_groups", "shutdown"]
 
@@ -650,6 +651,7 @@ def test_vllm_shutdown_still_stops_core_if_rpc_fails():
     )
     with pytest.raises(RuntimeError, match="worker failed"):
         _shutdown_vllm_engine(llm)
+    _shutdown_vllm_engine(llm)
     assert closed == [True]
 
 
