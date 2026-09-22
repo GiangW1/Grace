@@ -125,3 +125,108 @@ def test_predictor_diagnostic_ridge_and_mlp_candidates():
     assert [row["model"] for row in rows] == ["ridge", "mlp"]
     assert all(np.isfinite(row["test_residual_mean"]) for row in rows)
     assert result["oracle_basis"]["test_coordinate_error_mean"] < 1e-10
+
+
+def test_serve_scheduler_refill_and_no_refill_keep_logical_slots(monkeypatch):
+    from scripts import scheduler_probe_serve as module
+
+    class FakeClient:
+        def __init__(self):
+            self.calls = []
+
+        def complete(self, prompt_token_ids, max_tokens, seed, stop_token_ids, request_id, cache_salt):
+            import time
+
+            index = int(request_id.split("-")[3])
+            if index % 3 == 0:
+                time.sleep(0.002)
+            self.calls.append((request_id, list(prompt_token_ids), int(max_tokens), cache_salt))
+            if len(prompt_token_ids) > 1:
+                token_ids, finish = [12], "stop"
+            elif int(max_tokens) == 2:
+                token_ids, finish = [10, 11], "length"
+            else:
+                token_ids, finish = [10, 11], "length"
+            started = time.perf_counter()
+            return module.ServeResponse(
+                request_id=request_id, prompt_token_ids=list(prompt_token_ids), token_ids=token_ids,
+                finish_reason=finish, stop_reason=None, usage={}, wall_seconds=0.001,
+                submitted_at=started, returned_at=started + 0.001,
+            )
+
+    starts = [{"problem_id": str(i), "prompt_token_ids": [1]} for i in range(5)]
+    plan = module.make_request_plan(5, 0.5, 19)
+    for scheduler in ("no_refill", "refill"):
+        client = FakeClient()
+        summary, records, requests = module.run_scheduler(
+            client, starts, scheduler=scheduler, capacity=2, all_concurrency=None,
+            mode="fixed_ht", decision_tokens=2, max_new_tokens=4, p=0.5,
+            request_plan=plan, eos_id=[99], cache_salt=f"test-{scheduler}",
+        )
+        assert len(records) == 5
+        assert summary["completed"] + summary["stopped"] == 5
+        assert summary["n_http_requests"] == len(requests)
+        assert summary["client_capacity"] == 2
+        assert all(row.request_count in {1, 2} for row in records)
+        assert all(row["cache_salt"] == f"test-{scheduler}" for row in client.calls)
+
+
+def test_serve_scheduler_selected_suffix_does_not_consume_new_slot():
+    from scripts import scheduler_probe_serve as module
+
+    class FakeClient:
+        def complete(self, prompt_token_ids, max_tokens, seed, stop_token_ids, request_id, cache_salt):
+            import time
+
+            now = time.perf_counter()
+            if len(prompt_token_ids) > 1:
+                token_ids, finish = [12], "stop"
+            else:
+                token_ids, finish = [10, 11], "length"
+            return module.ServeResponse(
+                request_id=request_id, prompt_token_ids=list(prompt_token_ids), token_ids=token_ids,
+                finish_reason=finish, stop_reason=None, usage={}, wall_seconds=0.001,
+                submitted_at=now, returned_at=now + 0.001,
+            )
+
+    starts = [{"problem_id": str(i), "prompt_token_ids": [1]} for i in range(3)]
+    plan = module.make_request_plan(3, 1.0, 23)
+    summary, records, requests = module.run_scheduler(
+        FakeClient(), starts, scheduler="refill", capacity=2, all_concurrency=None,
+        mode="fixed_ht", decision_tokens=2, max_new_tokens=4, p=1.0,
+        request_plan=plan, eos_id=[99], cache_salt="test",
+    )
+
+    assert summary["completed"] == 3
+    assert summary["stopped"] == 0
+    assert summary["n_http_requests"] == 6
+    assert all(row.request_count == 2 for row in records)
+    assert any(request["stage"] == "suffix" for request in requests)
+
+
+def test_serve_client_uses_tokenized_completion_request(monkeypatch):
+    from scripts import scheduler_probe_serve as module
+
+    client = module.VLLMServeClient("http://127.0.0.1:8000/v1", "served-model")
+    captured = {}
+
+    def fake_request(method, endpoint, payload=None):
+        captured.update({"method": method, "endpoint": endpoint, "payload": payload})
+        return {
+            "choices": [{
+                "prompt_token_ids": [1, 2], "token_ids": [10, 11],
+                "finish_reason": "length", "stop_reason": None,
+            }],
+            "usage": {"prompt_tokens": 2, "completion_tokens": 2},
+        }
+
+    monkeypatch.setattr(client, "_request", fake_request)
+    response = client.complete([1, 2], 2, 7, [99], "request-1", "salt")
+
+    assert captured["method"] == "POST"
+    assert captured["endpoint"] == "/v1/completions"
+    assert captured["payload"]["prompt"] == [1, 2]
+    assert captured["payload"]["return_token_ids"] is True
+    assert captured["payload"]["add_special_tokens"] is False
+    assert captured["payload"]["cache_salt"] == "salt"
+    assert response.token_ids == [10, 11]

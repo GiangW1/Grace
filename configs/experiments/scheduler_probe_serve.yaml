@@ -1,0 +1,22 @@
+# Independent serving-path scheduler probe. Start vllm serve separately.
+experiment_variant: phase12_scheduler_serve_probe
+backend: vllm_serve
+hardware:
+  name: a100
+  n_gpu: 1
+  gpu_memory_gb: 80
+scheduler_serve_probe:
+  base_url: http://127.0.0.1:8000/v1
+  # Must match the model id returned by GET /v1/models.
+  server_model: Qwen/Qwen3-4B-Base
+  capacity: 8
+  decision_tokens: 512
+  max_new_tokens: 2048
+  continuation_probabilities: [0.0, 0.5, 0.75, 1.0]
+  repeats: 3
+  workloads: [full_pg, fixed_ht]
+  schedulers: [all, no_refill, refill]
+  request_timeout_seconds: 600
+  # null means one client worker per start for the all-request baseline.
+  all_concurrency: null
+  api_key_env: VLLM_API_KEY

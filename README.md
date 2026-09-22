@@ -16,6 +16,8 @@ Qwen3-4B-Base 上的 GRACE 训练、评测和前缀审计。本机先做 CPU 检
 
 冻结 actor 的单卡连续补位探针，以及共用 rollout 的 Zero/Simple/Ridge/MLP 预测器诊断，见 [Phase 1/2 experiments](docs/EXPERIMENTS_PHASE12.md)。
 
+独立的单卡 A100 `vllm serve` 补位/不补位对照见 [serving-path scheduler probe](docs/EXPERIMENTS_PHASE12_SERVE.md)；它通过同一个 OpenAI-compatible endpoint 比较客户端 admission policy，并保留全量提交基线。
+
 5090 把下面所有 `configs/hardware/a100_1.yaml` 换成 `configs/hardware/rtx5090_1.yaml`。两种卡分别记时，不要折成 A100-hours。
 
 ### A. 本机（没有 GPU 也做）
