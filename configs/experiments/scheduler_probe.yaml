@@ -1,0 +1,17 @@
+# Frozen-actor scheduler probe. Layer this after a hardware/model config.
+# The CLI fixes the actor checkpoint and keeps all starts in the ledger.
+experiment_variant: phase12_scheduler_probe
+backend: gpu_verl
+hardware:
+  name: a100
+  n_gpu: 1
+vllm:
+  tensor_parallel: 1
+scheduler_probe:
+  capacity: 8
+  decision_tokens: 512
+  max_new_tokens: 2048
+  continuation_probabilities: [0.0, 0.5, 0.75, 1.0]
+  repeats: 3
+  workloads: [full_pg, fixed_ht]
+  schedulers: [legacy, continuous]

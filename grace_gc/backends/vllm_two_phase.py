@@ -315,12 +315,18 @@ def generate_phase(
     lora_request=None,
     *,
     execution: dict | None = None,
+    request_seeds: list[int] | None = None,
 ) -> PhaseResult:
     """Generate from raw token IDs. Prefix caching reuses KV, not RNG state."""
     execution = _execution_metadata(execution, len(prompt_token_ids))
     _LLM, _SP = _require_vllm()
     prompts = _vllm_prompts(prompt_token_ids)
-    seeds = [int(rng.integers(stream, 0, 2**31 - 1)) for _ in prompt_token_ids]
+    if request_seeds is None:
+        seeds = [int(rng.integers(stream, 0, 2**31 - 1)) for _ in prompt_token_ids]
+    else:
+        seeds = [int(value) for value in request_seeds]
+        if len(seeds) != len(prompt_token_ids):
+            raise ValueError("request_seeds must match the number of prompts")
     param_list = [
         build_sampling_params(
             max_tokens,
@@ -403,6 +409,7 @@ def continue_selected(
     lora_request=None,
     *,
     execution: dict | None = None,
+    request_seeds: list[int] | None = None,
 ) -> list[list[int] | None]:
     """Continue only selected prefixes on the same engine/snapshot."""
     from grace_gc.data.tokenize import is_stop_token
@@ -410,6 +417,9 @@ def continue_selected(
     selected = np.asarray(selected, dtype=bool)
     chosen = []
     chosen_idx = []
+    chosen_seeds = []
+    if request_seeds is not None and len(request_seeds) != len(prefix_token_ids):
+        raise ValueError("request_seeds must match the number of prefixes")
     already = {}
     for i, (ids, keep) in enumerate(zip(prefix_token_ids, selected)):
         if not keep:
@@ -419,6 +429,8 @@ def continue_selected(
             continue
         chosen.append(ids)
         chosen_idx.append(i)
+        if request_seeds is not None:
+            chosen_seeds.append(int(request_seeds[i]))
     out: list[list[int] | None] = [None] * len(prefix_token_ids)
     for i, seq in already.items():
         out[i] = seq
@@ -429,7 +441,8 @@ def continue_selected(
     if not chosen:
         return out
     phase = generate_phase(llm, chosen, max_tokens, temperature, eos_id, rng, "continuation",
-                           lora_request=lora_request, execution=execution)
+                           lora_request=lora_request, execution=execution,
+                           request_seeds=None if request_seeds is None else chosen_seeds)
     continue_selected.last_phase = phase
     continue_selected.last_idx = list(chosen_idx)
     for j, i in enumerate(chosen_idx):

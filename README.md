@@ -14,6 +14,8 @@ Qwen3-4B-Base 上的 GRACE 训练、评测和前缀审计。本机先做 CPU 检
 
 最新已复核实测是 [9月18日链](docs/MINIMAL_RESULTS_REVIEW_20260919.md)，不能作为本轮修复的收益证据。当前交接见 [STATE](.planning/STATE.md)，问题状态见 [30项清单](docs/GRACE_ISSUE_CHECKLIST_20260919.md)。
 
+冻结 actor 的单卡连续补位探针，以及共用 rollout 的 Zero/Simple/Ridge/MLP 预测器诊断，见 [Phase 1/2 experiments](docs/EXPERIMENTS_PHASE12.md)。
+
 5090 把下面所有 `configs/hardware/a100_1.yaml` 换成 `configs/hardware/rtx5090_1.yaml`。两种卡分别记时，不要折成 A100-hours。
 
 ### A. 本机（没有 GPU 也做）
