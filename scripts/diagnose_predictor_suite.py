@@ -420,6 +420,8 @@ def _summary(rows, examples):
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Offline predictor suite on a frozen prefix audit")
     parser.add_argument("--bundles", required=True, help="audit_bundles.jsonl or its run directory")
+    parser.add_argument("--decision-tokens", type=int, default=None,
+                        help="evaluate one checkpoint from a multi-t audit")
     parser.add_argument("--run-dir", default=None)
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--split-repeats", type=int, default=5)
@@ -448,6 +450,10 @@ def main(argv=None) -> int:
     if not feature_sets or not train_fractions or any(not 0.0 < x <= 1.0 for x in train_fractions):
         raise ValueError("feature-sets must be nonempty and train-fractions must be in (0, 1]")
     bundles = _load_bundles(Path(args.bundles))
+    if args.decision_tokens is not None:
+        bundles = [bundle for bundle in bundles if int(bundle.t) == args.decision_tokens]
+        if not bundles:
+            raise ValueError(f"no audit bundles at decision_tokens={args.decision_tokens}")
     examples = _prefix_examples(bundles)
     for name in feature_sets:
         _feature_view(examples[0].features, name)
@@ -466,6 +472,7 @@ def main(argv=None) -> int:
     run = RunDirectory(resolve_run_dir(requested))
     run.write_run_meta(kind="predictor-suite", started=utc_now(), requested=requested)
     run.write_json("config.json", {"bundles": str(Path(args.bundles).resolve()),
+                                   "decision_tokens": args.decision_tokens,
                                    "seed": int(args.seed), "split_repeats": int(args.split_repeats),
                                    "test_fraction": float(args.test_fraction), "models": args.models,
                                    "include_shuffled": bool(args.include_shuffled),

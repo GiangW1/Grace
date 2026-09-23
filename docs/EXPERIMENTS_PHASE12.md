@@ -4,6 +4,10 @@ The experiments use a frozen actor snapshot. The serving probe keeps its
 workload fixed, while the predictor analyses reuse stored audit labels; none
 of them updates the actor during measurement.
 
+The later sparse-checkpoint serve experiment, including 512/1024 decisions,
+global-barrier comparison, cost calibration, and frozen-predictor timing, is
+documented in [TRUNCATION_REFILL_SERVE.md](TRUNCATION_REFILL_SERVE.md).
+
 ## 1. Request-level scheduler probe
 
 `scripts/scheduler_probe.py` compares the existing two-call `LLM.generate`

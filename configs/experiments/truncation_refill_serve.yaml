@@ -1,0 +1,16 @@
+# Independent frozen-actor serve experiment, one A100 80G.
+# CLI supplies the workload, server name, and policy probabilities.
+experiment_variant: phase12_truncation_refill_serve
+method: grace
+backend: vllm_serve
+decision_tokens: 512
+max_new_tokens: 2048
+temperature: 1.0
+hardware:
+  name: a100
+  n_gpu: 1
+  gpu_memory_gb: 80
+vllm:
+  tensor_parallel: 1
+  dtype: bfloat16
+  gpu_memory_utilization: 0.5
