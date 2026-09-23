@@ -28,14 +28,20 @@ is a separate production baseline, not the no-refill counterfactual.
 
 ## Start one A100 server
 
-Use the same model/tokenizer and frozen actor snapshot that the offline probe
-uses. For a LoRA actor, launch vLLM with its LoRA serving flags and pass the
-served adapter/model name through `server_model`.
+Use the same base model/tokenizer and frozen actor adapter that the offline
+probe uses. The adapter must be a PEFT `save_pretrained` directory (for
+example, one produced by `grace_gc.backends.weight_sync.save_lora_adapter`),
+not the NumPy training checkpoint. Register it as a static LoRA model so the
+probe cannot accidentally measure the base model:
 
 ```bash
+SERVED_MODEL=grace-actor
+LORA_ADAPTER=/path/to/frozen-actor-adapter
 CUDA_VISIBLE_DEVICES=0 vllm serve "$MODEL_PATH" \
   --dtype bfloat16 \
   --tensor-parallel-size 1 \
+  --enable-lora \
+  --lora-modules "$SERVED_MODEL=$LORA_ADAPTER" \
   --gpu-memory-utilization 0.80 \
   --generation-config vllm \
   --enable-prefix-caching \
@@ -61,6 +67,7 @@ python scripts/scheduler_probe_serve.py \
   --n-problems 8 --starts-per-problem 16 \
   --capacity 8 \
   --decision-tokens 512 --max-new-tokens 2048 \
+  --temperature 0.2 \
   --p 0 --p 0.5 --p 0.75 --p 1 \
   --repeats 3 \
   --mode both --workload both \

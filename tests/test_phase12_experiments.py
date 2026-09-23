@@ -168,7 +168,7 @@ def test_serve_scheduler_refill_and_no_refill_keep_logical_slots(monkeypatch):
         assert summary["n_http_requests"] == len(requests)
         assert summary["client_capacity"] == 2
         assert all(row.request_count in {1, 2} for row in records)
-        assert all(row["cache_salt"] == f"test-{scheduler}" for row in client.calls)
+        assert all(row[3] == f"test-{scheduler}" for row in client.calls)
 
 
 def test_serve_scheduler_selected_suffix_does_not_consume_new_slot():
@@ -229,6 +229,7 @@ def test_serve_client_uses_tokenized_completion_request(monkeypatch):
     assert captured["payload"]["return_token_ids"] is True
     assert captured["payload"]["add_special_tokens"] is False
     assert captured["payload"]["cache_salt"] == "salt"
+    assert captured["payload"]["temperature"] == pytest.approx(0.2)
     assert response.token_ids == [10, 11]
 
 

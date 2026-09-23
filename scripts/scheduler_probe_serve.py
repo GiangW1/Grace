@@ -75,7 +75,7 @@ class VLLMServeClient:
     """Small stdlib HTTP client with one keep-alive connection per worker."""
 
     def __init__(self, base_url: str, model: str, *, api_key: str | None = None,
-                 timeout_seconds: float = 600.0):
+                 timeout_seconds: float = 600.0, temperature: float = 0.2):
         parsed = urlsplit(str(base_url).rstrip("/"))
         if parsed.scheme not in {"http", "https"} or not parsed.hostname:
             raise ValueError("base_url must be an http(s) URL")
@@ -83,6 +83,7 @@ class VLLMServeClient:
         self.model = str(model)
         self.api_key = api_key
         self.timeout_seconds = float(timeout_seconds)
+        self.temperature = float(temperature)
         self._scheme = parsed.scheme
         self._host = parsed.hostname
         self._port = parsed.port
@@ -155,7 +156,7 @@ class VLLMServeClient:
             "model": self.model,
             "prompt": [int(x) for x in prompt_token_ids],
             "max_tokens": int(max_tokens),
-            "temperature": 1.0,
+            "temperature": self.temperature,
             "top_p": 1.0,
             "top_k": -1,
             "min_p": 0.0,
@@ -472,6 +473,8 @@ def main(argv=None) -> int:
     parser.add_argument("--capacity", type=int, default=None)
     parser.add_argument("--decision-tokens", type=int, default=None)
     parser.add_argument("--max-new-tokens", type=int, default=None)
+    parser.add_argument("--temperature", type=float, default=None,
+                        help="sampling temperature for all requests (default: 0.2)")
     parser.add_argument("--p", type=float, action="append", default=None)
     parser.add_argument("--repeats", type=int, default=None)
     parser.add_argument("--mode", choices=("all", "no_refill", "refill", "both"), default=None)
@@ -501,6 +504,7 @@ def main(argv=None) -> int:
     capacity = int(args.capacity if args.capacity is not None else probe_cfg.get("capacity", 8))
     decision_tokens = int(args.decision_tokens if args.decision_tokens is not None else probe_cfg.get("decision_tokens", 512))
     max_new_tokens = int(args.max_new_tokens if args.max_new_tokens is not None else probe_cfg.get("max_new_tokens", 2048))
+    temperature = float(args.temperature if args.temperature is not None else probe_cfg.get("temperature", 0.2))
     configured_ps = [float(x) for x in (args.p if args.p is not None else probe_cfg.get("continuation_probabilities", [0.0, 0.5, 0.75, 1.0]))]
     repeats = int(args.repeats if args.repeats is not None else probe_cfg.get("repeats", 3))
     configured_modes = [str(x) for x in probe_cfg.get("schedulers", ["all", "no_refill", "refill"])]
@@ -522,6 +526,8 @@ def main(argv=None) -> int:
         raise ValueError("all_concurrency must be positive when provided")
     if request_timeout <= 0:
         raise ValueError("request-timeout must be positive")
+    if not 0.0 <= temperature <= 2.0:
+        raise ValueError("temperature must be in [0, 2]")
     if decision_tokens <= 0 or max_new_tokens < decision_tokens:
         raise ValueError("decision_tokens must be positive and <= max_new_tokens")
     if any(not 0.0 <= p <= 1.0 for p in configured_ps):
@@ -536,6 +542,7 @@ def main(argv=None) -> int:
     run.write_yaml("config.yaml", {**cfg, "scheduler_serve_probe": {
         **probe_cfg, "base_url": base_url, "server_model": str(server_model), "capacity": capacity,
         "decision_tokens": decision_tokens, "max_new_tokens": max_new_tokens,
+        "temperature": temperature,
         "continuation_probabilities": configured_ps, "repeats": repeats, "schedulers": modes,
         "workload": workload, "request_timeout_seconds": request_timeout,
         "all_concurrency": all_concurrency, "api_key_env": api_key_env,
@@ -566,7 +573,8 @@ def main(argv=None) -> int:
         for i in range(len(prompt_ids))
     ])
     eos_id = collect_stop_token_ids(tokenizer)
-    client = VLLMServeClient(base_url, str(server_model), api_key=api_key, timeout_seconds=request_timeout)
+    client = VLLMServeClient(base_url, str(server_model), api_key=api_key,
+                             timeout_seconds=request_timeout, temperature=temperature)
     client.health()
     served_models = client.models()
     if served_models and str(server_model) not in served_models:
