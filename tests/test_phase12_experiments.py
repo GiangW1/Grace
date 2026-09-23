@@ -392,3 +392,54 @@ def test_sparse_truncation_records_two_decisions_and_joint_probability():
     assert [row["selected"] for row in records[0]["decisions"]] == [True, False]
     assert records[0]["full_token_ids"] is None
     assert summary["feature_seconds"] == pytest.approx(0.04)
+
+
+def test_sparse_predictor_batches_arriving_prefixes(monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Condition, Thread
+    from scripts.truncation_refill_serve import FrozenPredictor
+    import grace_gc.backends.hf_actor as hf_actor
+
+    sizes = []
+
+    def fake_features(actor, prefixes, prompt_lens, baselines, pad_id, **kwargs):
+        sizes.append(len(prefixes))
+        return {"features": np.ones((len(prefixes), 2)),
+                "cost_feat": np.ones((len(prefixes), 3))}
+
+    class FakeModel:
+        constant_cost = True
+
+        def forward_numpy(self, features, cost_feat):
+            n = len(features)
+            return SimpleNamespace(f=np.zeros((n, 1)), r_hat=np.ones(n), c_hat=np.ones(n))
+
+    monkeypatch.setattr(hf_actor, "prefix_feature_bundle", fake_features)
+    predictor = FrozenPredictor.__new__(FrozenPredictor)
+    predictor.actor = object()
+    predictor.pad_id = 0
+    predictor.eos_ids = [99]
+    predictor.baseline = SimpleNamespace(get=lambda _problem_id: 0.5)
+    predictor.models = {2: FakeModel()}
+    predictor.feature_modes = {2: "legacy"}
+    predictor.lambdas = {2: 1.0}
+    predictor.uniform_p = {2: 0.5}
+    predictor.p_min = 0.2
+    predictor.uniform_shrink = 1.0
+    predictor.batch_size = 4
+    predictor.batch_wait_seconds = 0.05
+    predictor._condition = Condition()
+    predictor._pending = []
+    predictor._closed = False
+    predictor._worker = Thread(target=predictor._work, daemon=True)
+    predictor._worker.start()
+    try:
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(predictor.decide, 2, [1, 11, 11], 1, str(i))
+                       for i in range(4)]
+            results = [future.result() for future in futures]
+    finally:
+        predictor.close()
+    assert sizes == [4]
+    assert all(row["feature_batch_size"] == 4 for row in results)
+    assert all(row["p"] == pytest.approx(0.5) for row in results)

@@ -17,7 +17,7 @@ import os
 from pathlib import Path
 import statistics
 import sys
-from threading import Event, Lock, Thread
+from threading import Condition, Event, Thread
 from time import perf_counter
 from urllib.request import Request, urlopen
 
@@ -56,6 +56,18 @@ class PendingStart:
     requests: list[dict]
     settled: bool
     logical_started: float
+
+
+@dataclass
+class PendingDecision:
+    checkpoint: int
+    token_ids: list[int]
+    prompt_len: int
+    problem_id: str
+    submitted_at: float
+    done: Event
+    result: dict | None = None
+    error: Exception | None = None
 
 
 def make_trial_plan(n_starts: int, seed: int) -> dict:
@@ -108,7 +120,8 @@ class FrozenPredictor:
 
     def __init__(self, model_path: str, actor_checkpoint: str, artifacts: dict[int, str],
                  tokenizer, eos_ids, *, lambdas: dict[int, float], uniform_p: dict[int, float],
-                 p_min: float, uniform_shrink: float):
+                 p_min: float, uniform_shrink: float, batch_size: int = 4,
+                 batch_wait_ms: float = 5.0):
         from grace_gc.backends.hf_actor import named_lora_params
         from grace_gc.backends.verl_trainer import load_lora_actor
         from grace_gc.predictor.heads import predictor_from_spec
@@ -134,7 +147,10 @@ class FrozenPredictor:
         self.uniform_p = uniform_p
         self.p_min = p_min
         self.uniform_shrink = uniform_shrink
-        self.lock = Lock()
+        self.batch_size = int(batch_size)
+        self.batch_wait_seconds = float(batch_wait_ms) / 1000.0
+        if self.batch_size <= 0 or self.batch_wait_seconds < 0:
+            raise ValueError("feature batch size and wait must be nonnegative/positive")
         for checkpoint, path in artifacts.items():
             body = read_predictor(path)
             protocol = body["protocol"]
@@ -152,26 +168,80 @@ class FrozenPredictor:
             self.feature_modes[checkpoint] = str(protocol["feature_mode"])
             self.artifact_hashes[checkpoint] = sha256_file(path)
 
+        self._condition = Condition()
+        self._pending: list[PendingDecision] = []
+        self._closed = False
+        self._worker = Thread(target=self._work, name="grace-feature-batch", daemon=True)
+        self._worker.start()
+
+    def close(self) -> None:
+        with self._condition:
+            self._closed = True
+            self._condition.notify_all()
+        self._worker.join()
+
     def decide(self, checkpoint: int, token_ids: list[int], prompt_len: int,
                problem_id: str) -> dict:
-        from grace_gc.backends.hf_actor import prefix_feature_bundle
-
         if checkpoint not in self.models:
             raise ValueError(f"no predictor for checkpoint {checkpoint}")
-        with self.lock:
-            started = perf_counter()
-            bundle = prefix_feature_bundle(
-                self.actor, [token_ids], [prompt_len], [self.baseline.get(problem_id)],
-                self.pad_id, eos_id=self.eos_ids,
-                feature_mode=self.feature_modes[checkpoint], batch_size=1,
-            )
-            feature_seconds = perf_counter() - started
-            started = perf_counter()
-            model = self.models[checkpoint]
-            output = model.forward_numpy(bundle["features"], bundle["cost_feat"])
-            risk = float(output.r_hat[0])
+        request = PendingDecision(checkpoint, token_ids, prompt_len, problem_id,
+                                  perf_counter(), Event())
+        with self._condition:
+            if self._closed:
+                raise RuntimeError("predictor is closed")
+            self._pending.append(request)
+            self._condition.notify()
+        request.done.wait()
+        if request.error is not None:
+            raise request.error
+        return request.result
+
+    def _work(self) -> None:
+        while True:
+            with self._condition:
+                while not self._pending and not self._closed:
+                    self._condition.wait()
+                if not self._pending:
+                    return
+                checkpoint = self._pending[0].checkpoint
+                deadline = self._pending[0].submitted_at + self.batch_wait_seconds
+                while (sum(item.checkpoint == checkpoint for item in self._pending) < self.batch_size
+                       and perf_counter() < deadline and not self._closed):
+                    self._condition.wait(timeout=max(deadline - perf_counter(), 0.0))
+                batch = [item for item in self._pending if item.checkpoint == checkpoint][
+                    :self.batch_size]
+                chosen = {id(item) for item in batch}
+                self._pending = [item for item in self._pending if id(item) not in chosen]
+            try:
+                self._predict_batch(batch)
+            except Exception as exc:
+                for item in batch:
+                    item.error = exc
+            finally:
+                for item in batch:
+                    item.done.set()
+
+    def _predict_batch(self, batch: list[PendingDecision]) -> None:
+        from grace_gc.backends.hf_actor import prefix_feature_bundle
+
+        checkpoint = batch[0].checkpoint
+        started = perf_counter()
+        bundle = prefix_feature_bundle(
+            self.actor, [item.token_ids for item in batch],
+            [item.prompt_len for item in batch],
+            [self.baseline.get(item.problem_id) for item in batch],
+            self.pad_id, eos_id=self.eos_ids,
+            feature_mode=self.feature_modes[checkpoint], batch_size=len(batch),
+        )
+        feature_seconds = perf_counter() - started
+        started = perf_counter()
+        model = self.models[checkpoint]
+        output = model.forward_numpy(bundle["features"], bundle["cost_feat"])
+        results = []
+        for i in range(len(batch)):
+            risk = float(output.r_hat[i])
             cost = (max(2048 - checkpoint, 1) if model.constant_cost
-                    else max(float(output.c_hat[0]), 1e-8))
+                    else max(float(output.c_hat[i]), 1e-8))
             if not math.isfinite(risk) or not math.isfinite(cost):
                 raise ValueError("predictor returned non-finite risk or cost")
             risk = max(risk, 0.0)
@@ -179,10 +249,13 @@ class FrozenPredictor:
             adaptive = min(1.0, max(self.p_min, adaptive))
             p = (1 - self.uniform_shrink) * adaptive + self.uniform_shrink * self.uniform_p[checkpoint]
             p = min(1.0, max(self.p_min, p))
-            prediction_seconds = perf_counter() - started
-        return {"p": float(p), "risk": risk, "cost": cost,
-                "f": output.f[0].tolist(), "feature_seconds": feature_seconds,
-                "prediction_seconds": prediction_seconds}
+            results.append({"p": float(p), "risk": risk, "cost": cost,
+                            "f": output.f[i].tolist(), "feature_batch_size": len(batch)})
+        prediction_seconds = perf_counter() - started
+        for item, result in zip(batch, results):
+            item.result = {**result, "feature_seconds": feature_seconds / len(batch),
+                           "prediction_seconds": prediction_seconds / len(batch),
+                           "feature_queue_seconds": max(0.0, started - feature_seconds - item.submitted_at)}
 
 
 def _stage(client, pending: PendingStart, *, limit: int, stage: int, plan: dict,
@@ -466,9 +539,13 @@ def main(argv=None) -> int:
     parser.add_argument("--lambda-second", type=float, default=1.0)
     parser.add_argument("--p-min", type=float, default=0.2)
     parser.add_argument("--uniform-shrink", type=float, default=0.5)
+    parser.add_argument("--feature-batch-size", type=int, default=4)
+    parser.add_argument("--feature-batch-wait-ms", type=float, default=5.0)
     args = parser.parse_args(argv)
     if (not 0 < args.first < args.second < args.max_new_tokens or args.capacity <= 0
             or args.n_problems <= 0 or args.starts_per_problem <= 0 or args.repeats <= 0
+            or args.feature_batch_size <= 0 or not math.isfinite(args.feature_batch_wait_ms)
+            or args.feature_batch_wait_ms < 0
             or args.request_timeout <= 0 or not math.isfinite(args.metrics_interval)
             or args.metrics_interval < 0 or not math.isfinite(args.temperature)
             or not 0 < args.temperature <= 1
@@ -559,6 +636,7 @@ def main(argv=None) -> int:
             lambdas={args.first: args.lambda_first, args.second: args.lambda_second},
             uniform_p={args.first: args.p_single, args.second: args.p_two_second},
             p_min=args.p_min, uniform_shrink=args.uniform_shrink,
+            batch_size=args.feature_batch_size, batch_wait_ms=args.feature_batch_wait_ms,
         )
         preparation_seconds = perf_counter() - started
     run.write_json("preparation.json", {
@@ -569,36 +647,40 @@ def main(argv=None) -> int:
     })
 
     summaries = []
-    for repeat in range(args.repeats):
-        plan = make_trial_plan(len(starts_payload), args.seed + 100003 * repeat)
-        run.append_jsonl("plans.jsonl", {"repeat": repeat, **plan})
-        ordered = arms if repeat % 2 == 0 else list(reversed(arms))
-        for arm in ordered:
-            salt = f"grace-trunc-{plan['seed']}-{arm.name}"
-            summary, rows, requests, samples = run_trial(
-                client, starts_payload, arm, plan, capacity=args.capacity,
-                max_new=args.max_new_tokens, eos_ids=eos_ids,
-                cache_salt=salt, predictor=predictor,
-                metrics_interval=args.metrics_interval,
-            )
-            summary.update({"repeat": repeat, "trial_seed": plan["seed"],
-                            "cache_salt": salt, "p_first": arm.p_first,
-                            "p_second": arm.p_second, "learned": arm.learned})
-            summaries.append(summary)
-            run.append_jsonl("trials.jsonl", summary)
-            run.write_jsonl("records.jsonl", [
-                {**row, "arm": arm.name, "repeat": repeat} for row in rows
-            ], append=True)
-            run.write_jsonl("requests.jsonl", [
-                {**row, "arm": arm.name, "repeat": repeat} for row in requests
-            ], append=True)
-            run.write_jsonl("server_metrics.jsonl", [
-                {**row, "arm": arm.name, "repeat": repeat} for row in samples
-            ], append=True)
-            print(summary, flush=True)
-    run.write_json("summary.json", {"trials": summaries, "n_starts": len(starts_payload),
-                                    "cost_match_calibration": calibration,
-                                    **summarize_trials(summaries)})
+    try:
+        for repeat in range(args.repeats):
+            plan = make_trial_plan(len(starts_payload), args.seed + 100003 * repeat)
+            run.append_jsonl("plans.jsonl", {"repeat": repeat, **plan})
+            ordered = arms if repeat % 2 == 0 else list(reversed(arms))
+            for arm in ordered:
+                salt = f"grace-trunc-{plan['seed']}-{arm.name}"
+                summary, rows, requests, samples = run_trial(
+                    client, starts_payload, arm, plan, capacity=args.capacity,
+                    max_new=args.max_new_tokens, eos_ids=eos_ids,
+                    cache_salt=salt, predictor=predictor,
+                    metrics_interval=args.metrics_interval,
+                )
+                summary.update({"repeat": repeat, "trial_seed": plan["seed"],
+                                "cache_salt": salt, "p_first": arm.p_first,
+                                "p_second": arm.p_second, "learned": arm.learned})
+                summaries.append(summary)
+                run.append_jsonl("trials.jsonl", summary)
+                run.write_jsonl("records.jsonl", [
+                    {**row, "arm": arm.name, "repeat": repeat} for row in rows
+                ], append=True)
+                run.write_jsonl("requests.jsonl", [
+                    {**row, "arm": arm.name, "repeat": repeat} for row in requests
+                ], append=True)
+                run.write_jsonl("server_metrics.jsonl", [
+                    {**row, "arm": arm.name, "repeat": repeat} for row in samples
+                ], append=True)
+                print(summary, flush=True)
+        run.write_json("summary.json", {"trials": summaries, "n_starts": len(starts_payload),
+                                        "cost_match_calibration": calibration,
+                                        **summarize_trials(summaries)})
+    finally:
+        if predictor is not None:
+            predictor.close()
     return 0
 
 
