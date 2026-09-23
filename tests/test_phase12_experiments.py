@@ -230,3 +230,40 @@ def test_serve_client_uses_tokenized_completion_request(monkeypatch):
     assert captured["payload"]["add_special_tokens"] is False
     assert captured["payload"]["cache_salt"] == "salt"
     assert response.token_ids == [10, 11]
+
+
+def test_predictor_suite_separates_prefix_mean_from_suffix_noise():
+    from scripts import diagnose_predictor_suite as module
+
+    compact = module._without_large_grads(
+        '{"problem_id":"p","grads":[[1,2],[3,4]],"coords":null,"rewards":[1]}'
+    )
+    assert '"grads":null' in compact
+    assert '[[1,2],[3,4]]' not in compact
+
+    def bundle(problem_id, coords):
+        values = np.asarray(coords, dtype=np.float64).reshape(-1, 1)
+        return SimpleNamespace(
+            problem_id=problem_id, t=512, path_id=f"{problem_id}:0",
+            features=np.arange(8, dtype=np.float64), true_grad_coords=values,
+            true_grad_norm_sq=(values[:, 0] ** 2).tolist(),
+            basis_gram=[[1.0]], rewards=np.ones(len(values)),
+            suffix_cost=np.ones(len(values)),
+        )
+
+    examples = module._prefix_examples([bundle("a", [1.0, 3.0]), bundle("b", [0.0])])
+    metrics = module._coordinate_metrics(examples, np.zeros((2, 1)))
+
+    assert examples[0].coord_variance == pytest.approx(2.0)
+    assert metrics["test_prefix_mean_coordinate_error"] == pytest.approx(2.0)
+    assert metrics["test_suffix_residual_mean"] == pytest.approx(2.5)
+    assert metrics["test_prefix_mean_ratio_to_zero"] == pytest.approx(1.0)
+    assert module._feature_view(examples[0].features, "last").shape == (1,)
+
+    nonorthogonal = bundle("c", [2.0])
+    nonorthogonal.basis_gram = [[4.0]]
+    nonorthogonal.true_grad_norm_sq = [1.0]
+    projected = module._prefix_examples([nonorthogonal])
+    exact = module._coordinate_metrics(projected, np.asarray([[0.5]]))
+    assert exact["test_subspace_omission_mean"] == pytest.approx(0.0)
+    assert exact["test_suffix_residual_mean"] == pytest.approx(0.0)
