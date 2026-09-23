@@ -268,3 +268,178 @@ def test_predictor_suite_separates_prefix_mean_from_suffix_noise():
     exact = module._coordinate_metrics(projected, np.asarray([[0.5]]))
     assert exact["test_subspace_omission_mean"] == pytest.approx(0.0)
     assert exact["test_suffix_residual_mean"] == pytest.approx(0.0)
+
+
+def test_two_checkpoint_ht_estimate_is_unbiased_and_nested():
+    from grace_gc.core.estimator import two_checkpoint_ht_estimate
+
+    g = np.asarray([[7.0, -2.0]])
+    m1 = np.asarray([[2.0, 1.0]])
+    m2 = np.asarray([[4.0, 0.0]])
+    p1, p2 = 0.6, 0.4
+    outcomes = [
+        ((0, 0), 1 - p1),
+        ((1, 0), p1 * (1 - p2)),
+        ((1, 1), p1 * p2),
+    ]
+    mean = sum(prob * two_checkpoint_ht_estimate(
+        g, m1, m2, [p1], [p2], [z1], [z2],
+    )[0] for (z1, z2), prob in outcomes)
+    assert np.allclose(mean, g[0])
+    assert np.allclose(two_checkpoint_ht_estimate(g, m1, m2, [1], [1], [1], [1]), g)
+    with pytest.raises(ValueError, match="nested"):
+        two_checkpoint_ht_estimate(g, m1, m2, [p1], [p2], [0], [1])
+
+
+def test_sparse_truncation_cost_match_and_trial_plan_are_stable():
+    from scripts.truncation_refill_serve import make_trial_plan, matched_second_probability
+
+    plan_a = make_trial_plan(4, 19)
+    plan_b = make_trial_plan(4, 19)
+    assert plan_a == plan_b
+    assert len({*plan_a["prefix_seeds"]}) == 4
+    result = matched_second_probability([2, 4, 6, 8], 2, 4, 0.5, 0.6)
+    middle, tail = result["middle_tokens"], result["tail_tokens"]
+    assert 0 < result["p_second"] <= 1
+    assert 0.5 * (middle + tail) == pytest.approx(
+        0.6 * middle + 0.6 * result["p_second"] * tail
+    )
+
+
+def test_sparse_truncation_refills_and_barrier_delays_suffix():
+    from scripts import scheduler_probe_serve as serve
+    from scripts.truncation_refill_serve import Arm, make_trial_plan, run_trial
+    import threading
+    import time
+
+    class FakeClient:
+        def __init__(self):
+            self.calls = []
+            self.lock = threading.Lock()
+
+        def complete(self, prompt_token_ids, max_tokens, seed, stop_token_ids,
+                     request_id, cache_salt):
+            stage = int(request_id.rsplit("-", 1)[-1])
+            index = int(request_id.rsplit("-", 2)[-2])
+            if stage == 0 and index == 1:
+                time.sleep(0.02)
+            with self.lock:
+                self.calls.append((stage, index, cache_salt))
+            now = time.perf_counter()
+            return serve.ServeResponse(
+                request_id=request_id, prompt_token_ids=list(prompt_token_ids),
+                token_ids=[10 + stage] * int(max_tokens), finish_reason="length",
+                stop_reason=None, usage={}, wall_seconds=0.001,
+                submitted_at=now, returned_at=now,
+            )
+
+    starts = [{"problem_id": str(i), "prompt_token_ids": [1]} for i in range(3)]
+    plan = make_trial_plan(3, 7)
+    for scheduler in ("stream", "barrier"):
+        client = FakeClient()
+        arm = Arm(scheduler, (2,), scheduler=scheduler)
+        summary, records, requests, _samples = run_trial(
+            client, starts, arm, plan, capacity=2, max_new=4, eos_ids=[99],
+            cache_salt=scheduler,
+        )
+        assert summary["n_starts"] == 3
+        assert summary["n_http_requests"] == len(requests) == 6
+        assert all(row["inclusion_probability"] == 1 for row in records)
+        assert all(row["generated_tokens"] == 4 for row in records)
+        first_suffix = next(i for i, (stage, _index, _salt) in enumerate(client.calls) if stage == 1)
+        slow_prefix = next(i for i, (stage, index, _salt) in enumerate(client.calls)
+                           if stage == 0 and index == 1)
+        if scheduler == "stream":
+            assert first_suffix < slow_prefix
+        else:
+            assert first_suffix > slow_prefix
+
+
+def test_sparse_truncation_records_two_decisions_and_joint_probability():
+    from scripts import scheduler_probe_serve as serve
+    from scripts.truncation_refill_serve import Arm, make_trial_plan, run_trial
+    import time
+
+    class FakeClient:
+        def complete(self, prompt_token_ids, max_tokens, seed, stop_token_ids,
+                     request_id, cache_salt):
+            now = time.perf_counter()
+            return serve.ServeResponse(
+                request_id=request_id, prompt_token_ids=list(prompt_token_ids),
+                token_ids=[11] * int(max_tokens), finish_reason="length",
+                stop_reason=None, usage={}, wall_seconds=0.001,
+                submitted_at=now, returned_at=now,
+            )
+
+    class FakePredictor:
+        def decide(self, checkpoint, token_ids, prompt_len, problem_id):
+            return {"p": 0.8 if checkpoint == 2 else 0.3,
+                    "risk": 1.0, "cost": 2.0, "f": [0.1],
+                    "feature_seconds": 0.02, "prediction_seconds": 0.01}
+
+    plan = make_trial_plan(1, 7)
+    plan["selection_uniforms"] = [[0.1, 0.9]]
+    arm = Arm("learned_two", (2, 4), learned=True)
+    summary, records, requests, _samples = run_trial(
+        FakeClient(), [{"problem_id": "p", "prompt_token_ids": [1]}], arm, plan,
+        capacity=1, max_new=6, eos_ids=[99], cache_salt="test",
+        predictor=FakePredictor(),
+    )
+    assert summary["stopped"] == 1
+    assert summary["n_decisions"] == 2
+    assert len(requests) == 2
+    assert records[0]["inclusion_probability"] == pytest.approx(0.8 * 0.3)
+    assert [row["selected"] for row in records[0]["decisions"]] == [True, False]
+    assert records[0]["full_token_ids"] is None
+    assert summary["feature_seconds"] == pytest.approx(0.04)
+
+
+def test_sparse_predictor_batches_arriving_prefixes(monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Condition, Thread
+    from scripts.truncation_refill_serve import FrozenPredictor
+    import grace_gc.backends.hf_actor as hf_actor
+
+    sizes = []
+
+    def fake_features(actor, prefixes, prompt_lens, baselines, pad_id, **kwargs):
+        sizes.append(len(prefixes))
+        return {"features": np.ones((len(prefixes), 2)),
+                "cost_feat": np.ones((len(prefixes), 3))}
+
+    class FakeModel:
+        constant_cost = True
+
+        def forward_numpy(self, features, cost_feat):
+            n = len(features)
+            return SimpleNamespace(f=np.zeros((n, 1)), r_hat=np.ones(n), c_hat=np.ones(n))
+
+    monkeypatch.setattr(hf_actor, "prefix_feature_bundle", fake_features)
+    predictor = FrozenPredictor.__new__(FrozenPredictor)
+    predictor.actor = object()
+    predictor.pad_id = 0
+    predictor.eos_ids = [99]
+    predictor.baseline = SimpleNamespace(get=lambda _problem_id: 0.5)
+    predictor.models = {2: FakeModel()}
+    predictor.feature_modes = {2: "legacy"}
+    predictor.lambdas = {2: 1.0}
+    predictor.uniform_p = {2: 0.5}
+    predictor.p_min = 0.2
+    predictor.uniform_shrink = 1.0
+    predictor.batch_size = 4
+    predictor.batch_wait_seconds = 0.05
+    predictor._condition = Condition()
+    predictor._pending = []
+    predictor._closed = False
+    predictor._worker = Thread(target=predictor._work, daemon=True)
+    predictor._worker.start()
+    try:
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(predictor.decide, 2, [1, 11, 11], 1, str(i))
+                       for i in range(4)]
+            results = [future.result() for future in futures]
+    finally:
+        predictor.close()
+    assert sizes == [4]
+    assert all(row["feature_batch_size"] == 4 for row in results)
+    assert all(row["p"] == pytest.approx(0.5) for row in results)

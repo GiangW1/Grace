@@ -45,6 +45,41 @@ def batch_ht_mean(
     return ghat.sum(axis=0) / denom
 
 
+def two_checkpoint_ht_estimate(
+    g: np.ndarray,
+    m_first: np.ndarray,
+    m_second: np.ndarray,
+    p_first: np.ndarray,
+    p_second: np.ndarray,
+    z_first: np.ndarray,
+    z_second: np.ndarray,
+) -> np.ndarray:
+    """Nested CV/HT estimate for decisions at two prefix checkpoints.
+
+    ``m_second`` is used only after surviving the first decision.  The second
+    draw can depend on the longer prefix; it must be made before the unseen
+    suffix.  Natural finishes use p=z=1 at the checkpoint they skip.
+    """
+    g = _as_2d(g)
+    first = np.broadcast_to(_as_2d(m_first), g.shape)
+    second = np.broadcast_to(_as_2d(m_second), g.shape)
+    p1 = np.asarray(p_first, dtype=np.float64).reshape(-1)
+    p2 = np.asarray(p_second, dtype=np.float64).reshape(-1)
+    z1 = np.asarray(z_first, dtype=np.float64).reshape(-1)
+    z2 = np.asarray(z_second, dtype=np.float64).reshape(-1)
+    if any(x.shape[0] != g.shape[0] for x in (p1, p2, z1, z2)):
+        raise ValueError("two-checkpoint batch dimensions do not match")
+    if (np.any(~np.isfinite(p1)) or np.any(~np.isfinite(p2))
+            or np.any((p1 <= 0) | (p1 > 1)) or np.any((p2 <= 0) | (p2 > 1))):
+        raise ValueError("checkpoint probabilities must be in (0, 1]")
+    if (np.any(~np.isin(z1, (0.0, 1.0))) or np.any(~np.isin(z2, (0.0, 1.0)))
+            or np.any(z2 > z1)):
+        raise ValueError("second selection must be nested inside the first")
+    return first + (z1 / p1)[:, None] * (second - first) + (
+        (z2 / (p1 * p2))[:, None] * (g - second)
+    )
+
+
 def prediction_correction(u: np.ndarray, f: np.ndarray, z: np.ndarray, p: np.ndarray, n: int) -> np.ndarray:
     """`(U/N) sum_i (1 - Z_i/p_i) f_i`. Includes completed starts."""
     u = np.asarray(u, dtype=np.float64)
