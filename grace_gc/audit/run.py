@@ -163,6 +163,7 @@ def _bundles_from_engines(
     n_baseline: int | None = None,
     control_variate: bool = True,
     baseline_policy=None,
+    store_features: bool = False,
 ) -> list[PrefixBundle]:
     from grace_gc.core.rng import IsolatedRNG
 
@@ -204,8 +205,15 @@ def _bundles_from_engines(
             else any(bool(m.get("prompt_truncated")) for m in encode_meta if isinstance(m, dict))
         )
         prefix_rng_state = rng.streams["token"].bit_generator.state
-        longs, finished_long = engines.generate_prefix(prompts, tmax, rng, "token")
-        prefix_seeds = _request_seeds(engines, len(longs))
+        if tmax == 0:
+            # Unconditional reference/background audit: vLLM rejects a
+            # zero-token generation request. The prompt itself is the prefix.
+            longs = [list(prompt) for prompt in prompts]
+            finished_long = np.zeros(len(prompts), dtype=bool)
+            prefix_seeds = [None] * len(prompts)
+        else:
+            longs, finished_long = engines.generate_prefix(prompts, tmax, rng, "token")
+            prefix_seeds = _request_seeds(engines, len(longs))
         finished_long = np.asarray(finished_long, dtype=bool).reshape(-1)
         if len(longs) != len(prompts) or finished_long.shape[0] != len(prompts):
             raise ValueError(f"audit generate_prefix returned {len(longs)} for {len(prompts)} prefixes")
@@ -241,46 +249,54 @@ def _bundles_from_engines(
             c_list: list[float | None] = [None] * len(prefixes)
             f_list: list[np.ndarray | None] = [None] * len(prefixes)
             effective_f_list: list[np.ndarray | None] = [None] * len(prefixes)
-            if predictor is not None and u is not None:
-                feat_bundle = engines.prefix_features(
-                    prefixes, prompt_lens_t, [b_feat for _ in prefixes]
-                )
+            feature_list: list[np.ndarray | None] = [None] * len(prefixes)
+            cost_feature_list: list[np.ndarray | None] = [None] * len(prefixes)
+            need_features = bool(store_features or (predictor is not None and u is not None))
+            if need_features:
+                feat_bundle = engines.prefix_features(prefixes, prompt_lens_t, [b_feat for _ in prefixes])
                 feat_in = _predictor_audit_features(feat_bundle, spec)
-                pred = predictor.forward_numpy(feat_in, feat_bundle.get("cost_feat"))
-                effective_f = control_variate_coordinates(pred.f, enabled=control_variate).copy()
-                effective_f[np.asarray(finished, dtype=bool)] = 0.
-                mapped = effective_f @ np.asarray(u, dtype=np.float64).T
-                if mapped.shape[1] != layout.dim:
-                    raise ValueError("checkpoint predictor maps to a different G dimension than the audit actor")
-                m_list = [mapped[i] for i in range(len(prefixes))]
-                if spec is not None and spec.risk_mode == "reward":
-                    from grace_gc.trainer.algorithm import _reward_features
+                feature_list = [np.asarray(feat_in[i], dtype=np.float64) for i in range(len(prefixes))]
+                if feat_bundle.get("cost_feat") is not None:
+                    cost_feature_list = [
+                        np.asarray(feat_bundle["cost_feat"][i], dtype=np.float64)
+                        for i in range(len(prefixes))
+                    ]
+                if predictor is not None and u is not None:
+                    pred = predictor.forward_numpy(feat_in, feat_bundle.get("cost_feat"))
+                    effective_f = control_variate_coordinates(pred.f, enabled=control_variate).copy()
+                    effective_f[np.asarray(finished, dtype=bool)] = 0.
+                    mapped = effective_f @ np.asarray(u, dtype=np.float64).T
+                    if mapped.shape[1] != layout.dim:
+                        raise ValueError("checkpoint predictor maps to a different G dimension than the audit actor")
+                    m_list = [mapped[i] for i in range(len(prefixes))]
+                    if spec is not None and spec.risk_mode == "reward":
+                        from grace_gc.trainer.algorithm import _reward_features
 
-                    q_hat = predictor.forward_success(feat_in)
-                    reward_feats = np.stack(
-                        [
-                            _reward_features(
-                                float(q_hat[i]),
-                                float(max(len(prefixes[i]) - int(prompt_lens_t[i]), 1)),
-                                b_feat,
-                            )
-                            for i in range(len(prefixes))
-                        ]
-                    )
-                    r_hat = predictor.forward_reward_risk(reward_feats)
-                    r_list = [float(r_hat[i]) for i in range(len(prefixes))]
-                else:
-                    r_list = [float(pred.r_hat[i]) for i in range(len(prefixes))]
-                remain_c = [
-                    max(0, int(max_new) - (len(prefixes[i]) - int(prompt_lens_t[i])))
-                    for i in range(len(prefixes))
-                ]
-                if getattr(predictor, "constant_cost", True):
-                    c_list = [float(x) for x in incremental_token_costs(remain_c, finished)]
-                else:
-                    c_list = [float(pred.c_hat[i]) for i in range(len(prefixes))]
-                f_list = [np.asarray(pred.f[i], dtype=np.float64) for i in range(len(prefixes))]
-                effective_f_list = [np.asarray(effective_f[i], dtype=np.float64) for i in range(len(prefixes))]
+                        q_hat = predictor.forward_success(feat_in)
+                        reward_feats = np.stack(
+                            [
+                                _reward_features(
+                                    float(q_hat[i]),
+                                    float(max(len(prefixes[i]) - int(prompt_lens_t[i]), 1)),
+                                    b_feat,
+                                )
+                                for i in range(len(prefixes))
+                            ]
+                        )
+                        r_hat = predictor.forward_reward_risk(reward_feats)
+                        r_list = [float(r_hat[i]) for i in range(len(prefixes))]
+                    else:
+                        r_list = [float(pred.r_hat[i]) for i in range(len(prefixes))]
+                    remain_c = [
+                        max(0, int(max_new) - (len(prefixes[i]) - int(prompt_lens_t[i])))
+                        for i in range(len(prefixes))
+                    ]
+                    if getattr(predictor, "constant_cost", True):
+                        c_list = [float(x) for x in incremental_token_costs(remain_c, finished)]
+                    else:
+                        c_list = [float(pred.c_hat[i]) for i in range(len(prefixes))]
+                    f_list = [np.asarray(pred.f[i], dtype=np.float64) for i in range(len(prefixes))]
+                    effective_f_list = [np.asarray(effective_f[i], dtype=np.float64) for i in range(len(prefixes))]
             for loc, prefix in enumerate(prefixes):
                 prompt_len = prompt_lens_t[loc]
                 idx = path_idx[loc]
@@ -383,6 +399,8 @@ def _bundles_from_engines(
                         basis_gram=None if gram is None else gram.tolist(),
                         effective_coords=None if effective_f_list[loc] is None else effective_f_list[loc].tolist(),
                         control_variate_enabled=control_variate,
+                        features=None if feature_list[loc] is None else feature_list[loc].tolist(),
+                        cost_feat=None if cost_feature_list[loc] is None else cost_feature_list[loc].tolist(),
                         projection={"version": 2, "original_dim": original_dim,
                                     "stored_dim": int(grads_arr.shape[1]), "seed": int(jl_seed),
                                     "normalization": "norm_preserving_in_expectation"},
@@ -466,6 +484,18 @@ def _frozen_predictor(cfg: dict[str, Any] | None, payload=None):
     return heads, np.asarray(stored, dtype=np.float64)
 
 
+def _frozen_basis(cfg: dict[str, Any] | None, payload=None):
+    """Load only U for label geometry when the audited method has no predictor."""
+    if not cfg:
+        return None
+    ckpt = cfg.get("checkpoint") or cfg.get("resume")
+    if not ckpt:
+        return None
+    payload = load_checkpoint(ckpt) if payload is None else payload
+    stored = (payload.get("basis") or {}).get("u")
+    return None if stored is None else np.asarray(stored, dtype=np.float64)
+
+
 def generate_bundles_tiny(
     records: list[MathRecord],
     n_prefixes: int,
@@ -475,6 +505,7 @@ def generate_bundles_tiny(
     seed: int,
     cfg: dict[str, Any] | None = None,
     actor=None,
+    store_features: bool = False,
 ) -> list[PrefixBundle]:
     from grace_gc.data.tokenize import encode_records_tiny
     from grace_gc.trainer.tiny_engine import make_tiny_engines
@@ -491,11 +522,18 @@ def generate_bundles_tiny(
         encode.last_meta = meta
         return out
 
-    predictor, u = _frozen_predictor(cfg)
-    spec = _audit_method_spec(cfg)
-    if spec is not None and not spec.use_predictor:
-        predictor, u = None, None
     audit_cfg = {} if cfg is None else (cfg.get("audit") or {})
+    spec = _audit_method_spec(cfg)
+    if store_features and bool(audit_cfg.get("predictor_diagnostic", False)):
+        predictor = None
+        u = _frozen_basis(cfg)
+        if u is None:
+            raise ValueError("predictor diagnostic audit requires a checkpoint basis U")
+    elif spec is not None and not spec.use_predictor:
+        predictor = None
+        u = _frozen_basis(cfg) if store_features else None
+    else:
+        predictor, u = _frozen_predictor(cfg)
     return _bundles_from_engines(
         records,
         engines,
@@ -515,6 +553,7 @@ def generate_bundles_tiny(
         n_baseline=audit_cfg.get("n_baseline"),
         control_variate=bool(((cfg or {}).get("predictor") or {}).get("control_variate", True)),
         baseline_policy=baseline_from_config((cfg or {}).get("baseline")),
+        store_features=store_features,
     )
 
 
@@ -531,6 +570,7 @@ def generate_bundles_gpu(
     layout=None,
     cache: dict | None = None,
     payload=None,
+    store_features: bool = False,
 ) -> list[PrefixBundle]:
     if cache and engines is None and cache.get("engines") is not None:
         engines = cache["engines"]
@@ -611,11 +651,18 @@ def generate_bundles_gpu(
     # A caller may initialize this frozen engine once for another audit design.
     if not records:
         return []
-    predictor, u = _frozen_predictor(cfg)
-    spec = _audit_method_spec(cfg)
-    if spec is not None and not spec.use_predictor:
-        predictor, u = None, None
     audit_cfg = cfg.get("audit") or {}
+    spec = _audit_method_spec(cfg)
+    if store_features and bool(audit_cfg.get("predictor_diagnostic", False)):
+        predictor = None
+        u = _frozen_basis(cfg, payload=payload)
+        if u is None:
+            raise ValueError("predictor diagnostic audit requires a checkpoint basis U")
+    elif spec is not None and not spec.use_predictor:
+        predictor = None
+        u = _frozen_basis(cfg, payload=payload) if store_features else None
+    else:
+        predictor, u = _frozen_predictor(cfg, payload=payload)
     return _bundles_from_engines(
         records,
         engines,
@@ -635,6 +682,7 @@ def generate_bundles_gpu(
         n_baseline=audit_cfg.get("n_baseline"),
         control_variate=bool((cfg.get("predictor") or {}).get("control_variate", True)),
         baseline_policy=baseline_from_config(cfg.get("baseline")),
+        store_features=store_features,
     )
 
 
@@ -715,9 +763,25 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
                     seed,
                     cfg,
                     work_dir=Path(run.root) / "audit_lora",
+                    store_features=bool(
+                        (cfg.get("audit") or {}).get("store_features", False)
+                        or (cfg.get("predictor") or {}).get("store_features", False)
+                    ),
                 )
             else:
-                bundles = generate_bundles_tiny(recs, n_pref, n_cont, grid, max_new, seed, cfg=cfg)
+                bundles = generate_bundles_tiny(
+                    recs,
+                    n_pref,
+                    n_cont,
+                    grid,
+                    max_new,
+                    seed,
+                    cfg=cfg,
+                    store_features=bool(
+                        (cfg.get("audit") or {}).get("store_features", False)
+                        or (cfg.get("predictor") or {}).get("store_features", False)
+                    ),
+                )
             run.write_jsonl("audit_raw_problems.jsonl", getattr(_bundles_from_engines, "last", []))
             run.write_jsonl("audit_bundles.jsonl", [bundle_to_dict(b) for b in bundles])
             if not bundles:

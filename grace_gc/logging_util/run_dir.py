@@ -52,6 +52,12 @@ def has_run_artifacts(root: str | Path) -> bool:
         "checkpoints.json",
         "compute_ledger.json",
         "persistence.jsonl",
+        "replay_provenance.json",
+        "replay_summary.json",
+        "mean_grads.npy",
+        "expected_gain_summary.json",
+        "expected_gain_data_manifest.json",
+        "optimizer_probe_summary.json",
     )
     return any((root / name).is_file() for name in names)
 

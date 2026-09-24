@@ -1,0 +1,23 @@
+experiment_variant: expected_gain_global_reference
+method: full_pg
+decision_tokens: 0
+max_new_tokens: 2048
+temperature: 1.0
+audit:
+  n_problems: 64
+  n_prefixes: 1
+  n_continuations: 8
+  n_baseline: 8
+  decision_grid: [0]
+  max_new_tokens: 2048
+  jl_dim: 256
+  store_features: false
+  predictor_diagnostic: false
+hardware:
+  name: a100
+  n_gpu: 1
+  gpu_memory_gb: 80
+vllm:
+  tensor_parallel: 1
+  dtype: bfloat16
+  gpu_memory_utilization: 0.5

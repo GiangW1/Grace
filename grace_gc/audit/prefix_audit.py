@@ -56,6 +56,11 @@ class PrefixBundle:
     basis_gram: list[list[float]] | None = None
     effective_coords: list[float] | None = None
     control_variate_enabled: bool | None = None
+    # Raw frozen-actor features are optional audit artifacts.  They are kept
+    # separate from m_pred so predictor diagnostics can fit new heads without
+    # re-running the expensive rollout.
+    features: list[float] | None = None
+    cost_feat: list[float] | None = None
 
 
 def bundle_to_dict(bundle: PrefixBundle) -> dict:
@@ -65,7 +70,7 @@ def bundle_to_dict(bundle: PrefixBundle) -> dict:
 
 def bundle_from_dict(raw: dict) -> PrefixBundle:
     values = {f.name: raw[f.name] for f in fields(PrefixBundle) if f.name in raw}
-    for key in ("grads", "rewards", "coords", "suffix_cost", "m_pred"):
+    for key in ("grads", "rewards", "coords", "suffix_cost", "m_pred", "features", "cost_feat"):
         if values.get(key) is not None:
             values[key] = np.asarray(values[key], dtype=np.float64)
     return PrefixBundle(**values)

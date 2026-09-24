@@ -1,0 +1,15 @@
+# Common frozen data for predictor diagnostics. This audit stores features but
+# does not use a predictor to make continuation decisions.
+experiment_variant: phase12_predictor_diagnostic
+method: full_pg
+audit:
+  n_problems: 32
+  n_prefixes: 2
+  n_continuations: 8
+  decision_grid: [256, 512, 1024]
+  max_new_tokens: 2048
+  store_features: true
+  predictor_diagnostic: true
+predictor:
+  feature_mode: legacy
+  store_features: true

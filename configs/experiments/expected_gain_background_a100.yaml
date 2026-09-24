@@ -1,0 +1,7 @@
+# Layer on top of expected_gain_reference_a100.yaml.
+experiment_variant: expected_gain_optimizer_background
+audit:
+  n_problems: 16
+  n_prefixes: 1
+  n_continuations: 8
+  decision_grid: [0]

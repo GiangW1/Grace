@@ -1,0 +1,25 @@
+# One larger A100 audit shared by the offline predictor suite.
+experiment_variant: phase12_predictor_suite_audit
+method: full_pg
+audit:
+  n_problems: 64
+  n_prefixes: 2
+  n_continuations: 32
+  n_baseline: 8
+  decision_grid: [512]
+  max_new_tokens: 2048
+  # Keep exact full-space norms/U coordinates while bounding saved raw gradients.
+  jl_dim: 256
+  store_features: true
+  predictor_diagnostic: true
+predictor:
+  feature_mode: legacy
+  store_features: true
+hardware:
+  name: a100
+  n_gpu: 1
+  gpu_memory_gb: 80
+vllm:
+  tensor_parallel: 1
+  dtype: bfloat16
+  gpu_memory_utilization: 0.5

@@ -1,0 +1,3 @@
+# Overlay for an independently fitted frozen GRACE predictor at the long-tail checkpoint.
+decision_tokens: 1024
+max_new_tokens: 2048
