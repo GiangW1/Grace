@@ -3,17 +3,47 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 from time import perf_counter
 
 import numpy as np
 
 
+def audit_file(path):
+    source = Path(path)
+    return source / "audit_bundles.jsonl" if source.is_dir() else source
+
+
+def continuation_digest(record):
+    content = {key: record.get(key) for key in
+               ("token_ids", "prompt_len", "reward", "baseline", "generated_suffix_tokens")}
+    return hashlib.sha256(json.dumps(content, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def replay_config(payload, model_path, config_paths=(), bundles=None):
+    """Recover numerical policy settings before applying explicit overrides."""
+    from grace_gc.config import default_config, merge_configs, load_config, validate_config
+    from grace_gc.trainer.methods import apply_method_defaults
+    cfg = merge_configs(default_config(), payload.get("run_config") or {})
+    if payload.get("lora"):
+        cfg["lora"] = merge_configs(cfg.get("lora") or {}, payload["lora"])
+    if bundles is not None:
+        saved = audit_file(bundles).parent / "config.yaml"
+        if saved.is_file():
+            cfg = merge_configs(cfg, load_config(saved))
+    for path in config_paths:
+        cfg = merge_configs(cfg, load_config(path))
+    cfg["model_path"] = model_path
+    # Source training/audit data may live elsewhere; replay uses saved token IDs.
+    cfg.pop("data_path", None)
+    cfg.pop("eval_data_path", None)
+    return validate_config(apply_method_defaults(cfg))
+
+
 def audit_rows(path: str | Path, decision_tokens: int | None = 512):
     """Read the small audit fields; the saved JL sketch is not a full gradient."""
-    source = Path(path)
-    if source.is_dir():
-        source = source / "audit_bundles.jsonl"
+    source = audit_file(path)
     if not source.is_file():
         raise FileNotFoundError(f"audit bundles are not readable: {source}")
     # Existing audits normally store only a 256-d sketch. Legacy full-gradient
@@ -43,6 +73,7 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
     direction = None if reference_direction is None else np.asarray(reference_direction, dtype=np.float64)
     if direction is not None and direction.shape != (dimension,):
         raise ValueError("reference direction and full gradient layout differ")
+    rows = list(rows)
     selected = [row for row in rows if not bool(row.get("finished", False))]
     if not selected:
         raise ValueError("no live prefixes at the requested decision point")
@@ -58,9 +89,9 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
             n = len(records) if max_continuations is None else min(len(records), max_continuations)
             if n <= 0:
                 raise ValueError(f"prefix {i} has no saved continuation records")
-            chosen = (np.arange(len(records)) if n == len(records) else
-                      np.sort(np.random.default_rng(np.random.SeedSequence([seed, i]))
-                              .choice(len(records), size=n, replace=False)))
+            # Shuffle even when retaining every suffix so the two halves are
+            # randomized independently of acquisition order.
+            chosen = np.random.default_rng(np.random.SeedSequence([seed, i])).permutation(len(records))[:n]
             mean = np.zeros(dimension, dtype=np.float64)
             first = np.zeros(dimension, dtype=np.float64)
             second = np.zeros(dimension, dtype=np.float64)
@@ -101,6 +132,8 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                 "index": i, "problem_id": str(row["problem_id"]),
                 "path_id": str(row.get("path_id") or i), "t": int(row["t"]),
                 "n_continuations": n, "continuation_indices": chosen.tolist(),
+                "continuation_sha256": {str(int(index)): continuation_digest(records[int(index)])
+                                         for index in chosen},
                 "mean_norm_sq": norm_sum / n,
                 "half_mean_dot": half_dot, "mean_reward": float(np.mean(rewards)),
                 "half_directional_gain": ([float((first / first_n) @ direction),
@@ -118,6 +151,7 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
             print(f"replay={i + 1}/{len(selected)} problem={info['problem_id']}", flush=True)
     del matrix
     summary = {"n_prefixes": len(selected), "n_problems": len({x["problem_id"] for x in metadata}),
+               "input_prefixes": len(rows), "finished_input_prefixes": len(rows) - len(selected),
                "dimension": dimension, "n_continuations": sum(x["n_continuations"] for x in metadata),
                "wall_seconds": perf_counter() - started,
                "note": "exact frozen-actor ascent gradients; prefix means stored in FP64"}

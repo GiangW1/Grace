@@ -205,8 +205,15 @@ def _bundles_from_engines(
             else any(bool(m.get("prompt_truncated")) for m in encode_meta if isinstance(m, dict))
         )
         prefix_rng_state = rng.streams["token"].bit_generator.state
-        longs, finished_long = engines.generate_prefix(prompts, tmax, rng, "token")
-        prefix_seeds = _request_seeds(engines, len(longs))
+        if tmax == 0:
+            # Unconditional reference/background audit: vLLM rejects a
+            # zero-token generation request. The prompt itself is the prefix.
+            longs = [list(prompt) for prompt in prompts]
+            finished_long = np.zeros(len(prompts), dtype=bool)
+            prefix_seeds = [None] * len(prompts)
+        else:
+            longs, finished_long = engines.generate_prefix(prompts, tmax, rng, "token")
+            prefix_seeds = _request_seeds(engines, len(longs))
         finished_long = np.asarray(finished_long, dtype=bool).reshape(-1)
         if len(longs) != len(prompts) or finished_long.shape[0] != len(prompts):
             raise ValueError(f"audit generate_prefix returned {len(longs)} for {len(prompts)} prefixes")

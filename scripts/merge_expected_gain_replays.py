@@ -14,8 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from grace_gc.audit.expected_gain import load_replay
-from grace_gc.logging_util.run_dir import resolve_run_dir
+from grace_gc.audit.expected_gain import load_replay, start_experiment_run
 
 
 def main(argv=None):
@@ -33,7 +32,7 @@ def main(argv=None):
         provenance = json.loads((root / "replay_provenance.json").read_text(encoding="utf-8"))
         common = {key: provenance.get(key) for key in
                   ("actor_sha256", "layout_names", "layout_dim", "model_path",
-                   "decision_tokens", "max_continuations")}
+                   "decision_tokens", "max_continuations", "lora", "reference_direction_sha256")}
         if identity is None:
             identity = common
         elif identity != common:
@@ -47,8 +46,7 @@ def main(argv=None):
         sources.append((root, rows, means))
     total = sum(len(rows) for _, rows, _ in sources)
     dim = int(identity["layout_dim"])
-    out = resolve_run_dir(args.run_dir)
-    out.mkdir(parents=True, exist_ok=True)
+    out = start_experiment_run(args.run_dir, "expected_gain_merge", vars(args))
     combined = np.lib.format.open_memmap(out / "mean_grads.npy", mode="w+",
                                          dtype=np.float64, shape=(total, dim))
     offset = 0

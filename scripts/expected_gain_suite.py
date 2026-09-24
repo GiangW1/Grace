@@ -18,8 +18,8 @@ if str(ROOT) not in sys.path:
 from grace_gc.audit.expected_gain import (
     fit_global_basis, fit_predict, full_space_residual, load_replay,
     problem_split, project_means, reference_gradient, ridge_oof_by_problem,
+    start_experiment_run, BasisUnavailable,
 )
-from grace_gc.logging_util.run_dir import resolve_run_dir
 
 
 def _indices(rows, ids):
@@ -36,7 +36,7 @@ def _check_replay_identity(replay_dir, reference_dir):
     first, second = _provenance(replay_dir), _provenance(reference_dir)
     if first is None or second is None:
         raise ValueError("both replays need actor/layout provenance from replay_expected_gain.py")
-    for key in ("actor_sha256", "layout_names", "layout_dim", "model_path"):
+    for key in ("actor_sha256", "layout_names", "layout_dim", "model_path", "lora"):
         if first.get(key) != second.get(key):
             raise ValueError(f"predictor and reference replays differ in {key}")
 
@@ -116,13 +116,14 @@ def _directional_labels(means, reference, block=32768):
 
 def _fixed_probability(score, cost, lam, p_min):
     values = np.asarray(score, dtype=np.float64)
-    values = np.maximum(values, 1e-12 * max(float(np.max(values)), 1.))
+    # A pointwise floor: changing other test prefixes must not change p(h).
+    values = np.maximum(values, 1e-12)
     return np.maximum(p_min, np.minimum(1.0, lam * values /
                                       np.sqrt(np.maximum(np.asarray(cost), 1.0))))
 
 
 def _calibrate_probability(score, cost, beta, p_min):
-    if not p_min <= beta <= 1.0:
+    if not 0 < p_min <= beta <= 1.0:
         raise ValueError("beta must lie in [p_min, 1]")
     if beta == 1.0:
         return float("inf")
@@ -145,14 +146,17 @@ def _calibrate_probability(score, cost, beta, p_min):
 
 
 def _allocation(name, val_score, test_score, val_cost, test_cost,
-                test_risk, beta, p_min):
+                test_risk, beta, p_min, observed_test_cost=None, control_variate="selected"):
     lam = _calibrate_probability(val_score, val_cost, beta, p_min)
     p = (_fixed_probability(test_score, test_cost, lam, p_min) if np.isfinite(lam)
          else np.ones(len(test_score)))
     risk = np.maximum(np.asarray(test_risk), 0.)
-    return {"strategy": name, "lambda_from_validation": lam,
+    observed = np.asarray(test_cost if observed_test_cost is None else observed_test_cost)
+    return {"strategy": name, "control_variate": control_variate,
+            "lambda_from_validation": float(lam) if np.isfinite(lam) else None,
             "test_probability_mean": float(np.mean(p)),
-            "test_cost_fraction": float(np.sum(p * test_cost) / np.sum(test_cost)),
+            "test_cost_fraction": float(np.sum(p * observed) / np.sum(observed)),
+            "predicted_test_cost_fraction": float(np.sum(p * test_cost) / np.sum(test_cost)),
             "test_extra_variance_per_start": float(np.mean((1 / p - 1) * risk)),
             "test_max_inverse_probability": float(np.max(1 / p))}
 
@@ -179,6 +183,10 @@ def main(argv=None) -> int:
                         help="fixed starts per training step; must match the checkpoint run")
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     args = parser.parse_args(argv)
+    if args.n_start <= 0 or not np.isfinite(args.learning_rate) or args.learning_rate <= 0:
+        raise ValueError("N and learning rate must be positive")
+    if not 0 < args.p_min <= args.beta <= 1:
+        raise ValueError("require 0 < p-min <= beta <= 1")
     started = perf_counter()
     rows, means = load_replay(args.replay_dir)
     ref_rows, ref_means = load_replay(args.reference_dir)
@@ -188,6 +196,10 @@ def main(argv=None) -> int:
     if set(x["problem_id"] for x in rows) & set(x["problem_id"] for x in ref_rows):
         raise ValueError("reference construction and predictor problems overlap")
     ref = reference_gradient(ref_rows, ref_means)
+    from grace_gc.versions import sha256_array
+    half_reference_sha = (_provenance(args.replay_dir) or {}).get("reference_direction_sha256")
+    if half_reference_sha and half_reference_sha != sha256_array(ref):
+        raise ValueError("half-suffix gain labels were computed with a different reference direction")
     check_agreement = None
     if args.reference_check_dir:
         _check_replay_identity(args.replay_dir, args.reference_check_dir)
@@ -196,7 +208,8 @@ def main(argv=None) -> int:
         if all_ids & {x["problem_id"] for x in check_rows}:
             raise ValueError("reference check pool overlaps predictor or reference construction")
         ref_check = reference_gradient(check_rows, check_means)
-        check_agreement = float(ref @ ref_check / max(np.linalg.norm(ref) * np.linalg.norm(ref_check), 1e-20))
+        denom = float(np.linalg.norm(ref) * np.linalg.norm(ref_check))
+        check_agreement = None if denom == 0 else float(ref @ ref_check / denom)
     if args.split_manifest:
         split = json.loads(Path(args.split_manifest).read_text(encoding="utf-8"))
     else:
@@ -223,8 +236,9 @@ def main(argv=None) -> int:
     utilities = _directional_labels(means, ref)
     names = [value.strip() for value in args.models.split(",") if value.strip()]
     settings = list(_model_settings(names))
-    destination = resolve_run_dir(args.run_dir)
-    destination.mkdir(parents=True, exist_ok=True)
+    if not settings:
+        raise ValueError("choose at least one predictor model")
+    destination = start_experiment_run(args.run_dir, "expected_gain_suite", vars(args))
     (destination / "split.json").write_text(json.dumps(split, indent=2), encoding="utf-8")
     tr, va, te = (roles[x] for x in ("train", "validation", "diagnostic"))
     xtr, xva, xte = features[tr], features[va], features[te]
@@ -234,11 +248,12 @@ def main(argv=None) -> int:
     # rewards here would let the gain head train on an unavailable shortcut.
     reward_features = np.zeros((len(rows), 3), dtype=np.float64)
     reward_features[:, :2] = features[:, -2:]
-    reward_features[tr, 2] = ridge_oof_by_problem(
-        xtr, rewards[tr], [rows[i]["problem_id"] for i in tr]).reshape(-1)
-    reward_features[va, 2] = fit_predict("ridge", xtr, rewards[tr], xva).reshape(-1)
-    reward_features[te, 2] = fit_predict("ridge", xtr, rewards[tr], xte).reshape(-1)
-    baseline_features["predicted_reward_length"] = reward_features
+    if len({rows[i]["problem_id"] for i in tr}) > 1:
+        reward_features[tr, 2] = ridge_oof_by_problem(
+            xtr, rewards[tr], [rows[i]["problem_id"] for i in tr]).reshape(-1)
+        reward_features[va, 2] = fit_predict("ridge", xtr, rewards[tr], xva).reshape(-1)
+        reward_features[te, 2] = fit_predict("ridge", xtr, rewards[tr], xte).reshape(-1)
+        baseline_features["predicted_reward_length"] = reward_features
     if all(row.get("prompt_features") is not None for row in rows):
         prompt_features = np.stack([np.asarray(row["prompt_features"], dtype=np.float64)
                                     for row in rows])
@@ -271,7 +286,7 @@ def main(argv=None) -> int:
             try:
                 info = fit_global_basis(means, tr, xtr,
                                         [rows[i]["problem_id"] for i in tr], variant, k, path)
-            except ValueError as exc:
+            except BasisUnavailable as exc:
                 basis_rows.append({"basis": variant, "k": k, "status": "unavailable",
                                    "reason": str(exc)})
                 continue
@@ -306,7 +321,10 @@ def main(argv=None) -> int:
                     chosen = (key, row, cval, ctest, coord, gram)
             print(f"basis={variant} k={k} rank={info['actual_rank']}", flush=True)
     if chosen is None:
-        raise ValueError("no global basis was fit; see unavailable basis rows")
+        chosen = (float(np.mean(norms[va])),
+                  {"basis": "none", "k": 0, "actual_rank": 0, "model": "zero"},
+                  np.zeros((len(va), 0)), np.zeros((len(te), 0)),
+                  np.zeros((len(rows), 0)), np.zeros((0, 0)))
     _, selected, cval, ctest, coords, gram = chosen
     residual_val = np.maximum(full_space_residual(norms[va], coords[va], cval, gram), 0.)
     residual_test = np.maximum(full_space_residual(norms[te], coords[te], ctest, gram), 0.)
@@ -314,19 +332,25 @@ def main(argv=None) -> int:
     # are therefore honest labels for this fixed predictor; fit the risk head
     # there and evaluate once on the independent diagnostic problems.
     validation_problems = sorted({str(rows[i]["problem_id"]) for i in va})
-    if len(validation_problems) < 2:
-        raise ValueError("risk-head fit and allocation calibration need two validation problems")
     shuffled = np.random.default_rng(args.seed + 101).permutation(validation_problems)
-    fit_problems = set(shuffled[:max(1, len(shuffled) // 2)])
+    fit_problems = set(shuffled[:len(shuffled) // 2])
     risk_fit = np.asarray([j for j, i in enumerate(va)
                            if str(rows[i]["problem_id"]) in fit_problems], dtype=int)
     risk_cal = np.asarray([j for j, i in enumerate(va)
                            if str(rows[i]["problem_id"]) not in fit_problems], dtype=int)
-    risk_test = fit_predict("ridge", xva[risk_fit], residual_val[risk_fit], xte,
-                            ridge_l2=10.).reshape(-1)
-    risk_val_for_calibration = fit_predict("ridge", xva[risk_fit],
-                                           residual_val[risk_fit], xva[risk_cal],
-                                           ridge_l2=10.).reshape(-1)
+    if len(risk_fit):
+        risk_head_kind = "validation_fit_ridge"
+        risk_test = fit_predict("ridge", xva[risk_fit], residual_val[risk_fit], xte,
+                               ridge_l2=10.).reshape(-1)
+        risk_val_for_calibration = fit_predict("ridge", xva[risk_fit],
+                                               residual_val[risk_fit], xva[risk_cal],
+                                               ridge_l2=10.).reshape(-1)
+        constant_risk = float(np.mean(residual_val[risk_fit]))
+    else:
+        risk_head_kind = "train_risk0_constant_no_validation_fit_fold"
+        constant_risk = float(np.mean(norms[tr]))
+        risk_test = np.full(len(te), constant_risk)
+        risk_val_for_calibration = np.full(len(risk_cal), constant_risk)
     direct_val, direct_test = scalar_best["gain_direct"][1:3]
     cost_val, cost_test = scalar_best["cost"][1:3]
     cost_val, cost_test = np.maximum(cost_val, 1.), np.maximum(cost_test, 1.)
@@ -334,16 +358,21 @@ def main(argv=None) -> int:
     gain_scale = max(float(np.sqrt(np.mean(utilities[tr] ** 2))), 1e-8)
     allocations = [
         _allocation("uniform", np.sqrt(cost_val[risk_cal]), np.sqrt(cost_test),
-                    cost_val[risk_cal], cost_test, residual_test, args.beta, args.p_min),
+                    cost_val[risk_cal], cost_test, residual_test, args.beta, args.p_min, costs[te]),
         _allocation("risk0", np.sqrt(np.maximum(risk0_val[risk_cal], 0.)),
                     np.sqrt(np.maximum(risk0_test, 0.)), cost_val[risk_cal], cost_test,
-                    norms[te], args.beta, args.p_min),
+                    residual_test, args.beta, args.p_min, costs[te]),
         _allocation("residual_risk", np.sqrt(np.maximum(risk_val_for_calibration, 0.)),
                     np.sqrt(np.maximum(risk_test, 0.)), cost_val[risk_cal], cost_test,
-                    residual_test, args.beta, args.p_min),
+                    residual_test, args.beta, args.p_min, costs[te]),
         _allocation("direct_gain", np.exp(np.clip(direct_val[risk_cal] / gain_scale, -5, 5)),
                     np.exp(np.clip(direct_test / gain_scale, -5, 5)),
-                    cost_val[risk_cal], cost_test, residual_test, args.beta, args.p_min),
+                    cost_val[risk_cal], cost_test, residual_test, args.beta, args.p_min, costs[te]),
+        _allocation("uniform_m0", np.sqrt(cost_val[risk_cal]), np.sqrt(cost_test),
+                    cost_val[risk_cal], cost_test, norms[te], args.beta, args.p_min, costs[te], "zero"),
+        _allocation("risk0_m0", np.sqrt(np.maximum(risk0_val[risk_cal], 0.)),
+                    np.sqrt(np.maximum(risk0_test, 0.)), cost_val[risk_cal], cost_test,
+                    norms[te], args.beta, args.p_min, costs[te], "zero"),
     ]
     half_dots = [row["half_mean_dot"] for row in rows if row["half_mean_dot"] is not None]
     result = {"source_replay": str(Path(args.replay_dir).resolve()),
@@ -354,8 +383,10 @@ def main(argv=None) -> int:
               "split_counts": {key: len(value) for key, value in roles.items()},
               "split_problem_counts": {key: len(value) for key, value in split.items()},
               "mean_half_dot": None if not half_dots else float(np.mean(half_dots)),
-              "half_gain_reliability": _half_gain_reliability(rows),
+              "half_gain_reliability": (_half_gain_reliability(rows) if half_reference_sha else
+                                        {"status": "unavailable_reference_identity"}),
               "risk_validation_fit_problems": sorted(fit_problems),
+              "risk_head_kind": risk_head_kind,
               "risk_validation_calibration_problems": sorted(set(shuffled) - fit_problems),
               "utility_label": "reference policy-gradient dot product; local SGD direction only",
               "utility_scale_eta_over_n": args.learning_rate / args.n_start,
@@ -363,12 +394,12 @@ def main(argv=None) -> int:
                                                   ("basis", "k", "actual_rank", "model")},
               "selected_scalar_by_validation": {key: value[3] for key, value in scalar_best.items()},
               "diagnostic_residual_risk_mse": _mse(risk_test, residual_test),
-              "diagnostic_residual_risk_constant_mse": _mse(np.full(len(te), np.mean(residual_val)),
+              "diagnostic_residual_risk_constant_mse": _mse(np.full(len(te), constant_risk),
                                                              residual_test),
               "allocation": allocations, "basis_rows": basis_rows,
               "scalar_rows": scalar_rows, "wall_seconds": perf_counter() - started}
     (destination / "expected_gain_summary.json").write_text(
-        json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
+        json.dumps(result, indent=2, ensure_ascii=False, allow_nan=False), encoding="utf-8")
     print(json.dumps({"run_dir": str(destination),
                       "selected": result["selected_by_validation_residual"],
                       "wall_seconds": result["wall_seconds"]}, ensure_ascii=False))

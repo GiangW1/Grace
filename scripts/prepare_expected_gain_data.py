@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from grace_gc.data.math_data import load_training_data
+from grace_gc.audit.expected_gain import problem_split, start_experiment_run
 from grace_gc.versions import sha256_file
 
 
@@ -58,8 +59,15 @@ def main(argv=None):
     roles = {"predictor": selected[:cut1],
              "reference": selected[cut1:cut2],
              "reference_check": selected[cut2:cut2 + args.reference_check_problems]}
-    out = Path(args.output_dir)
-    out.mkdir(parents=True, exist_ok=True)
+    if min(args.predictor_problems, args.reference_problems, args.reference_check_problems) <= 0:
+        raise ValueError("problem counts must be positive")
+    out = start_experiment_run(args.output_dir, "expected_gain_data", vars(args))
+    split = problem_split([{"problem_id": pid} for pid in roles["predictor"]],
+                           seed=args.seed, prior_train=prior)
+    (out / "split.json").write_text(json.dumps(split, indent=2), encoding="utf-8")
+    # A small unconditional training-side pool for the optimizer background.
+    # These IDs are fixed before observing which 512-token prefixes survive.
+    roles["background"] = list(np.random.default_rng(args.seed + 1).permutation(split["train"]))[:16]
     for role, ids in roles.items():
         with (out / f"{role}.jsonl").open("w", encoding="utf-8") as handle:
             for pid in ids:
@@ -71,7 +79,9 @@ def main(argv=None):
                 handle.write(json.dumps(raw, ensure_ascii=False) + "\n")
     manifest = {"seed": args.seed, "source_sha256": sha256_file(args.data_path),
                 "external_eval_sha256": sha256_file(args.eval_data_path),
-                "prior_train_ids": sorted(prior), "roles": roles,
+                "prior_train_ids": sorted(prior),
+                "roles": {key: value for key, value in roles.items() if key != "background"},
+                "background_train_ids": roles["background"],
                 "predictor_file_omits_prior": args.omit_prior_from_predictor_file,
                 "n_excluded_eval": len(report["eval_exclusion"]["removed"]),
                 "prompt_digest_by_id": {pid: hashlib.sha256(by_id[pid].prompt.encode()).hexdigest()

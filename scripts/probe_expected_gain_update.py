@@ -14,21 +14,45 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from grace_gc.audit.benefit_replay import audit_rows
-from grace_gc.audit.expected_gain import load_replay, reference_gradient
+from grace_gc.audit.benefit_replay import audit_rows, audit_file, continuation_digest, replay_config
+from grace_gc.audit.expected_gain import load_replay, reference_gradient, start_experiment_run
 from grace_gc.audit.update_probe import adamw_update_direction
-from grace_gc.logging_util.run_dir import resolve_run_dir
-from grace_gc.trainer.loop import build_run_config
 
 
 def _key(row):
     return (str(row["problem_id"]), str(row["path_id"]), int(row["t"]))
 
 
+def _load_sources(paths, decision_tokens=None):
+    source = {}
+    for path in paths:
+        for row in audit_rows(path, decision_tokens):
+            key = _key(row)
+            if key in source:
+                raise ValueError(f"duplicate audit prefix across inputs: {key}")
+            source[key] = row
+    return source
+
+
+def _checked_gradient(gradient, bundle, index, replay_row=None):
+    record = bundle["continuation_records"][int(index)]
+    digest = None if replay_row is None else (replay_row.get("continuation_sha256") or {}).get(str(index))
+    if digest and continuation_digest(record) != digest:
+        raise ValueError("source continuation differs from the trajectory used for replay labels")
+    g = gradient(record["token_ids"], int(record["prompt_len"]),
+                 float(record["reward"]), float(record["baseline"]))
+    norms = bundle.get("true_grad_norm_sq")
+    if norms is not None and not np.isclose(float(g @ g), float(norms[int(index)]), rtol=5e-3, atol=1e-5):
+        raise ValueError("optimizer probe failed the source trajectory gradient-norm check")
+    return g
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bundles", required=True,
+    parser.add_argument("--bundles", required=True, action="append",
                         help="original predictor audit_bundles.jsonl with token IDs")
+    parser.add_argument("--background-bundles", required=True, action="append",
+                        help="training-side t=0 audit, independent of both reference pools")
     parser.add_argument("--replay-dir", required=True)
     parser.add_argument("--reference-dir", required=True)
     parser.add_argument("--split-manifest", required=True,
@@ -41,13 +65,15 @@ def main(argv=None):
     parser.add_argument("--suffixes-per-prefix", type=int, default=4)
     parser.add_argument("--backgrounds", type=int, default=3)
     parser.add_argument("--seed", type=int, default=17)
+    parser.add_argument("--decision-tokens", type=int, default=512,
+                        help="predictor decision token used by the fixed-N source audit")
+    parser.add_argument("--grad-clip", type=float, default=None,
+                        help="explicit override; otherwise use checkpoint run_config.optim.grad_clip")
     parser.add_argument("--run-dir", required=True)
     args = parser.parse_args(argv)
     if min(args.n_start, args.n_prefixes, args.suffixes_per_prefix,
            args.backgrounds) <= 0:
         raise ValueError("counts must be positive")
-    cfg = build_run_config(args.config, {"checkpoint": args.checkpoint,
-                                         "model_path": args.model_path})
     from functools import partial
     from types import SimpleNamespace
 
@@ -61,6 +87,14 @@ def main(argv=None):
     from grace_gc.versions import sha256_named
 
     payload = load_checkpoint(args.checkpoint)
+    cfg = replay_config(payload, args.model_path, args.config)
+    stored_clip = ((payload.get("run_config") or {}).get("optim") or {}).get("grad_clip")
+    if args.grad_clip is None and stored_clip is None:
+        raise ValueError("checkpoint lacks grad_clip; supply the original training value with --grad-clip")
+    clip = float(stored_clip if args.grad_clip is None else args.grad_clip)
+    if not np.isfinite(clip):
+        raise ValueError("grad-clip must be finite")
+    out = start_experiment_run(args.run_dir, "expected_gain_update_probe", vars(args))
     check_snapshot_identity(payload, cfg)
     if int(payload.get("n_ref", args.n_start)) != args.n_start:
         raise ValueError("n-start must equal the saved training step's fixed N")
@@ -73,6 +107,12 @@ def main(argv=None):
     if payload.get("layout_names") != layout.names() or int(payload.get("layout_dim", -1)) != layout.dim:
         raise ValueError("checkpoint and actor LoRA layout differ")
     actor_sha = sha256_named(named)
+    for path in args.bundles + args.background_bundles:
+        source_meta = audit_file(path).parent / "actor_source.json"
+        if source_meta.is_file():
+            source_sha = json.loads(source_meta.read_text(encoding="utf-8")).get("actor_sha256")
+            if source_sha and source_sha != actor_sha:
+                raise ValueError(f"audit actor differs from optimizer checkpoint: {path}")
     for folder in (args.replay_dir, args.reference_dir):
         provenance = json.loads((Path(folder) / "replay_provenance.json").read_text(encoding="utf-8"))
         if provenance.get("actor_sha256") != actor_sha:
@@ -91,15 +131,22 @@ def main(argv=None):
     ref_rows, ref_means = load_replay(args.reference_dir)
     reference = reference_gradient(ref_rows, ref_means)
     split = json.loads(Path(args.split_manifest).read_text(encoding="utf-8"))
-    train_ids, validation_ids = set(split["train"]), set(split["validation"])
+    train_ids, validation_ids = set(map(str, split["train"])), set(map(str, split["validation"]))
+    if train_ids & validation_ids:
+        raise ValueError("training and validation problem IDs overlap")
+    if {str(row["problem_id"]) for row in ref_rows} & (train_ids | validation_ids):
+        raise ValueError("reference problems overlap the optimizer training/validation pool")
     train = [row for row in metadata if row["problem_id"] in train_ids]
     validation = [row for row in metadata if row["problem_id"] in validation_ids]
     if not train or not validation:
         raise ValueError("split needs live training and validation prefixes")
-    source = {_key(row): row for row in audit_rows(args.bundles, 512)
-              if not bool(row.get("finished", False))}
-    if any(_key(row) not in source for row in train + validation):
+    source = _load_sources(args.bundles, args.decision_tokens)
+    if any(_key(row) not in source for row in validation):
         raise ValueError("audit bundles and replay prefixes differ")
+    background_source = _load_sources(args.background_bundles, 0)
+    background_pool = [row for row in background_source.values() if str(row["problem_id"]) in train_ids]
+    if not background_pool:
+        raise ValueError("background audit has no unconditional t=0 trajectories on training problems")
     rng = np.random.default_rng(args.seed)
     chosen = rng.choice(len(validation), size=min(args.n_prefixes, len(validation)), replace=False)
     chosen_rows = [validation[int(i)] for i in chosen]
@@ -107,16 +154,13 @@ def main(argv=None):
     # the other N-1 starts of the same fixed training step.
     backgrounds = []
     for _ in range(args.backgrounds):
-        indices = rng.choice(len(train), size=args.n_start - 1,
-                             replace=len(train) < args.n_start - 1)
+        indices = rng.choice(len(background_pool), size=args.n_start - 1, replace=True)
         total = np.zeros(layout.dim, dtype=np.float64)
         for index in indices:
-            bundle = source[_key(train[int(index)])]
-            record = bundle["continuation_records"][int(rng.integers(len(bundle["continuation_records"])))]
-            total += gradient(record["token_ids"], int(record["prompt_len"]),
-                              float(record["reward"]), float(record["baseline"]))
+            bundle = background_pool[int(index)]
+            suffix_index = int(rng.integers(len(bundle["continuation_records"])))
+            total += _checked_gradient(gradient, bundle, suffix_index)
         backgrounds.append(total / args.n_start)
-    clip = float((cfg.get("optim") or {}).get("grad_clip", 1.))
     baseline = [adamw_update_direction(payload["actor"], layout, payload["optimizer"],
                                        cfg.get("optim") or {}, b, reference, clip)
                 for b in backgrounds]
@@ -125,9 +169,7 @@ def main(argv=None):
         records = source[_key(row)]["continuation_records"]
         indices = row["continuation_indices"][:args.suffixes_per_prefix]
         for suffix_index in indices:
-            record = records[int(suffix_index)]
-            g = gradient(record["token_ids"], int(record["prompt_len"]),
-                         float(record["reward"]), float(record["baseline"]))
+            g = _checked_gradient(gradient, source[_key(row)], int(suffix_index), row)
             linear = float(reference @ g / args.n_start)
             for background_index, b in enumerate(backgrounds):
                 update = adamw_update_direction(
@@ -142,13 +184,13 @@ def main(argv=None):
                                "clip_triggered_with": update["clip_triggered"],
                                "clip_triggered_background": baseline[background_index]["clip_triggered"]})
         print(f"optimizer_probe problem={row['problem_id']} path={row['path_id']}", flush=True)
-    out = resolve_run_dir(args.run_dir)
-    out.mkdir(parents=True, exist_ok=True)
     (out / "optimizer_probe.jsonl").write_text(
         "".join(json.dumps(row) + "\n" for row in report), encoding="utf-8")
     summary = {"n_prefixes": len(chosen_rows), "n_rows": len(report),
                "n_start": args.n_start, "backgrounds": len(backgrounds),
                "clip": clip, "actor_sha256": actor_sha,
+               "optimizer_execution": "CPU PyTorch using saved groups/moments and shared training clip path; not bitwise CUDA validation",
+               "background_pool": "training-only t=0 full trajectories, sampled with replacement",
                "label_scope": "fixed-actor reference-gradient local proxy; not observed reward change"}
     (out / "optimizer_probe_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(json.dumps({**summary, "run_dir": str(out)}))

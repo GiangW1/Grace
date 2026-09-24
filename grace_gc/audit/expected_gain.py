@@ -11,6 +11,19 @@ from grace_gc.predictor.basis import crossfit_ridge_operator, effective_rank
 from grace_gc.predictor.scale import FeatureScaler, fit_weighted_ridge, ridge_predict
 
 
+class BasisUnavailable(ValueError):
+    """A valid dataset has no estimable direction for this basis variant."""
+
+
+def start_experiment_run(path, kind, config):
+    from grace_gc.logging_util.run_dir import RunDirectory, resolve_run_dir, utc_now
+    destination = resolve_run_dir(path)
+    run = RunDirectory(destination)
+    run.write_run_meta(kind=kind, started=utc_now(), requested=path)
+    run.write_json("experiment_config.json", config)
+    return destination
+
+
 def load_replay(path: str | Path):
     root = Path(path)
     rows = [json.loads(line) for line in (root / "prefixes.jsonl").read_text(encoding="utf-8").splitlines()
@@ -45,6 +58,9 @@ def problem_split(rows, seed: int = 17, counts=(160, 48, 48), prior_train=()):
 
 def reference_gradient(reference_rows, reference_means, block: int = 32768):
     """Equal weight per reference problem, then equal weight across problems."""
+    if not reference_rows or any(int(row.get("t", -1)) != 0 for row in reference_rows):
+        raise ValueError("reference reward gradient needs unconditional t=0 trajectories; "
+                         "a survivor-only t>0 audit estimates a different target")
     groups = {}
     for i, row in enumerate(reference_rows):
         groups.setdefault(str(row["problem_id"]), []).append(i)
@@ -78,7 +94,7 @@ def fit_global_basis(means, indices, features, problem_ids, variant: str,
     eigen, left = np.linalg.eigh(gram)
     live = eigen > max(float(eigen.max()), 0.0) * 1e-12
     if not np.any(live):
-        raise ValueError("training prefix means have no nonzero gradient rank")
+        raise BasisUnavailable("training prefix means have no nonzero gradient rank")
     values = eigen[live]
     left = left[:, live]
     roots = np.sqrt(values)
@@ -92,7 +108,7 @@ def fit_global_basis(means, indices, features, problem_ids, variant: str,
         operator, available = crossfit_ridge_operator(
             np.asarray(features, dtype=np.float64), problem_ids, ridge_l2=1.0)
         if not np.all(available):
-            raise ValueError("predictable basis needs other training problems for every row")
+            raise BasisUnavailable("predictable basis has no cross-problem fit for every row")
         b = (operator + operator.T) / (2 * len(indices))
         small = roots[:, None] * (left.T @ b @ left) * roots[None, :]
         signal, vectors = np.linalg.eigh((small + small.T) / 2)
@@ -101,7 +117,7 @@ def fit_global_basis(means, indices, features, problem_ids, variant: str,
         coeff = (left / roots) @ vectors[:, positive[:rank]]
         metrics["positive_signal_rank"] = len(positive)
     if rank == 0:
-        raise ValueError(f"{variant} has no valid basis direction")
+        raise BasisUnavailable(f"{variant} has no valid basis direction")
     destination = Path(output)
     destination.parent.mkdir(parents=True, exist_ok=True)
     u = np.lib.format.open_memmap(destination, mode="w+", dtype=np.float64,
