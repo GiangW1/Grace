@@ -16,7 +16,7 @@ if str(ROOT) not in sys.path:
 
 from grace_gc.audit.benefit_replay import audit_rows, audit_file, continuation_digest, replay_config
 from grace_gc.audit.expected_gain import load_replay, reference_gradient, start_experiment_run
-from grace_gc.audit.update_probe import adamw_update_direction
+from grace_gc.audit.update_probe import adamw_update_direction, adamw_update_vector
 
 
 def _key(row):
@@ -69,11 +69,17 @@ def main(argv=None):
                         help="predictor decision token used by the fixed-N source audit")
     parser.add_argument("--grad-clip", type=float, default=None,
                         help="explicit override; otherwise use checkpoint run_config.optim.grad_clip")
+    parser.add_argument("--export-direction", default=None,
+                        help="optional .npy path for the ascent-aligned lagged AdamW direction")
+    parser.add_argument("--export-background", type=int, default=0,
+                        help="background index used with --export-direction (default: 0)")
     parser.add_argument("--run-dir", required=True)
     args = parser.parse_args(argv)
     if min(args.n_start, args.n_prefixes, args.suffixes_per_prefix,
            args.backgrounds) <= 0:
         raise ValueError("counts must be positive")
+    if args.export_background < 0:
+        raise ValueError("export-background must be non-negative")
     from functools import partial
     from types import SimpleNamespace
 
@@ -84,7 +90,7 @@ def main(argv=None):
     from grace_gc.data.tokenize import load_hf_tokenizer
     from grace_gc.trainer.checkpoint import load_checkpoint
     from grace_gc.trainer.state_io import check_snapshot_identity, load_numpy_module_state
-    from grace_gc.versions import sha256_named
+    from grace_gc.versions import sha256_array, sha256_named
 
     payload = load_checkpoint(args.checkpoint)
     cfg = replay_config(payload, args.model_path, args.config)
@@ -164,6 +170,38 @@ def main(argv=None):
     baseline = [adamw_update_direction(payload["actor"], layout, payload["optimizer"],
                                        cfg.get("optim") or {}, b, reference, clip)
                 for b in backgrounds]
+    exported_direction = None
+    if args.export_direction:
+        if args.export_background >= len(backgrounds):
+            raise ValueError("export-background is outside the sampled background range")
+        delta, direction_stats = adamw_update_vector(
+            payload["actor"], layout, payload["optimizer"], cfg.get("optim") or {},
+            backgrounds[args.export_background], clip)
+        # AdamW receives the negative ascent gradient, so its parameter delta
+        # is already aligned with the ascent convention used by replay labels.
+        direction = np.asarray(delta, dtype=np.float64)
+        direction_path = Path(args.export_direction)
+        if direction_path.suffix.lower() != ".npy":
+            raise ValueError("export-direction must end in .npy")
+        direction_path.parent.mkdir(parents=True, exist_ok=True)
+        np.save(direction_path, direction, allow_pickle=False)
+        exported_direction = {
+            "path": str(direction_path.resolve()),
+            "direction_kind": "lagged_adamw_ascent_aligned",
+            "convention": "parameter_delta_from_negative_ascent_gradient",
+            "actor_sha256": actor_sha,
+            "checkpoint_step": payload.get("step"),
+            "n_start": int(args.n_start),
+            "seed": int(args.seed),
+            "background_index": int(args.export_background),
+            "shape": list(direction.shape),
+            "norm": float(np.linalg.norm(direction)),
+            "direction_sha256": sha256_array(direction),
+            "parameter_delta_norm": float(direction_stats["parameter_update_norm"]),
+            "clip_triggered": bool(direction_stats["clip_triggered"]),
+        }
+        (out / "exported_direction.json").write_text(
+            json.dumps(exported_direction, indent=2), encoding="utf-8")
     report = []
     for row in chosen_rows:
         records = source[_key(row)]["continuation_records"]
@@ -191,7 +229,8 @@ def main(argv=None):
                "clip": clip, "actor_sha256": actor_sha,
                "optimizer_execution": "CPU PyTorch using saved groups/moments and shared training clip path; not bitwise CUDA validation",
                "background_pool": "training-only t=0 full trajectories, sampled with replacement",
-               "label_scope": "fixed-actor reference-gradient local proxy; not observed reward change"}
+               "label_scope": "fixed-actor reference-gradient local proxy; not observed reward change",
+               "exported_direction": exported_direction}
     (out / "optimizer_probe_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(json.dumps({**summary, "run_dir": str(out)}))
     return 0
