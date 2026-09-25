@@ -39,6 +39,7 @@ it in numeric order and verify SHA256 against:
 
 `8741ffb83e4955c615d7256651c1c443f03d6ed36e41723e6e3079f704bad529`
 
-The replay used the legacy record-only handling for the known BF16 norm drift
-in these historical bundles. No source code in the PR branch was changed for
-that runner compatibility adjustment.
+The replay records the known BF16 norm drift in each prefix's `replay_errors`
+and the run-level `max_norm_relative_error` field instead of aborting on the
+historical bundle mismatch. This keeps the directional scalar usable while
+making the numerical discrepancy explicit.
