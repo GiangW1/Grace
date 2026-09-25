@@ -65,6 +65,10 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                  prompt_feature_fn=None, reference_direction=None) -> dict:
     """Stream exact G labels, storing one FP64 mean per live prefix.
 
+    When ``reference_direction`` is supplied, also store the scalar dot
+    product for each sampled continuation so later n-grid stability checks do
+    not need to replay the model.
+
     `grad_fn` receives (token_ids, prompt_len, reward, baseline). This small
     seam also permits a CPU test of the replay bookkeeping without a model.
     """
@@ -81,6 +85,22 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
     target.mkdir(parents=True, exist_ok=True)
     matrix = np.lib.format.open_memmap(target / "mean_grads.npy", mode="w+",
                                        dtype=np.float64, shape=(len(selected), dimension))
+    directional_values = None
+    if direction is not None:
+        # Keep the per-continuation scalar only.  This is tiny compared with
+        # the full gradients and lets the offline audit check n=16/64/256
+        # without replaying the model a second time.
+        capacities = [min(len(row.get("continuation_records") or []),
+                           max_continuations if max_continuations is not None else
+                           len(row.get("continuation_records") or []))
+                      for row in selected]
+        if any(capacity <= 0 for capacity in capacities):
+            raise ValueError("directional replay needs at least one continuation per prefix")
+        capacity = max(capacities)
+        directional_values = np.lib.format.open_memmap(
+            target / "directional_values.npy", mode="w+", dtype=np.float64,
+            shape=(len(selected), capacity))
+        directional_values[:] = np.nan
     metadata = []
     started = perf_counter()
     with (target / "prefixes.jsonl").open("w", encoding="utf-8") as handle:
@@ -118,6 +138,8 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                 if expected_norms and not np.isclose(norm, float(expected_norms[int(original_index)]),
                                                      rtol=5e-3, atol=1e-5):
                     raise ValueError(f"prefix {i} continuation {j} does not replay its saved gradient norm")
+                if directional_values is not None:
+                    directional_values[i, j] = float(grad @ direction)
                 mean += grad
                 (first if j < n // 2 else second)[:] += grad
                 norm_sum += norm
@@ -150,10 +172,16 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
             matrix.flush()
             print(f"replay={i + 1}/{len(selected)} problem={info['problem_id']}", flush=True)
     del matrix
+    if directional_values is not None:
+        directional_values.flush()
+        del directional_values
     summary = {"n_prefixes": len(selected), "n_problems": len({x["problem_id"] for x in metadata}),
                "input_prefixes": len(rows), "finished_input_prefixes": len(rows) - len(selected),
                "dimension": dimension, "n_continuations": sum(x["n_continuations"] for x in metadata),
                "wall_seconds": perf_counter() - started,
+               "directional_values": (None if direction is None else
+                                       {"path": "directional_values.npy",
+                                        "shape": [len(selected), capacity]}),
                "note": "exact frozen-actor ascent gradients; prefix means stored in FP64"}
     (target / "replay_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     return summary

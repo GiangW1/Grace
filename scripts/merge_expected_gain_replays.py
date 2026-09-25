@@ -32,7 +32,8 @@ def main(argv=None):
         provenance = json.loads((root / "replay_provenance.json").read_text(encoding="utf-8"))
         common = {key: provenance.get(key) for key in
                   ("actor_sha256", "layout_names", "layout_dim", "model_path",
-                   "decision_tokens", "max_continuations", "lora", "reference_direction_sha256")}
+                   "decision_tokens", "max_continuations", "lora", "reference_direction_sha256",
+                   "direction_sha256")}
         if identity is None:
             identity = common
         elif identity != common:
@@ -49,17 +50,39 @@ def main(argv=None):
     out = start_experiment_run(args.run_dir, "expected_gain_merge", vars(args))
     combined = np.lib.format.open_memmap(out / "mean_grads.npy", mode="w+",
                                          dtype=np.float64, shape=(total, dim))
+    scalar_sources = [np.load(root / "directional_values.npy", mmap_mode="r")
+                      if (root / "directional_values.npy").is_file() else None
+                      for root, _, _ in sources]
+    keep_scalars = (identity.get("direction_sha256") is not None and
+                    all(values is not None and values.ndim == 2 and
+                        values.shape[0] == len(rows)
+                        for values, (_, rows, _) in zip(scalar_sources, sources)))
+    scalar_capacity = (max(values.shape[1] for values in scalar_sources)
+                       if keep_scalars else 0)
+    scalars = (np.lib.format.open_memmap(out / "directional_values.npy", mode="w+",
+                                         dtype=np.float64, shape=(total, scalar_capacity))
+               if keep_scalars else None)
+    if scalars is not None:
+        scalars[:] = np.nan
     offset = 0
     with (out / "prefixes.jsonl").open("w", encoding="utf-8") as handle:
-        for _root, rows, means in sources:
+        for source_index, (_root, rows, means) in enumerate(sources):
             if means.shape != (len(rows), dim):
                 raise ValueError("replay matrix shape disagrees with provenance")
+            values = scalar_sources[source_index]
+            if values is not None and (values.ndim != 2 or values.shape[0] != len(rows)):
+                raise ValueError("directional scalar matrix shape disagrees with replay")
             for i, row in enumerate(rows):
                 combined[offset] = means[i]
+                if scalars is not None:
+                    scalars[offset, :values.shape[1]] = values[i]
                 handle.write(json.dumps({**row, "index": offset}, ensure_ascii=False) + "\n")
                 offset += 1
             combined.flush()
     del combined
+    if scalars is not None:
+        scalars.flush()
+        del scalars
     provenance = {**identity, "merged_replay_dirs": [str(root.resolve()) for root, _, _ in sources],
                   "prompt_features_replayed": all(all(row.get("prompt_features") is not None
                                                       for row in rows) for _, rows, _ in sources)}
@@ -67,7 +90,11 @@ def main(argv=None):
         json.dumps(provenance, indent=2, ensure_ascii=False), encoding="utf-8")
     (out / "replay_summary.json").write_text(
         json.dumps({"n_prefixes": total, "n_problems": len(seen), "dimension": dim,
-                    "merged_sources": len(sources)}, indent=2), encoding="utf-8")
+                    "merged_sources": len(sources),
+                    "directional_values": (None if not keep_scalars else
+                                            {"path": "directional_values.npy",
+                                             "shape": [total, scalar_capacity]})},
+                   indent=2), encoding="utf-8")
     print(json.dumps({"run_dir": str(out), "n_prefixes": total, "n_problems": len(seen)}))
     return 0
 
