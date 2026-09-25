@@ -45,14 +45,16 @@ still promising, rerun only the predictor replay with
 `--max-continuations 256`; no predictor fitting has to be repeated on the
 GPU.
 
-For an actual frozen lagged update direction, use the same replay command with
+For a supplied frozen ascent/update direction, use the same replay command with
 `--direction-file runs/step-XX-update-direction.npy` instead of
 `--reference-dir`. The file must be a finite flattened LoRA ascent/update
 vector with the replay's `layout_dim` entries.
 
-The optimizer probe can reconstruct that direction from the saved AdamW
-moments and a training-only background gradient. Run it with the same frozen
-checkpoint, replay split, and fixed `N`:
+The optimizer probe can construct a **counterfactual** one-step AdamW parameter
+delta from the saved optimizer state and a training-only background gradient.
+It cannot reconstruct the historical training batch update unless that update
+was saved during training. Run it with the same frozen checkpoint, replay split,
+and fixed `N`:
 
 ```bash
 python scripts/probe_expected_gain_update.py \
@@ -69,11 +71,13 @@ python scripts/probe_expected_gain_update.py \
 ```
 
 AdamW receives the negative ascent gradient, so the exported parameter delta
-is already aligned with the ascent gradients used by the directional labels. The sidecar
-`exported_direction.json` records the actor hash, direction hash, sampled
-background index, clipping flag, and vector norm. Repeat with another
-`--export-background` index to check sensitivity to the sampled training
-background before treating the direction as a stable lagged update.
+uses the ascent convention used by the directional labels. The sidecar
+`exported_direction.json` records the checkpoint hash, actor/layout identity,
+source bundle hashes, exact sampled prefix/suffix draws, direction hash,
+clipping flag, and vector norm. A second sidecar is written next to the `.npy`
+file and is checked automatically when that file is replayed. Repeat with
+another `--export-background` index to measure sensitivity to the sampled
+counterfactual background before treating the direction as stable.
 
 ## 2. Run the CPU audit
 
