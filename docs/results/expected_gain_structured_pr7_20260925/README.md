@@ -21,7 +21,7 @@ Files:
 - `basis_coefficients.npz`: coefficients needed to reconstruct fitted bases.
 - `feature_provenance.json`: actor, replay, shape, and four-shard provenance.
 - `split.json`: fixed train/validation/diagnostic problem split.
-- `expected-gain-structured-pr7-007b762.tar.gz.part-00` through `part-02`:
+- `expected-gain-structured-pr7-007b762.tar.gz.part-00` through `part-08`:
   complete 57 MB run output split for reliable GitHub upload. Concatenate the
   parts in numeric order to recover the gzip archive; it includes merged and
   per-shard feature matrices, logs, and configurations.
