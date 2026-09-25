@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 import sys
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -25,6 +27,8 @@ def main(argv=None) -> int:
     parser.add_argument("--bundles", required=True)
     parser.add_argument("--reference-dir", default=None,
                         help="disjoint reference replay; records two independent half-suffix gain means")
+    parser.add_argument("--direction-file", default=None,
+                        help="optional .npy ascent/update direction; mutually exclusive with --reference-dir")
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--model-path", required=True)
     parser.add_argument("--config", action="append", default=[])
@@ -76,6 +80,10 @@ def main(argv=None) -> int:
     )
     destination = start_experiment_run(args.run_dir, "expected_gain_replay", vars(args))
     reference = None
+    direction_kind = None
+    reference_rows = None
+    if args.reference_dir and args.direction_file:
+        raise ValueError("choose at most one of --reference-dir and --direction-file")
     if args.reference_dir:
         from grace_gc.audit.expected_gain import load_replay, reference_gradient
         ref_provenance = json.loads((Path(args.reference_dir) / "replay_provenance.json")
@@ -86,6 +94,12 @@ def main(argv=None) -> int:
         if reference_means.shape[1] != layout.dim:
             raise ValueError("reference replay LoRA dimension differs")
         reference = reference_gradient(reference_rows, reference_means)
+        direction_kind = "reference_gradient"
+    elif args.direction_file:
+        reference = np.asarray(np.load(args.direction_file), dtype=np.float64).reshape(-1)
+        if reference.shape != (layout.dim,) or not np.all(np.isfinite(reference)):
+            raise ValueError("direction-file must contain one finite vector with layout_dim entries")
+        direction_kind = "direction_file"
     def prompt_features(row):
         tokens = row.get("prompt_token_ids")
         if not tokens:
@@ -97,7 +111,7 @@ def main(argv=None) -> int:
                                      int(pad), eos_id=tok.eos_token_id)["prompt_features"][0]
 
     source_rows = list(audit_rows(args.bundles, args.decision_tokens))
-    if reference is not None and ({str(row["problem_id"]) for row in source_rows} &
+    if args.reference_dir and ({str(row["problem_id"]) for row in source_rows} &
                                    {str(row["problem_id"]) for row in reference_rows}):
         raise ValueError("predictor and reference problems overlap")
     result = replay_means(source_rows,
@@ -115,7 +129,14 @@ def main(argv=None) -> int:
                   "seed": args.seed,
                   "prompt_features_replayed": not args.skip_prompt_features,
                   "reference_dir": args.reference_dir,
-                  "reference_direction_sha256": None if reference is None else sha256_array(reference),
+                  "direction_file": (None if args.direction_file is None else
+                                      str(Path(args.direction_file).resolve())),
+                  "direction_file_sha256": (None if args.direction_file is None else
+                                              sha256_file(args.direction_file)),
+                  "direction_kind": direction_kind,
+                  "direction_sha256": None if reference is None else sha256_array(reference),
+                  "reference_direction_sha256": (None if args.reference_dir is None or reference is None
+                                                  else sha256_array(reference)),
                   "lora": cfg.get("lora"),
                   "source_actor_metadata_available": source_meta.is_file(),
                   "layout_names": layout.names(), "layout_dim": layout.dim,
