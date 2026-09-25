@@ -44,7 +44,7 @@ def main(argv=None) -> int:
                                             prefix_feature_bundle, trainable_params)
     from grace_gc.backends.verl_trainer import load_lora_actor
     from grace_gc.core.layout import collect_lora_layout
-    from grace_gc.data.tokenize import load_hf_tokenizer
+    from grace_gc.data.tokenize import collect_stop_token_ids, load_hf_tokenizer
     from grace_gc.trainer.checkpoint import load_checkpoint
     from grace_gc.trainer.state_io import check_snapshot_identity, load_numpy_module_state
     from grace_gc.versions import sha256_file, sha256_named, sha256_array
@@ -69,8 +69,9 @@ def main(argv=None) -> int:
     pad = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
     if pad is None:
         raise ValueError("tokenizer needs a pad or EOS ID")
+    stop_ids = collect_stop_token_ids(tok)
     engines = SimpleNamespace(
-        logprob_one=partial(logprob_one, actor, pad_id=int(pad), eos_id=tok.eos_token_id),
+        logprob_one=partial(logprob_one, actor, pad_id=int(pad), eos_id=stop_ids),
         trainable_params=partial(trainable_params, actor),
         named_lora=partial(named_lora_params, actor),
     )
@@ -94,7 +95,7 @@ def main(argv=None) -> int:
                             else float(row.get("baseline") or 0.))
         return prefix_feature_bundle(actor, [tokens], [len(tokens)],
                                      [feature_baseline],
-                                     int(pad), eos_id=tok.eos_token_id)["prompt_features"][0]
+                                     int(pad), eos_id=stop_ids)["prompt_features"][0]
 
     source_rows = list(audit_rows(args.bundles, args.decision_tokens))
     if reference is not None and ({str(row["problem_id"]) for row in source_rows} &
