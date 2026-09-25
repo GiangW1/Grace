@@ -60,6 +60,23 @@ class DirectionalAuditTest(unittest.TestCase):
             self.assertEqual([row["n"] for row in summary["n_grid"]], [2, 4])
             self.assertTrue(summary["predictors_on_mean_label"])
 
+    def test_directional_values_reject_all_nan_prefix(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rows = [{"problem_id": f"p{i // 2}", "prefix_token_ids": [1, 2, i],
+                     "mean_cost": 10. + i, "mean_reward": float(i % 2),
+                     "baseline": .5} for i in range(12)]
+            replay = root / "replay"
+            _write_replay(replay, rows, np.ones((len(rows), 4)))
+            np.save(replay / "directional_values.npy", np.full((len(rows), 2), np.nan))
+            direction = root / "direction.npy"
+            np.save(direction, np.ones(4))
+            with self.assertRaisesRegex(ValueError, "at least one finite"):
+                main(["--replay-dir", str(replay), "--direction", "file",
+                      "--direction-file", str(direction), "--features", "cheap",
+                      "--models", "constant", "--n-grid", "2",
+                      "--run-dir", str(root / "result")])
+
     def test_reference_direction_keeps_problem_pools_disjoint(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -95,6 +112,8 @@ class DirectionalAuditTest(unittest.TestCase):
             self.assertTrue(np.all(np.isfinite(values)))
             summary = json.loads((Path(tmp) / "replay_summary.json").read_text())
             self.assertEqual(summary["directional_values"]["shape"], [1, 4])
+            sidecar = json.loads((Path(tmp) / "directional_values_provenance.json").read_text())
+            self.assertEqual(sidecar["shape"], [1, 4])
 
     def test_merge_preserves_scalar_values_when_direction_matches(self):
         with tempfile.TemporaryDirectory() as tmp:
