@@ -29,6 +29,8 @@ def main(argv=None) -> int:
                         help="disjoint reference replay; records two independent half-suffix gain means")
     parser.add_argument("--direction-file", default=None,
                         help="optional .npy ascent/update direction; mutually exclusive with --reference-dir")
+    parser.add_argument("--direction-sidecar", default=None,
+                        help="optional exported-direction JSON; adjacent .json is checked automatically")
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--model-path", required=True)
     parser.add_argument("--config", action="append", default=[])
@@ -81,6 +83,7 @@ def main(argv=None) -> int:
     destination = start_experiment_run(args.run_dir, "expected_gain_replay", vars(args))
     reference = None
     direction_kind = None
+    direction_sidecar_kind = None
     reference_rows = None
     if args.reference_dir and args.direction_file:
         raise ValueError("choose at most one of --reference-dir and --direction-file")
@@ -100,6 +103,26 @@ def main(argv=None) -> int:
         if reference.shape != (layout.dim,) or not np.all(np.isfinite(reference)):
             raise ValueError("direction-file must contain one finite vector with layout_dim entries")
         direction_kind = "direction_file"
+        sidecar_path = (Path(args.direction_sidecar) if args.direction_sidecar else
+                        Path(args.direction_file).with_suffix(".json"))
+        if args.direction_sidecar and not sidecar_path.is_file():
+            raise FileNotFoundError(f"direction sidecar is not readable: {sidecar_path}")
+        if sidecar_path.is_file():
+            sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+            if sidecar.get("path") != str(Path(args.direction_file).resolve()):
+                raise ValueError("direction sidecar points to another direction file")
+            if sidecar.get("actor_sha256") != sha256_named(named):
+                raise ValueError("direction sidecar actor differs from checkpoint actor")
+            if sidecar.get("checkpoint_sha256") != sha256_file(args.checkpoint):
+                raise ValueError("direction sidecar checkpoint differs from replay checkpoint")
+            if (sidecar.get("layout_dim") != layout.dim or
+                    sidecar.get("layout_names") != layout.names()):
+                raise ValueError("direction sidecar layout differs from replay layout")
+            if sidecar.get("direction_sha256") != sha256_array(reference):
+                raise ValueError("direction sidecar vector hash differs from direction file")
+            direction_sidecar_kind = sidecar.get("direction_kind")
+        else:
+            sidecar_path = None
     def prompt_features(row):
         tokens = row.get("prompt_token_ids")
         if not tokens:
@@ -129,11 +152,15 @@ def main(argv=None) -> int:
                   "seed": args.seed,
                   "prompt_features_replayed": not args.skip_prompt_features,
                   "reference_dir": args.reference_dir,
-                  "direction_file": (None if args.direction_file is None else
-                                      str(Path(args.direction_file).resolve())),
-                  "direction_file_sha256": (None if args.direction_file is None else
-                                              sha256_file(args.direction_file)),
-                  "direction_kind": direction_kind,
+                   "direction_file": (None if args.direction_file is None else
+                                       str(Path(args.direction_file).resolve())),
+                   "direction_file_sha256": (None if args.direction_file is None else
+                                               sha256_file(args.direction_file)),
+                   "direction_sidecar": (None if args.direction_file is None or sidecar_path is None else
+                                          str(sidecar_path.resolve())),
+                   "direction_sidecar_sha256": (None if args.direction_file is None or sidecar_path is None else
+                                                 sha256_file(sidecar_path)),
+                   "direction_kind": direction_sidecar_kind or direction_kind,
                   "direction_sha256": None if reference is None else sha256_array(reference),
                   "reference_direction_sha256": (None if args.reference_dir is None or reference is None
                                                   else sha256_array(reference)),
