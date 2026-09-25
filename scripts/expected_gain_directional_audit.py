@@ -22,9 +22,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from grace_gc.audit.benefit_replay import prefix_keys_sha256
 from grace_gc.audit.expected_gain import (fit_predict, load_replay, problem_split,
                                            reference_gradient, start_experiment_run)
-from grace_gc.versions import sha256_array
+from grace_gc.versions import sha256_array, sha256_file
 from scripts.expected_gain_suite import (_check_replay_identity, _directional_labels,
                                          _indices, _metrics, _provenance)
 
@@ -261,6 +262,14 @@ def main(argv=None) -> int:
         targets, loo_norms = _loo_targets(rows, means)
         direction_description = "leave_one_problem_out_replay_mean"
 
+    if args.direction == "file":
+        stored = replay_meta.get("direction_sha256")
+        if stored and stored != sha256_array(reference):
+            raise ValueError("replay labels use another direction file")
+        stored_file = replay_meta.get("direction_file_sha256")
+        if stored_file and stored_file != sha256_file(args.direction_file):
+            raise ValueError("direction file differs from the replay provenance")
+
     split, roles = _split_roles(rows, args.split_manifest, args.seed)
     features = _feature_matrix(rows, args.features)
     model_names = [name.strip() for name in args.models.split(",") if name.strip()]
@@ -275,11 +284,22 @@ def main(argv=None) -> int:
         candidate = np.load(directional_path, mmap_mode="r")
         if candidate.ndim != 2 or candidate.shape[0] != len(rows) or np.any(np.isinf(candidate)):
             raise ValueError("directional-values must be a prefix by continuation matrix")
+        sidecar_path = directional_path.parent / "directional_values_provenance.json"
+        if args.directional_values and not sidecar_path.is_file():
+            raise ValueError("custom directional-values needs directional_values_provenance.json")
+        if sidecar_path.is_file():
+            sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+            if sidecar.get("prefix_keys_sha256") != prefix_keys_sha256(rows):
+                raise ValueError("directional-values rows do not match this replay")
+            if sidecar.get("shape") != list(candidate.shape):
+                raise ValueError("directional-values sidecar shape disagrees with matrix")
+            if reference is not None and sidecar.get("direction_sha256") != sha256_array(reference):
+                raise ValueError("directional-values were generated with another direction")
         for row_values in candidate:
             finite = np.isfinite(row_values)
-            if np.any(finite & np.isnan(row_values)):
-                raise ValueError("directional-values contain invalid scalar labels")
             first_missing = np.flatnonzero(~finite)
+            if not len(finite) or not np.any(finite):
+                raise ValueError("directional-values rows must contain at least one finite scalar")
             if len(first_missing) and np.any(finite[first_missing[0] + 1:]):
                 raise ValueError("directional-values must have only trailing NaN padding")
         stored = replay_meta.get("direction_sha256")
