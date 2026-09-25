@@ -50,6 +50,31 @@ For an actual frozen lagged update direction, use the same replay command with
 `--reference-dir`. The file must be a finite flattened LoRA ascent/update
 vector with the replay's `layout_dim` entries.
 
+The optimizer probe can reconstruct that direction from the saved AdamW
+moments and a training-only background gradient. Run it with the same frozen
+checkpoint, replay split, and fixed `N`:
+
+```bash
+python scripts/probe_expected_gain_update.py \
+  --bundles runs/directional-predictor/audit_bundles.jsonl \
+  --background-bundles runs/directional-background/audit_bundles.jsonl \
+  --replay-dir runs/directional-predictor-replay \
+  --reference-dir runs/directional-reference-replay \
+  --split-manifest runs/directional-data/split.json \
+  --checkpoint "$CHECKPOINT" --model-path "$MODEL_PATH" \
+  --n-start "$N_START" \
+  --run-dir runs/directional-update-probe \
+  --export-direction runs/step-XX-update-direction.npy \
+  --export-background 0
+```
+
+AdamW receives the negative ascent gradient, so the exported parameter delta
+is already aligned with the ascent gradients used by the directional labels. The sidecar
+`exported_direction.json` records the actor hash, direction hash, sampled
+background index, clipping flag, and vector norm. Repeat with another
+`--export-background` index to check sensitivity to the sampled training
+background before treating the direction as a stable lagged update.
+
 ## 2. Run the CPU audit
 
 The fit is deliberately small: zero, constant, and Ridge are the only default
