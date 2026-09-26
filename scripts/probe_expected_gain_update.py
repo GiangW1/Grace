@@ -14,7 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from grace_gc.audit.benefit_replay import audit_rows, audit_file, continuation_digest, replay_config
+from grace_gc.audit.benefit_replay import (audit_rows, audit_file, check_replayed_gradient,
+                                           continuation_digest, replay_config)
 from grace_gc.audit.expected_gain import load_replay, reference_gradient, start_experiment_run
 from grace_gc.audit.update_probe import adamw_update_direction, adamw_update_vector
 
@@ -34,16 +35,20 @@ def _load_sources(paths, decision_tokens=None):
     return source
 
 
-def _checked_gradient(gradient, bundle, index, replay_row=None):
+def _checked_gradient(gradient, bundle, index, replay_row=None, error_log=None):
     record = bundle["continuation_records"][int(index)]
     digest = None if replay_row is None else (replay_row.get("continuation_sha256") or {}).get(str(index))
     if digest and continuation_digest(record) != digest:
         raise ValueError("source continuation differs from the trajectory used for replay labels")
     g = gradient(record["token_ids"], int(record["prompt_len"]),
                  float(record["reward"]), float(record["baseline"]))
-    norms = bundle.get("true_grad_norm_sq")
-    if norms is not None and not np.isclose(float(g @ g), float(norms[int(index)]), rtol=5e-3, atol=1e-5):
-        raise ValueError("optimizer probe failed the source trajectory gradient-norm check")
+    _, norm_error, sketch_error = check_replayed_gradient(g, bundle, int(index))
+    if error_log is not None:
+        error_log.append({"problem_id": str(bundle["problem_id"]),
+                          "path_id": str(bundle.get("path_id")),
+                          "continuation_index": int(index),
+                          "norm_relative_error": norm_error,
+                          "sketch_relative_error": sketch_error})
     return g
 
 
@@ -87,7 +92,7 @@ def main(argv=None):
     from grace_gc.backends.hf_actor import logprob_one, named_lora_params, trainable_params
     from grace_gc.backends.verl_trainer import load_lora_actor
     from grace_gc.core.layout import collect_lora_layout
-    from grace_gc.data.tokenize import load_hf_tokenizer
+    from grace_gc.data.tokenize import collect_stop_token_ids, load_hf_tokenizer
     from grace_gc.trainer.checkpoint import load_checkpoint
     from grace_gc.trainer.state_io import check_snapshot_identity, load_numpy_module_state
     from grace_gc.versions import sha256_array, sha256_file, sha256_named
@@ -128,7 +133,7 @@ def main(argv=None):
     if pad is None:
         raise ValueError("tokenizer needs pad or EOS ID")
     engines = SimpleNamespace(
-        logprob_one=partial(logprob_one, actor, pad_id=int(pad), eos_id=tok.eos_token_id),
+        logprob_one=partial(logprob_one, actor, pad_id=int(pad), eos_id=collect_stop_token_ids(tok)),
         trainable_params=partial(trainable_params, actor),
         named_lora=partial(named_lora_params, actor),
     )
@@ -164,6 +169,7 @@ def main(argv=None):
     # Backgrounds are independent training-side continuations, normalized as
     # the other N-1 starts of the same fixed training step.
     backgrounds, background_traces = [], []
+    replay_errors = []
     for background_index in range(args.backgrounds):
         indices = rng.choice(len(background_pool), size=args.n_start - 1, replace=True)
         total = np.zeros(layout.dim, dtype=np.float64)
@@ -171,7 +177,7 @@ def main(argv=None):
         for index in indices:
             bundle = background_pool[int(index)]
             suffix_index = int(rng.integers(len(bundle["continuation_records"])))
-            total += _checked_gradient(gradient, bundle, suffix_index)
+            total += _checked_gradient(gradient, bundle, suffix_index, error_log=replay_errors)
             record = bundle["continuation_records"][suffix_index]
             trace.append({"prefix": _key(bundle), "suffix_index": suffix_index,
                           "continuation_sha256": continuation_digest(record)})
@@ -227,7 +233,8 @@ def main(argv=None):
         records = source[_key(row)]["continuation_records"]
         indices = row["continuation_indices"][:args.suffixes_per_prefix]
         for suffix_index in indices:
-            g = _checked_gradient(gradient, source[_key(row)], int(suffix_index), row)
+            g = _checked_gradient(gradient, source[_key(row)], int(suffix_index), row,
+                                  error_log=replay_errors)
             linear = float(reference @ g / args.n_start)
             for background_index, b in enumerate(backgrounds):
                 update = adamw_update_direction(
@@ -244,6 +251,8 @@ def main(argv=None):
         print(f"optimizer_probe problem={row['problem_id']} path={row['path_id']}", flush=True)
     (out / "optimizer_probe.jsonl").write_text(
         "".join(json.dumps(row) + "\n" for row in report), encoding="utf-8")
+    (out / "replay_errors.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in replay_errors), encoding="utf-8")
     summary = {"n_prefixes": len(chosen_rows), "n_rows": len(report),
                "n_start": args.n_start, "backgrounds": len(backgrounds),
                "clip": clip, "actor_sha256": actor_sha,
@@ -251,7 +260,11 @@ def main(argv=None):
                "background_pool": "training-only t=0 full trajectories, sampled with replacement",
                "background_sources": background_sources,
                "label_scope": "fixed-actor counterfactual AdamW direction proxy; not historical update reconstruction or observed reward change",
-               "exported_direction": exported_direction}
+               "exported_direction": exported_direction,
+               "max_norm_relative_error": max((row["norm_relative_error"] or 0.)
+                                              for row in replay_errors),
+               "max_sketch_relative_error": max((row["sketch_relative_error"] or 0.)
+                                                for row in replay_errors)}
     (out / "optimizer_probe_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(json.dumps({**summary, "run_dir": str(out)}))
     return 0

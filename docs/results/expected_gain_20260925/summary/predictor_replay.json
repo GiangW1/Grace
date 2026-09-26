@@ -1,0 +1,12 @@
+{
+  "n_prefixes": 382,
+  "n_problems": 229,
+  "input_prefixes": 382,
+  "finished_input_prefixes": 0,
+  "dimension": 5898240,
+  "n_continuations": 6112,
+  "wall_seconds": 2170.1703743822873,
+  "max_norm_relative_error": 0.12792747733661275,
+  "max_sketch_relative_error": 0.08264870002847587,
+  "note": "exact frozen-actor ascent gradients; prefix means stored in FP64"
+}
