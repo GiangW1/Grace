@@ -137,6 +137,8 @@ Git Bash分别对 `run_minimal_gpu.sh`、`run_mechanism_gpu.sh`、`run_matched_c
 
 ## 需要服务器 GPU 再跑
 
+- 分层 q/v 基底与无参数多窗口池化：本机 `test_expected_gain_structured.py` 与 `test_expected_gain_experiment.py` 的 CPU 合成/回归测试已通过；冻结 actor 的真实 A100 特征提取及真实 replay 对照尚未运行。
+
 - U6：FP64 参考梯度 vs 分布式实现
 - U7：真实 FSDP AMP / DDP 下校正不被乘以卡数
 - vLLM 两阶段与单阶段 token 分布、prefix cache 下 RNG 隔离

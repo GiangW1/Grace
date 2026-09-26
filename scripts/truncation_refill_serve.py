@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import argparse
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 import math
 import os
@@ -44,6 +44,7 @@ class Arm:
     p_first: float = 1.0
     p_second: float = 1.0
     learned: bool = False
+    feature_batch_size: int | None = None
 
 
 @dataclass
@@ -180,6 +181,14 @@ class FrozenPredictor:
             self._condition.notify_all()
         self._worker.join()
 
+    def set_batch_size(self, size: int) -> None:
+        if size <= 0:
+            raise ValueError("feature batch size must be positive")
+        with self._condition:
+            if self._pending:
+                raise RuntimeError("cannot change feature batch size with pending decisions")
+            self.batch_size = size
+
     def decide(self, checkpoint: int, token_ids: list[int], prompt_len: int,
                problem_id: str) -> dict:
         if checkpoint not in self.models:
@@ -225,7 +234,7 @@ class FrozenPredictor:
         from grace_gc.backends.hf_actor import prefix_feature_bundle
 
         checkpoint = batch[0].checkpoint
-        started = perf_counter()
+        feature_started = perf_counter()
         bundle = prefix_feature_bundle(
             self.actor, [item.token_ids for item in batch],
             [item.prompt_len for item in batch],
@@ -233,8 +242,8 @@ class FrozenPredictor:
             self.pad_id, eos_id=self.eos_ids,
             feature_mode=self.feature_modes[checkpoint], batch_size=len(batch),
         )
-        feature_seconds = perf_counter() - started
-        started = perf_counter()
+        feature_seconds = perf_counter() - feature_started
+        prediction_started = perf_counter()
         model = self.models[checkpoint]
         output = model.forward_numpy(bundle["features"], bundle["cost_feat"])
         results = []
@@ -251,11 +260,11 @@ class FrozenPredictor:
             p = min(1.0, max(self.p_min, p))
             results.append({"p": float(p), "risk": risk, "cost": cost,
                             "f": output.f[i].tolist(), "feature_batch_size": len(batch)})
-        prediction_seconds = perf_counter() - started
+        prediction_seconds = perf_counter() - prediction_started
         for item, result in zip(batch, results):
             item.result = {**result, "feature_seconds": feature_seconds / len(batch),
                            "prediction_seconds": prediction_seconds / len(batch),
-                           "feature_queue_seconds": max(0.0, started - feature_seconds - item.submitted_at)}
+                           "feature_queue_seconds": max(0.0, feature_started - item.submitted_at)}
 
 
 def _stage(client, pending: PendingStart, *, limit: int, stage: int, plan: dict,
@@ -434,6 +443,11 @@ def run_trial(client, starts: list[dict], arm: Arm, plan: dict, *, capacity: int
     wall = perf_counter() - trial_started
     ordered = [results[i].record for i in range(len(starts))]
     requests = [row for i in range(len(starts)) for row in results[i].requests]
+    decisions = [decision for row in ordered for decision in row["decisions"]]
+    decision_latencies = sorted(float(row["decision_seconds"]) for row in decisions)
+    queue_latencies = sorted(float(row.get("feature_queue_seconds", 0.0)) for row in decisions)
+    observed_batch_sizes = [int(row["feature_batch_size"]) for row in decisions
+                            if "feature_batch_size" in row]
     settled = sorted(row["settled_offset_seconds"] for row in ordered)
     p90_index = max(math.ceil(0.9 * len(settled)) - 1, 0)
     summary = {
@@ -448,6 +462,26 @@ def run_trial(client, starts: list[dict], arm: Arm, plan: dict, *, capacity: int
         "n_decisions": sum(len(row["decisions"]) for row in ordered),
         "feature_seconds": sum(d["feature_seconds"] for row in ordered for d in row["decisions"]),
         "prediction_seconds": sum(d["prediction_seconds"] for row in ordered for d in row["decisions"]),
+        "decision_latency_mean_seconds": statistics.mean(decision_latencies) if decisions else 0.0,
+        "decision_latency_p95_seconds": (
+            decision_latencies[math.ceil(0.95 * len(decisions)) - 1] if decisions else 0.0
+        ),
+        "feature_queue_mean_seconds": statistics.mean(queue_latencies) if decisions else 0.0,
+        "feature_queue_p95_seconds": (
+            queue_latencies[math.ceil(0.95 * len(decisions)) - 1] if decisions else 0.0
+        ),
+        "observed_feature_batch_size_mean": (
+            statistics.mean(observed_batch_sizes) if observed_batch_sizes else 0.0
+        ),
+        "selection_sha256": sha256_mapping({"selected": [
+            [decision["selected"] for decision in row["decisions"]] for row in ordered
+        ]}),
+        "token_lengths_sha256": sha256_mapping({"lengths": [
+            row["generated_tokens"] for row in ordered
+        ]}),
+        "trajectories_sha256": sha256_mapping({"tokens": [
+            results[i].token_ids for i in range(len(starts))
+        ]}),
         "n_server_metric_samples": len(samples),
         "scope": "one frozen-actor vllm serve rollout; startup and predictor loading excluded",
     }
@@ -472,14 +506,38 @@ def _arms(names: list[str], first: int, second: int, p_single: float,
     return [catalog[name] for name in names]
 
 
-def summarize_trials(trials: list[dict]) -> dict:
+def compared_batch_arms(arms: list[Arm], batch_sizes: tuple[int, int] | None) -> list[Arm]:
+    if batch_sizes is None:
+        return arms
+    return [variant for arm in arms for variant in (
+        [replace(arm, name=f"{arm.name}_batch{size}", feature_batch_size=size)
+         for size in batch_sizes] if arm.learned else [arm]
+    )]
+
+
+def parse_batch_comparison(value: str | None) -> tuple[int, int] | None:
+    if value is None:
+        return None
+    try:
+        sizes = tuple(int(part.strip()) for part in value.split(","))
+    except ValueError as exc:
+        raise ValueError("--compare-feature-batches requires two positive integers") from exc
+    if len(sizes) != 2 or any(size <= 0 for size in sizes) or sizes[0] == sizes[1]:
+        raise ValueError("--compare-feature-batches requires two distinct positive integers")
+    return sizes
+
+
+def summarize_trials(trials: list[dict], *, batch_sizes: tuple[int, int] | None = None) -> dict:
     grouped = {}
     by_repeat = {}
     for row in trials:
         grouped.setdefault(row["arm"], []).append(row)
         by_repeat.setdefault(row["repeat"], {})[row["arm"]] = row
     metrics = ("wall_seconds", "generated_tokens", "tail_after_90_percent_seconds",
-               "feature_seconds", "prediction_seconds", "stopped", "hit_max")
+               "feature_seconds", "prediction_seconds", "stopped", "hit_max",
+               "decision_latency_mean_seconds", "decision_latency_p95_seconds",
+               "feature_queue_mean_seconds", "feature_queue_p95_seconds",
+               "observed_feature_batch_size_mean")
     aggregate = {}
     for name, rows in grouped.items():
         aggregate[name] = {"n_repeats": len(rows)}
@@ -491,6 +549,15 @@ def summarize_trials(trials: list[dict]) -> dict:
              ("single_barrier", "single_stream"), ("single_stream", "two_stream"),
              ("single_keep", "single_stream"), ("two_keep", "two_stream"),
              ("single_stream", "learned_single"), ("two_stream", "learned_two"))
+    if batch_sizes is not None:
+        pairs = tuple((left, right) for left, right in pairs
+                      if not left.startswith("learned_") and not right.startswith("learned_"))
+        pairs += tuple((baseline, f"{learned}_batch{size}")
+                       for baseline, learned in (("single_stream", "learned_single"),
+                                                 ("two_stream", "learned_two"))
+                       for size in batch_sizes)
+        pairs += tuple((f"{base}_batch{batch_sizes[0]}", f"{base}_batch{batch_sizes[1]}")
+                       for base in ("learned_single", "learned_two"))
     comparisons = []
     for repeat, row in sorted(by_repeat.items()):
         for left, right in pairs:
@@ -498,9 +565,22 @@ def summarize_trials(trials: list[dict]) -> dict:
                 a, b = row[left], row[right]
                 comparisons.append({"repeat": repeat, "left": left, "right": right,
                                     "wall_ratio_right_over_left": b["wall_seconds"] / a["wall_seconds"],
+                                    "wall_delta_seconds": b["wall_seconds"] - a["wall_seconds"],
                                     "token_ratio_right_over_left": (
                                         b["generated_tokens"] / a["generated_tokens"]
-                                        if a["generated_tokens"] else None)})
+                                        if a["generated_tokens"] else None),
+                                    "same_generated_tokens": (
+                                        a["generated_tokens"] == b["generated_tokens"]),
+                                    "same_token_lengths_by_start": (
+                                        a["token_lengths_sha256"] == b["token_lengths_sha256"]),
+                                    "same_trajectories_by_start": (
+                                        a["trajectories_sha256"] == b["trajectories_sha256"]),
+                                    "same_selection_by_start": (
+                                        a["selection_sha256"] == b["selection_sha256"]),
+                                    "decision_latency_p95_ratio_right_over_left": (
+                                        b["decision_latency_p95_seconds"] /
+                                        a["decision_latency_p95_seconds"]
+                                        if a["decision_latency_p95_seconds"] else None)})
     return {"by_arm": aggregate, "comparisons": comparisons}
 
 
@@ -541,7 +621,10 @@ def main(argv=None) -> int:
     parser.add_argument("--uniform-shrink", type=float, default=0.5)
     parser.add_argument("--feature-batch-size", type=int, default=4)
     parser.add_argument("--feature-batch-wait-ms", type=float, default=5.0)
+    parser.add_argument("--compare-feature-batches", default=None,
+                        help="paired learned-arm feature batch sizes, for example 1,4")
     args = parser.parse_args(argv)
+    batch_sizes = parse_batch_comparison(args.compare_feature_batches)
     if (not 0 < args.first < args.second < args.max_new_tokens or args.capacity <= 0
             or args.n_problems <= 0 or args.starts_per_problem <= 0 or args.repeats <= 0
             or args.feature_batch_size <= 0 or not math.isfinite(args.feature_batch_wait_ms)
@@ -571,6 +654,9 @@ def main(argv=None) -> int:
         calibration["sha256"] = sha256_file(args.calibration_records)
     arms = _arms(names, args.first, args.second, args.p_single,
                  args.p_two_first, args.p_two_second)
+    if batch_sizes is not None and not any(arm.learned for arm in arms):
+        raise ValueError("--compare-feature-batches requires a learned arm")
+    arms = compared_batch_arms(arms, batch_sizes)
     if any(arm.learned for arm in arms) and (not args.actor_checkpoint or not args.predictor_first):
         raise ValueError("learned arms require --actor-checkpoint and --predictor-first")
     if "learned_two" in names and not args.predictor_second:
@@ -653,6 +739,8 @@ def main(argv=None) -> int:
             run.append_jsonl("plans.jsonl", {"repeat": repeat, **plan})
             ordered = arms if repeat % 2 == 0 else list(reversed(arms))
             for arm in ordered:
+                if arm.feature_batch_size is not None:
+                    predictor.set_batch_size(arm.feature_batch_size)
                 salt = f"grace-trunc-{plan['seed']}-{arm.name}"
                 summary, rows, requests, samples = run_trial(
                     client, starts_payload, arm, plan, capacity=args.capacity,
@@ -662,7 +750,8 @@ def main(argv=None) -> int:
                 )
                 summary.update({"repeat": repeat, "trial_seed": plan["seed"],
                                 "cache_salt": salt, "p_first": arm.p_first,
-                                "p_second": arm.p_second, "learned": arm.learned})
+                                "p_second": arm.p_second, "learned": arm.learned,
+                                "feature_batch_size": arm.feature_batch_size})
                 summaries.append(summary)
                 run.append_jsonl("trials.jsonl", summary)
                 run.write_jsonl("records.jsonl", [
@@ -677,7 +766,8 @@ def main(argv=None) -> int:
                 print(summary, flush=True)
         run.write_json("summary.json", {"trials": summaries, "n_starts": len(starts_payload),
                                         "cost_match_calibration": calibration,
-                                        **summarize_trials(summaries)})
+                                        "compared_feature_batch_sizes": batch_sizes,
+                                        **summarize_trials(summaries, batch_sizes=batch_sizes)})
     finally:
         if predictor is not None:
             predictor.close()

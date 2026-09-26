@@ -108,7 +108,7 @@ class ExpectedGainExperimentTest(unittest.TestCase):
 
     def test_adamw_probe_restores_moments_groups_and_shared_clip_order(self):
         import torch
-        from grace_gc.audit.update_probe import adamw_update_direction
+        from grace_gc.audit.update_probe import adamw_update_direction, adamw_update_vector
         from grace_gc.core.layout import collect_lora_layout
         from grace_gc.trainer.state_io import optimizer_state
 
@@ -126,7 +126,12 @@ class ExpectedGainExperimentTest(unittest.TestCase):
         g, ref = np.array([3., 4., 0.]), np.array([1., -2., 3.])
         first = adamw_update_direction(actor, layout, snapshot, {}, g, ref, .5)
         again = adamw_update_direction(actor, layout, snapshot, {}, g, ref, .5)
+        vector, vector_stats = adamw_update_vector(actor, layout, snapshot, {}, g, .5)
+        vector_again, _ = adamw_update_vector(actor, layout, snapshot, {}, g, .5)
         self.assertEqual(first, again)
+        np.testing.assert_array_equal(vector, vector_again)
+        self.assertAlmostEqual(float(ref @ vector), first["reference_dot_delta"])
+        self.assertEqual(vector_stats["clip_triggered"], first["clip_triggered"])
         for key, state in original["state"].items():
             for name, value in state.items():
                 np.testing.assert_array_equal(snapshot["state"][key][name], value)
@@ -135,6 +140,7 @@ class ExpectedGainExperimentTest(unittest.TestCase):
         optimizer.step()
         delta = np.concatenate([(param.detach() - start).numpy()
                                 for param, start in zip(params, starts)])
+        np.testing.assert_allclose(vector, delta, rtol=0., atol=1e-8)
         self.assertAlmostEqual(first["reference_dot_delta"], float(delta @ ref), places=7)
         self.assertTrue(first["clip_triggered"])
 
