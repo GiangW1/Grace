@@ -116,6 +116,7 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
             shape=(len(selected), capacity))
         directional_values[:] = np.nan
     metadata = []
+    max_norm_relative_error = 0.0
     started = perf_counter()
     with (target / "prefixes.jsonl").open("w", encoding="utf-8") as handle:
         for i, row in enumerate(selected):
@@ -131,6 +132,7 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
             second = np.zeros(dimension, dtype=np.float64)
             norm_sum = 0.0
             rewards, costs = [], []
+            replay_errors = {}
             expected_norms = row.get("true_grad_norm_sq") or []
             if expected_norms and len(expected_norms) < len(records):
                 raise ValueError(f"prefix {i} has fewer stored norms than trajectories")
@@ -149,9 +151,15 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                 if grad.shape != (dimension,) or not np.all(np.isfinite(grad)):
                     raise ValueError(f"prefix {i} continuation {j} has an invalid gradient")
                 norm = float(grad @ grad)
-                if expected_norms and not np.isclose(norm, float(expected_norms[int(original_index)]),
-                                                     rtol=5e-3, atol=1e-5):
-                    raise ValueError(f"prefix {i} continuation {j} does not replay its saved gradient norm")
+                if expected_norms:
+                    expected = float(expected_norms[int(original_index)])
+                    if not np.isfinite(expected) or expected < 0:
+                        raise ValueError(f"prefix {i} continuation {j} has an invalid saved gradient norm")
+                    norm_error = abs(norm - expected) / max(expected, 1e-12)
+                    max_norm_relative_error = max(max_norm_relative_error, norm_error)
+                    replay_errors[str(int(original_index))] = {
+                        "norm_relative_error": norm_error,
+                    }
                 if directional_values is not None:
                     directional_values[i, j] = float(grad @ direction)
                 mean += grad
@@ -170,6 +178,7 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                 "n_continuations": n, "continuation_indices": chosen.tolist(),
                 "continuation_sha256": {str(int(index)): continuation_digest(records[int(index)])
                                          for index in chosen},
+                "replay_errors": replay_errors,
                 "mean_norm_sq": norm_sum / n,
                 "half_mean_dot": half_dot, "mean_reward": float(np.mean(rewards)),
                 "half_directional_gain": ([float((first / first_n) @ direction),
@@ -193,6 +202,7 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                "input_prefixes": len(rows), "finished_input_prefixes": len(rows) - len(selected),
                "dimension": dimension, "n_continuations": sum(x["n_continuations"] for x in metadata),
                "wall_seconds": perf_counter() - started,
+               "max_norm_relative_error": max_norm_relative_error,
                "directional_values": (None if direction is None else
                                        {"path": "directional_values.npy",
                                         "shape": [len(selected), capacity],

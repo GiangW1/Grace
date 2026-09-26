@@ -28,6 +28,7 @@ def main(argv=None):
     sources = []
     identity = None
     seen = set()
+    problem_ids = set()
     for path in args.replay:
         root = Path(path)
         provenance = json.loads((root / "replay_provenance.json").read_text(encoding="utf-8"))
@@ -41,10 +42,13 @@ def main(argv=None):
             raise ValueError(f"replay settings or frozen actor differ: {root}")
         rows, means = load_replay(root)
         for row in rows:
-            pid = str(row["problem_id"])
-            if pid in seen:
-                raise ValueError(f"problem {pid} appears in multiple replay inputs")
-        seen.update(str(row["problem_id"]) for row in rows)
+            key = (str(row["problem_id"]), str(row.get("path_id") or row.get("index")),
+                   int(row.get("t", -1)))
+            if key in seen:
+                raise ValueError(f"prefix {key} appears in multiple replay inputs")
+        seen.update((str(row["problem_id"]), str(row.get("path_id") or row.get("index")),
+                     int(row.get("t", -1))) for row in rows)
+        problem_ids.update(str(row["problem_id"]) for row in rows)
         sources.append((root, rows, means))
     total = sum(len(rows) for _, rows, _ in sources)
     dim = int(identity["layout_dim"])
@@ -90,7 +94,7 @@ def main(argv=None):
     (out / "replay_provenance.json").write_text(
         json.dumps(provenance, indent=2, ensure_ascii=False), encoding="utf-8")
     (out / "replay_summary.json").write_text(
-        json.dumps({"n_prefixes": total, "n_problems": len(seen), "dimension": dim,
+        json.dumps({"n_prefixes": total, "n_problems": len(problem_ids), "dimension": dim,
                     "merged_sources": len(sources),
                     "directional_values": (None if not keep_scalars else
                                             {"path": "directional_values.npy",
@@ -102,7 +106,7 @@ def main(argv=None):
             json.dumps({"direction_sha256": identity["direction_sha256"],
                         "prefix_keys_sha256": prefix_keys_sha256(merged_rows),
                         "shape": [total, scalar_capacity]}, indent=2), encoding="utf-8")
-    print(json.dumps({"run_dir": str(out), "n_prefixes": total, "n_problems": len(seen)}))
+    print(json.dumps({"run_dir": str(out), "n_prefixes": total, "n_problems": len(problem_ids)}))
     return 0
 
 

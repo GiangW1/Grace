@@ -90,7 +90,7 @@ def main(argv=None):
     from grace_gc.data.tokenize import load_hf_tokenizer
     from grace_gc.trainer.checkpoint import load_checkpoint
     from grace_gc.trainer.state_io import check_snapshot_identity, load_numpy_module_state
-    from grace_gc.versions import sha256_array, sha256_named
+    from grace_gc.versions import sha256_array, sha256_file, sha256_named
 
     payload = load_checkpoint(args.checkpoint)
     cfg = replay_config(payload, args.model_path, args.config)
