@@ -1,0 +1,9 @@
+{
+  "replay_dir": "/SSD/00/wja/GRACE/runs/expected-gain-fixed-36ae00c/predictor-replay",
+  "reference_dir": "/SSD/00/wja/GRACE/runs/expected-gain-fixed-36ae00c/reference-replay",
+  "reference_check_dir": "/SSD/00/wja/GRACE/runs/expected-gain-fixed-36ae00c/reference-check-replay",
+  "feature_dir": "/SSD/00/wja/GRACE/runs/expected-gain-structured-pr7-007b762/multiwindow-features",
+  "run_dir": "/SSD/00/wja/GRACE/runs/expected-gain-structured-pr7-007b762/structured-gain",
+  "split_manifest": "/SSD/00/wja/GRACE/runs/expected-gain-data-fixed-36ae00c/split.json",
+  "seed": 17
+}
