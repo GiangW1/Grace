@@ -59,8 +59,12 @@ def validate_config(cfg: dict[str, Any]) -> dict[str, Any]:
         raise ValueError(f"n_start must be positive, got {n_start}")
     decision = int(cfg.get("decision_tokens", 16))
     max_new = int(cfg.get("max_new_tokens", 32))
-    if decision <= 0 or max_new <= 0:
-        raise ValueError("decision_tokens and max_new_tokens must be positive")
+    if decision < 0 or max_new <= 0:
+        raise ValueError("decision_tokens must be nonnegative and max_new_tokens must be positive")
+    if decision == 0:
+        grid = (cfg.get("audit") or {}).get("decision_grid") or []
+        if not any(int(value) == 0 for value in grid):
+            raise ValueError("decision_tokens=0 is only valid for an audit decision_grid containing 0")
     if decision > max_new:
         raise ValueError(f"decision_tokens {decision} exceeds max_new_tokens {max_new}")
     fw_steps = int((cfg.get("format_warmup") or {}).get("steps", 0) or 0)
