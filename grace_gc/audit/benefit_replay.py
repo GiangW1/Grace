@@ -8,6 +8,7 @@ from pathlib import Path
 from time import perf_counter
 
 import numpy as np
+from grace_gc.versions import sha256_array
 
 
 def audit_file(path):
@@ -19,6 +20,16 @@ def continuation_digest(record):
     content = {key: record.get(key) for key in
                ("token_ids", "prompt_len", "reward", "baseline", "generated_suffix_tokens")}
     return hashlib.sha256(json.dumps(content, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def prefix_keys_sha256(rows):
+    """Hash replay row identity and order for scalar sidecar alignment checks."""
+    keys = [{"problem_id": str(row["problem_id"]),
+             "path_id": str(row.get("path_id") or row.get("index") or i),
+             "t": int(row["t"])}
+            for i, row in enumerate(rows)]
+    payload = json.dumps(keys, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(payload).hexdigest()
 
 
 def replay_config(payload, model_path, config_paths=(), bundles=None):
@@ -97,14 +108,21 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                  prompt_feature_fn=None, reference_direction=None) -> dict:
     """Stream exact G labels, storing one FP64 mean per live prefix.
 
+    When ``reference_direction`` is supplied, also store the scalar dot
+    product for each sampled continuation so later n-grid stability checks do
+    not need to replay the model.
+
     `grad_fn` receives (token_ids, prompt_len, reward, baseline). This small
     seam also permits a CPU test of the replay bookkeeping without a model.
     """
     if dimension <= 0 or (max_continuations is not None and max_continuations <= 0):
         raise ValueError("dimension and max_continuations must be positive")
     direction = None if reference_direction is None else np.asarray(reference_direction, dtype=np.float64)
-    if direction is not None and direction.shape != (dimension,):
-        raise ValueError("reference direction and full gradient layout differ")
+    if direction is not None:
+        if direction.shape != (dimension,):
+            raise ValueError("reference direction and full gradient layout differ")
+        if not np.all(np.isfinite(direction)):
+            raise ValueError("reference direction must be finite")
     rows = list(rows)
     selected = [row for row in rows if not bool(row.get("finished", False))]
     if not selected:
@@ -113,6 +131,22 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
     target.mkdir(parents=True, exist_ok=True)
     matrix = np.lib.format.open_memmap(target / "mean_grads.npy", mode="w+",
                                        dtype=np.float64, shape=(len(selected), dimension))
+    directional_values = None
+    if direction is not None:
+        # Keep the per-continuation scalar only.  This is tiny compared with
+        # the full gradients and lets the offline audit check n=16/64/256
+        # without replaying the model a second time.
+        capacities = [min(len(row.get("continuation_records") or []),
+                           max_continuations if max_continuations is not None else
+                           len(row.get("continuation_records") or []))
+                      for row in selected]
+        if any(capacity <= 0 for capacity in capacities):
+            raise ValueError("directional replay needs at least one continuation per prefix")
+        capacity = max(capacities)
+        directional_values = np.lib.format.open_memmap(
+            target / "directional_values.npy", mode="w+", dtype=np.float64,
+            shape=(len(selected), capacity))
+        directional_values[:] = np.nan
     metadata = []
     max_norm_error = 0.0
     max_sketch_error = 0.0
@@ -159,6 +193,8 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                     "norm_relative_error": norm_error,
                     "sketch_relative_error": sketch_error,
                 }
+                if directional_values is not None:
+                    directional_values[i, j] = float(grad @ direction)
                 mean += grad
                 (first if j < n // 2 else second)[:] += grad
                 norm_sum += norm
@@ -192,12 +228,25 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
             matrix.flush()
             print(f"replay={i + 1}/{len(selected)} problem={info['problem_id']}", flush=True)
     del matrix
+    if directional_values is not None:
+        directional_values.flush()
+        del directional_values
     summary = {"n_prefixes": len(selected), "n_problems": len({x["problem_id"] for x in metadata}),
                "input_prefixes": len(rows), "finished_input_prefixes": len(rows) - len(selected),
                "dimension": dimension, "n_continuations": sum(x["n_continuations"] for x in metadata),
                "wall_seconds": perf_counter() - started,
                "max_norm_relative_error": max_norm_error,
                "max_sketch_relative_error": max_sketch_error,
+               "directional_values": (None if direction is None else
+                                       {"path": "directional_values.npy",
+                                        "shape": [len(selected), capacity],
+                                        "direction_sha256": sha256_array(direction),
+                                        "prefix_keys_sha256": prefix_keys_sha256(metadata)}),
                "note": "exact frozen-actor ascent gradients; prefix means stored in FP64"}
+    if direction is not None:
+        (target / "directional_values_provenance.json").write_text(
+            json.dumps({"direction_sha256": sha256_array(direction),
+                        "prefix_keys_sha256": prefix_keys_sha256(metadata),
+                        "shape": [len(metadata), capacity]}, indent=2), encoding="utf-8")
     (target / "replay_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     return summary
