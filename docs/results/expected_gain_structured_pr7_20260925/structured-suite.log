@@ -1,0 +1,3 @@
+basis=global64 rank=64
+basis=layer_qv64 rank=64
+{"run_dir": "/SSD/00/wja/GRACE/runs/expected-gain-structured-pr7-007b762/structured-gain", "selected": {"basis": "global64", "requested_rank": 64, "actual_rank": 64, "feature_set": "legacy", "model": "zero", "validation_full_residual_mean": 40073.35827670035, "diagnostic_full_residual_mean": 44187.510806501035, "diagnostic_zero_residual_mean": 44187.510806501035, "diagnostic_oracle_mean_energy_fraction": 0.12154748004949324, "diagnostic_gain_from_gradient": {"mse": 3264.920822112928, "mean_target": -7.019897966989757, "r2_vs_train_mean": -0.0029504228602765803, "sign_accuracy_nonzero": 0.0}}, "wall_seconds": 37.07237677834928}

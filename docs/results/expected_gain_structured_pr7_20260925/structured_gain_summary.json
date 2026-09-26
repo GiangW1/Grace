@@ -1,0 +1,2027 @@
+{
+  "split": {
+    "train": [
+      "075fc58d-f21c-4203-b36f-5058f6da9a59",
+      "0a3d137b-59d8-49d0-9601-04e2325a2f2e",
+      "0a8567c2-4ecf-4f3b-8b70-9dfdca23cddb",
+      "0a905be8-ed8d-490b-88b9-02d9eba27602",
+      "0ba04ed5-8af6-42b3-9d59-d4fab41ef124",
+      "0c10f964-ca0f-40d9-a12f-cd104b35a290",
+      "0e97a050-c63e-4d05-a5b8-f356709e580d",
+      "101db56d-a6bf-4bd0-aa19-f520ba80e31e",
+      "114f3961-d158-4b30-8ace-67fc24e86d20",
+      "11849c02-eaab-49fe-a3f3-98b41d844c76",
+      "11890018-5490-4e5f-991f-eac2ed279c8b",
+      "155382bb-298c-49c0-8eca-6fdf2a6a4cc1",
+      "170b7e42-578d-4820-918e-28ec99cf97e5",
+      "181430a1-90d5-4b7d-9435-708396ea2b66",
+      "19b02f3f-fed8-49d8-b4a8-c25ddc9d836c",
+      "1b5baa9a-b342-49f8-af3a-41299984f4d0",
+      "1b5f4642-ea10-44c3-991b-143d0fd14450",
+      "1dc3ed91-17cf-4c8a-be97-756b4b493bbd",
+      "1efb743e-948d-498b-9495-29cefb9cd482",
+      "1f59568a-4083-49fb-a3f4-ef185d73d78e",
+      "208c62ec-e721-443d-a2c3-a117bab13aa0",
+      "21eb7339-50c8-4401-8f46-c1360869713f",
+      "2517c249-d9de-47de-b421-8bb6c001635d",
+      "27f3492b-af8e-4662-9f45-c2cc37527ab8",
+      "28f1d742-8a03-4709-abdd-1bac6e78d8c3",
+      "2aa1383a-c619-4420-93e6-bc8da6e3a32b",
+      "2cde7f4d-92e2-4530-9bd5-8abb24d5bd94",
+      "2d00daf0-e917-4d57-856f-a45ef5750870",
+      "2d64afea-0fa4-44cb-b5d9-0fda6fe9df41",
+      "2d6ca7ea-7940-449a-9e8c-e2e5793bf93d",
+      "30271b4e-9dfd-40c6-b402-84c29e9d75d1",
+      "30bdd4f3-c482-4ab1-88dd-c40e99166ed3",
+      "338a4c07-6ff5-4710-b9a6-057bf9d4e32e",
+      "34212085-a68a-4af2-b2b0-2a1835d3f9a3",
+      "34c6aee1-b6c3-47f9-a563-1f19d0f01cd8",
+      "35025d98-2c2c-472a-a915-6e3e8c11ee1a",
+      "357ed618-1aaa-4685-9105-8d8e44a4578d",
+      "369e9d02-969e-428e-bb35-18389dad6bf9",
+      "384e85d2-ea77-4cf6-bbea-22701800c6c4",
+      "3935f7ba-e09c-4018-9183-b3938936ea09",
+      "3cf13c7d-98dd-42e2-a6ee-a1297b369146",
+      "3e1f2221-5eae-4d1a-9188-f7c2bffadcce",
+      "3f1b5215-5627-4ce6-b438-7d265f49e3f0",
+      "400f43b0-879f-4158-a88e-b8593004224d",
+      "40119b55-ec2b-453e-81f2-0c4805749c90",
+      "45ac3f7a-b24c-4aad-856c-008949eeff74",
+      "460ab09a-0128-470b-b720-83727efa5c69",
+      "476716ae-a874-45b2-8af7-dc2c7459a4a4",
+      "49e8d0ad-6a0f-452a-bd36-1686678d6f31",
+      "4c08396d-f7bd-46f3-a504-9ebf558568cd",
+      "4e5124aa-2ea7-48d4-9a85-cc846300a6d3",
+      "571af440-ad42-4da0-8be3-56376aed1006",
+      "58c52e09-9e94-47bd-90f8-290cb4941eb5",
+      "590bf669-fc0e-4cb3-9392-b3a03a053f2d",
+      "5ae3e585-ce15-4218-9b01-b4d730f1d050",
+      "5afcfc8e-bb33-4524-aeb5-2f9fa18afc2e",
+      "5d21ea89-7190-4dc8-b6c2-540ec349219b",
+      "5e1218b2-7aae-4050-bea1-2cec3735fe7b",
+      "5e360543-8c7c-40a6-880c-d8ffb0e80491",
+      "5f99878e-6bf0-45b4-8f5c-59d374c72384",
+      "612d1769-97d6-445e-b096-91fa463f8cc6",
+      "61a3e42f-9342-4ebc-a4e2-a8f82067197b",
+      "65ca41de-a7cb-47c5-97fd-fa1d7aa9096a",
+      "6d7e21a5-d81a-4a98-9f13-909b9aac28b0",
+      "6da9c333-52f6-4e29-b766-05e60e627a57",
+      "6e40545f-2b75-4ae0-90a0-cb31417175c9",
+      "6f32232d-bebe-4fa3-9dfc-e1129d1debae",
+      "6f368787-edea-4761-97ad-f168903e736f",
+      "6f411433-90bf-4a23-a9f0-f547d73e4f9d",
+      "70d9fcbe-2223-46ec-9764-42d915ee7883",
+      "731ed9fe-a914-41e7-ac18-a3b280fe304f",
+      "739be673-f088-4feb-8db4-bd2286ac8203",
+      "73bc6c5e-3bfa-4ca3-85a9-bcbcf4fe6ca2",
+      "747f3da0-3ba9-472a-9b7d-b1b3562d71bc",
+      "75c7e49a-120f-47e8-8077-eea6f881fd64",
+      "75f18e07-033a-4434-bd5f-e1fe955cb9fa",
+      "7693b48a-01b7-499b-9859-eea95fb56fdb",
+      "769b8648-0af5-4dbf-b82b-7a9e8e52b06b",
+      "7a05a514-d6ee-4ad3-8b75-fb48df87b44b",
+      "7ab6f6ce-bc3d-433b-b96e-5a406b7dae7b",
+      "7b766156-fbe4-46ee-903b-8dce4378dd74",
+      "7b94d9ae-87a7-4c0d-99fc-0edea5fb4b86",
+      "8268468a-b6b2-4df2-9d56-e1a020f6dfe7",
+      "832e3045-1b57-4698-aee1-d2707ca4a327",
+      "8579c852-602f-41a1-9026-c12f9d3913d9",
+      "85fa0b97-ff60-42a3-bb4c-d14fb021b585",
+      "89c3c6f0-d7f7-4381-b0e6-075c1c8f7906",
+      "89e6d07a-b92d-4dfa-b24e-80a231d397ff",
+      "8bf372f7-b87d-401c-9757-5016dc5c8fc5",
+      "8e23387c-ee16-4d68-ae84-abdea54060b1",
+      "8e9418ab-65f7-4a45-894d-1f15669a567a",
+      "8ec5b0fa-b743-4cac-89f2-b77655e3b9d9",
+      "90d99eb4-75aa-4495-8975-84e5ae1a8907",
+      "938be778-f847-477b-af49-72655f1c1173",
+      "94a66366-e8db-4541-a175-21193e0be14d",
+      "96afdf85-dfc8-4d1f-9402-8e777bdcefeb",
+      "9798cd89-553e-4840-80b5-8d08219433b1",
+      "97ba39c8-88e9-4b99-830e-2821e73a0420",
+      "9a1fa61a-dbb4-4676-bc35-1003c44ef973",
+      "a0044427-2691-4354-add8-d10e674acf3d",
+      "a3c44e92-c7ed-4f7f-ac1c-abdcb0eddfcd",
+      "a7db5043-6f23-4493-b3f6-890c61670bd6",
+      "a8fcb651-7f7f-4896-ab02-c91732f1c637",
+      "a936380f-cb50-4c0a-bf10-ee9fe441c878",
+      "add62b66-44a0-4a7b-b9fc-eccae2affc8d",
+      "affe547e-e5c7-413f-b10e-0a23f925e02b",
+      "b2c49136-11ed-442a-9201-db28b66ffdc8",
+      "b4c88dfe-6725-4041-864e-dd54463b7dce",
+      "b5eea887-271a-4c34-b9b9-c970ac1a9915",
+      "b68c1d27-b97c-4316-bc99-601329fe4525",
+      "b7773457-fe92-4ffe-a94e-857f65c21ede",
+      "ba165057-0239-4b18-bce5-e8f52d88eae8",
+      "ba8e8430-5336-41cb-9894-58b0497ae0a3",
+      "bea116ad-0450-41dc-ac3d-de0dd06baa49",
+      "c1525087-bfe3-4add-adc9-5cf55318f12b",
+      "c7858eb5-f707-4c71-9c60-27692db1fa05",
+      "c81b332f-be0f-47a2-9759-597d6e7ed7e0",
+      "c850d151-d85a-443c-93c5-8f2d44443ac3",
+      "cb72c3f4-0eca-47b0-9761-787d36721cc0",
+      "cb78152b-12d7-46e8-8764-5512cd60e937",
+      "cc3a8e5e-a558-4d22-b791-82869df20c1f",
+      "cd68b21f-1d2c-424d-b6b3-72ecdf7faf57",
+      "ce889fc5-9820-4022-a0a3-9ac7ae5c8452",
+      "d27c9bac-6b54-4d19-9d8b-1b7d7d713a11",
+      "d2d94be6-a510-46c0-89c5-466458a41822",
+      "d59c802c-72cd-4855-b49d-d164e39c5015",
+      "d7289987-a767-4481-b7e6-3d0ee92c09d7",
+      "d731ae4b-45f2-492a-8058-3dbda3e06f4a",
+      "d7fdca23-89b4-4dd7-a282-c68d3aa2fb4e",
+      "d8a589d5-173c-49e4-be23-6a04ea3bc7c1",
+      "d8de3166-1377-4ff0-a17c-1b74479cfe2b",
+      "dac883af-7bb5-4f23-b9eb-b628633f4605",
+      "e253dd34-1765-4f5a-8f8b-4df566978064",
+      "e2f421da-d2c8-46a1-bdae-b73254855479",
+      "e3c5f320-5604-49a8-8cfd-6f1e5611f1af",
+      "e440553b-1f00-43aa-8431-a7a4cd99b19e",
+      "e47cdc9f-da06-4512-a160-8fa59c21118e",
+      "e54dee00-5ff2-450c-bdba-00c47b146fc8",
+      "e62793ce-ec83-40c0-b915-742e3b477cd4",
+      "e80fe46b-492d-4e94-b00c-8aa3e25f64a0",
+      "e8c44c00-f194-44ed-bd04-623fd9d61e45",
+      "eafc01ad-ccec-466f-ab2b-cb39d538f3db",
+      "ece1f315-081c-4a30-8c11-70908139e5c1",
+      "ed5d5408-a58d-4c1f-96a6-2e2d82cfc152",
+      "ef4d9843-e72d-4dba-9b8b-68e88346e7e0",
+      "f15ec1b1-42c4-447f-9360-f07e483e0409",
+      "f22c9aa4-1fa9-44dc-9a58-9e88c477ba8a",
+      "f399477f-55ff-4801-9232-98464b12577e",
+      "f408cd19-2564-426b-bf38-ac719224bf14",
+      "f5b4cc11-1ceb-43e9-8bc5-ab84dd76157a",
+      "f65ed4c2-b5a3-42d1-b137-b07f0972c84a",
+      "f84df893-a442-4a26-add8-3e1e02d909fd",
+      "f93239e3-7261-4096-8ed3-d1117fc9de2d",
+      "fa90c7d1-1cc6-49a0-8c8b-13ddd50ab12f",
+      "faeec1ec-5f5a-4023-bf3f-6eec78a8ec85",
+      "faf8b8dc-bf58-4531-9993-8710aefa2fb0",
+      "fbfc2f27-8e36-4535-a6fd-20822c50ab81",
+      "fc6013b7-1476-4225-8521-ffbd8295bdcb",
+      "fe0baaa6-9fe1-4df6-b185-babfd07017f0",
+      "fe57099a-df8b-4ab7-b444-584420d81afc"
+    ],
+    "validation": [
+      "01614808-71a8-43d2-909e-f53fa3e79efe",
+      "02cd07ee-2130-4ae1-90db-5bfbf5534cad",
+      "0540b0f1-64a5-405f-b747-52f34fb4ad27",
+      "06e20141-f9c2-426b-951b-6555fa890a3f",
+      "07e856a6-1edb-44f2-afec-ba56295cc2e1",
+      "107d3122-08ad-494a-ab57-cc3d39421445",
+      "110c4235-cd1d-4a71-b7d6-ba4fc4d1f8de",
+      "141d762f-c395-47d6-a8ed-73f2eebd503b",
+      "2004b719-fe23-4468-bec9-88537a9f3162",
+      "2c5d98c6-91c7-4299-812f-68e00c15398f",
+      "30fa89f5-c94a-4140-9c41-2f2082c096f0",
+      "3222d5d6-71cf-4b37-925b-d300f16add01",
+      "37c243d7-361c-46b6-8e19-9a0cde3d1b7a",
+      "3bdcd15d-0f5e-4e20-b0f8-8934a0713596",
+      "3e68e15e-951c-43e3-8ccc-2a661f6bf463",
+      "40eb801c-e9e2-462a-a737-9aedbe0913f2",
+      "441b11f5-a9ab-4c57-8187-960767b911c3",
+      "4859a3b1-2998-4070-add1-29e905ee0a28",
+      "57b570df-7ce8-4a8f-ad79-7ce03d129870",
+      "5f7ebb21-c56e-4849-bd70-cb5ad5780c45",
+      "6137f3cc-cd8e-43dd-9213-2e4c3784c96e",
+      "69142055-e8d3-4506-ae3b-ec632d9a1c7a",
+      "6a69a2de-d714-485f-8f31-7e3a599fac21",
+      "6c441912-b35f-4158-b5d0-c7ac7d6470c6",
+      "6fcd713b-7a91-4523-a018-34026c4bac88",
+      "758bcb14-f97d-4323-b686-0e765a21a8fc",
+      "7671e17d-57ae-4194-8bd5-4c7d83f1fa3a",
+      "7b8cec4e-9583-4b25-9e72-26ccad2f1091",
+      "8580e746-6fcc-4901-8563-4aade09090e1",
+      "89511d36-6fd2-4960-bfd9-4631f9127e65",
+      "938a0114-ebd7-4dd1-99f1-3056d4808d49",
+      "a84d8baa-d3df-4a80-9813-32ecbff0d44e",
+      "a98d6ab6-c393-4f26-982e-960f3d3a22bc",
+      "aa75364f-fcde-4d0a-80aa-fff075854f8c",
+      "b5ead702-7bd4-4e00-a72a-d305ac591892",
+      "bb631369-a7a1-4fa6-b060-78f2b226c23d",
+      "c0920ae8-a7dc-49d8-a853-b3f13ca2b6ee",
+      "c435e318-d08f-461e-aa66-8d606a91e789",
+      "c943c99b-d19e-40e0-ac5b-5c1dc46bc995",
+      "d3065cdf-715b-4694-a101-3b8430556d74",
+      "de2b78c8-f65d-403f-b06f-2db734a010c3",
+      "e45ffdc6-ced3-447e-b971-a2f5dfd277b4",
+      "e59f9abb-d67a-42c2-ab33-4d0c2baba006",
+      "e64a6860-cffd-4b4b-b4aa-7088c116773b",
+      "ecfc384e-7887-439d-be55-958f23e02987",
+      "ee6e753c-3f28-4068-a97b-98a28bb2a2fb",
+      "f346362b-79d3-4bf2-b225-18ac089ec9fa",
+      "fb53e76b-ad17-484f-b13e-d9231aae6803"
+    ],
+    "diagnostic": [
+      "0161be47-82d1-483e-82ab-96354d02ddb4",
+      "043816dc-3fc3-4b90-b646-49bdceb414ce",
+      "050d4cd0-3b7f-4afa-845c-0585ed7c0d98",
+      "07af18f7-a32e-4a85-a1aa-464d5222607f",
+      "16fbb61d-de67-4b1d-8343-86384409857e",
+      "2342df75-7478-4d36-ab22-18946e8d261e",
+      "24770512-fa3c-4959-ab23-159f9b8f67f3",
+      "269c1c44-9ccb-4948-805a-e2befa00e33b",
+      "28d9b609-23c7-46d2-a402-ff8b3c1e55f8",
+      "2e0a5a77-967e-4e64-b20f-1bb846e195c9",
+      "33b07191-12e8-47bf-8017-668f4dc9b275",
+      "3cee50e7-f055-4259-a662-728dd6f66772",
+      "408bc4ee-5f1f-4e69-9644-e005ad293056",
+      "41ae7683-cf9e-45ae-96e7-4afcc06872de",
+      "42505fdf-2e74-454e-9da2-141c5367dcaa",
+      "4adf92ad-f9f0-49d0-968c-575988345003",
+      "55b73431-b0c6-41e2-8ac7-e80376a6bae5",
+      "5fc4fbb4-7341-4fa7-b545-fa0aae6557e1",
+      "603847cd-e73d-4e66-8f5c-05606c017a3b",
+      "6c2e988d-7f11-4536-bac8-fd781c21eae1",
+      "71ece1c7-67ab-4932-8078-338d7d1ed7ce",
+      "73ef41bc-e9ea-4e1d-9b31-06c8e3785fea",
+      "76b6914d-2b6f-44e7-80a0-c50c4b0784fe",
+      "799fc097-a2a3-480c-8c6d-d2acd0767ad4",
+      "7fbfb5fc-4521-4de9-99cb-9dc6ff89d3e1",
+      "8340e9f9-c01d-473b-bac8-986b3545a7d4",
+      "84016ccc-2145-44a1-91d6-bb76f09764cc",
+      "953581c2-5fd6-4613-af7e-f777293a5758",
+      "99e31a56-26b6-4bdb-89d0-09882eb94c45",
+      "a468cf87-74aa-40ec-bda8-69584353af3b",
+      "a9def5d6-bef6-461f-9d03-e687d64a60d6",
+      "aa9f472d-f9aa-4f81-9ed4-398351243b6e",
+      "b02aa526-d149-4e0a-a685-400b77e2d891",
+      "b5917ecc-675e-407a-9f26-c913f066385f",
+      "bcdeeafc-1254-4802-96c1-b8a684a31614",
+      "be830149-294d-42df-a71a-d6852473d198",
+      "c144fddb-bbb9-4eef-a193-a16af39d32a8",
+      "c45c978d-2bb8-41a0-a624-10cb0ca9eb7a",
+      "c7ca6ebe-77b9-4f08-8dd4-24bd75d8bee4",
+      "c958796c-bcbc-4d06-bfee-875fb01332d2",
+      "d0cce8e5-0074-4ea4-99c2-22cb6e0bc87f",
+      "d6a5922a-76e1-4ad1-9581-f6c602bf8e4f",
+      "d8e2a608-7bba-4f86-85aa-f06699b02000",
+      "df123b2c-373f-4ed2-8955-e016bb9804ba",
+      "e4857c22-dcd7-4c3b-b406-bc7a4bb30368",
+      "f1cdb3c1-2050-4a5b-aed9-72e10d353034",
+      "f4b6437d-4f58-49af-858e-5d67e77f980c",
+      "faff4537-f93c-4d92-a501-b814af5957d2"
+    ]
+  },
+  "reference_check_cosine": 0.1592727063480412,
+  "per_layer_reference": {
+    "layer_0_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.005087683949738875,
+      "reference_check_cosine": 0.543766584409318
+    },
+    "layer_0_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.026802690772736205,
+      "reference_check_cosine": 0.008108974518593354
+    },
+    "layer_1_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.00048590991588841136,
+      "reference_check_cosine": 0.009064576380605928
+    },
+    "layer_1_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.002903556697939951,
+      "reference_check_cosine": 0.10690982260151524
+    },
+    "layer_2_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.0010808900346850564,
+      "reference_check_cosine": 0.13812880239456538
+    },
+    "layer_2_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.0047080216057120445,
+      "reference_check_cosine": 0.16397130265457033
+    },
+    "layer_3_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.0013231068192607782,
+      "reference_check_cosine": -0.017490304892993032
+    },
+    "layer_3_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.01210747818062589,
+      "reference_check_cosine": 0.16435805531583403
+    },
+    "layer_4_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.0005145375470501748,
+      "reference_check_cosine": 0.02243026801276287
+    },
+    "layer_4_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.0025831566390441085,
+      "reference_check_cosine": 0.18076802206107356
+    },
+    "layer_5_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.001023711345236462,
+      "reference_check_cosine": -0.060868656085191236
+    },
+    "layer_5_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.003597325508352811,
+      "reference_check_cosine": 0.057673303854110125
+    },
+    "layer_6_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.000791190759216461,
+      "reference_check_cosine": 0.05882457952683971
+    },
+    "layer_6_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.004653524747607334,
+      "reference_check_cosine": 0.03802076214452236
+    },
+    "layer_7_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.005488124132226113,
+      "reference_check_cosine": 0.23338286049458443
+    },
+    "layer_7_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.008236763170517521,
+      "reference_check_cosine": 0.16055882677308064
+    },
+    "layer_8_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.0028239748820288253,
+      "reference_check_cosine": -0.04185388784517058
+    },
+    "layer_8_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.006959962398235249,
+      "reference_check_cosine": 0.15258637898524316
+    },
+    "layer_9_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.0027944731015717354,
+      "reference_check_cosine": 0.1890018427986913
+    },
+    "layer_9_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.0073777945057686,
+      "reference_check_cosine": 0.14299912990477978
+    },
+    "layer_10_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.0032453021090027272,
+      "reference_check_cosine": 0.30348681440180725
+    },
+    "layer_10_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.013736339569609074,
+      "reference_check_cosine": 0.11025608187719296
+    },
+    "layer_11_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.003577082527156584,
+      "reference_check_cosine": 0.2352433365536764
+    },
+    "layer_11_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.015675727805758898,
+      "reference_check_cosine": 0.14424349137749182
+    },
+    "layer_12_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.006029287273997044,
+      "reference_check_cosine": 0.36646439246509305
+    },
+    "layer_12_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.018808894260038924,
+      "reference_check_cosine": 0.22864725541123468
+    },
+    "layer_13_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.00532888053065368,
+      "reference_check_cosine": 0.140154120601897
+    },
+    "layer_13_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.01463097218448532,
+      "reference_check_cosine": 0.14418368198553078
+    },
+    "layer_14_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.014299908226702832,
+      "reference_check_cosine": 0.20370201662242546
+    },
+    "layer_14_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.05001309110079684,
+      "reference_check_cosine": 0.20356765076668645
+    },
+    "layer_15_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.021534123299393998,
+      "reference_check_cosine": 0.2820681512266568
+    },
+    "layer_15_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.07115907247187413,
+      "reference_check_cosine": 0.12236851843426572
+    },
+    "layer_16_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.004012547236804286,
+      "reference_check_cosine": 0.12754035284974952
+    },
+    "layer_16_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.03050227558065068,
+      "reference_check_cosine": 0.06642492738768899
+    },
+    "layer_17_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.017084373140828068,
+      "reference_check_cosine": 0.22883639292800087
+    },
+    "layer_17_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.03829683857655694,
+      "reference_check_cosine": 0.22175000371682013
+    },
+    "layer_18_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.017320577365031203,
+      "reference_check_cosine": 0.24344839681853886
+    },
+    "layer_18_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.04594594722772217,
+      "reference_check_cosine": 0.14554786770318195
+    },
+    "layer_19_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.015814825256783318,
+      "reference_check_cosine": 0.2347620145505093
+    },
+    "layer_19_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.07660823786056034,
+      "reference_check_cosine": 0.20225806235979343
+    },
+    "layer_20_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.01899591225014362,
+      "reference_check_cosine": 0.17641649809605292
+    },
+    "layer_20_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.035733852325765356,
+      "reference_check_cosine": 0.15254880967112963
+    },
+    "layer_21_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.029695357644701346,
+      "reference_check_cosine": 0.20683080065409504
+    },
+    "layer_21_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.03608972741626828,
+      "reference_check_cosine": 0.08212982370763053
+    },
+    "layer_22_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.016894593289962373,
+      "reference_check_cosine": 0.30427414230890176
+    },
+    "layer_22_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.03688646277605915,
+      "reference_check_cosine": 0.23451166180104532
+    },
+    "layer_23_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.013268782080970262,
+      "reference_check_cosine": -0.01944250168915369
+    },
+    "layer_23_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.028103697672245475,
+      "reference_check_cosine": 0.19866058925205274
+    },
+    "layer_24_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.012253179160261123,
+      "reference_check_cosine": 0.060585470257387454
+    },
+    "layer_24_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.024604070980554636,
+      "reference_check_cosine": 0.12106283068383213
+    },
+    "layer_25_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.011053241342016759,
+      "reference_check_cosine": 0.07073997955706265
+    },
+    "layer_25_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.023136676980520823,
+      "reference_check_cosine": 0.14955640268040735
+    },
+    "layer_26_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.003434956926724709,
+      "reference_check_cosine": -0.08585907690125189
+    },
+    "layer_26_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.01254039835777076,
+      "reference_check_cosine": 0.14406932247659077
+    },
+    "layer_27_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.004827740250472984,
+      "reference_check_cosine": 0.0726267652718543
+    },
+    "layer_27_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.007625454890468896,
+      "reference_check_cosine": 0.12846434407154628
+    },
+    "layer_28_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.010373057844256982,
+      "reference_check_cosine": 0.014646889531730564
+    },
+    "layer_28_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.013128385693796759,
+      "reference_check_cosine": 0.1619161814917937
+    },
+    "layer_29_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.005841017414590875,
+      "reference_check_cosine": 0.3261425754947931
+    },
+    "layer_29_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.006978356351971842,
+      "reference_check_cosine": 0.06630144709191858
+    },
+    "layer_30_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.004095760170112842,
+      "reference_check_cosine": 0.08380894103534373
+    },
+    "layer_30_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.009141578243859598,
+      "reference_check_cosine": 0.14162641855322833
+    },
+    "layer_31_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.003932637935348914,
+      "reference_check_cosine": -0.08903637537759888
+    },
+    "layer_31_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.004708656488112405,
+      "reference_check_cosine": 0.025830298629493535
+    },
+    "layer_32_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.005419484153822146,
+      "reference_check_cosine": 0.0671108514626995
+    },
+    "layer_32_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.0038661743036408538,
+      "reference_check_cosine": 0.11685239421634051
+    },
+    "layer_33_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.004381470073569912,
+      "reference_check_cosine": 0.18116379540568553
+    },
+    "layer_33_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.004736304253067912,
+      "reference_check_cosine": 0.10812471921369977
+    },
+    "layer_34_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.004632327361876852,
+      "reference_check_cosine": 0.3948085965701526
+    },
+    "layer_34_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.007489885042275978,
+      "reference_check_cosine": 0.04576873932670054
+    },
+    "layer_35_q": {
+      "dimension": 106496,
+      "reference_energy_fraction": 0.0015960676435821464,
+      "reference_check_cosine": 0.23021159476955858
+    },
+    "layer_35_v": {
+      "dimension": 57344,
+      "reference_energy_fraction": 0.009566552363357583,
+      "reference_check_cosine": 0.11150153939838069
+    }
+  },
+  "block_reference": {
+    "depth_0_q": {
+      "dimension": 958464,
+      "reference_energy_fraction": 0.018619129385331137,
+      "reference_check_cosine": 0.2007630457382026
+    },
+    "depth_0_v": {
+      "dimension": 516096,
+      "reference_energy_fraction": 0.07255247972077106,
+      "reference_check_cosine": 0.08784372006269836
+    },
+    "depth_1_q": {
+      "dimension": 958464,
+      "reference_energy_fraction": 0.07790597744611083,
+      "reference_check_cosine": 0.23873676061481494
+    },
+    "depth_1_v": {
+      "dimension": 516096,
+      "reference_energy_fraction": 0.2602010060555392,
+      "reference_check_cosine": 0.15566794204282336
+    },
+    "depth_2_q": {
+      "dimension": 958464,
+      "reference_energy_fraction": 0.13873142531659452,
+      "reference_check_cosine": 0.17006299756069124
+    },
+    "depth_2_v": {
+      "dimension": 516096,
+      "reference_energy_fraction": 0.31964907159746686,
+      "reference_check_cosine": 0.16576793530898798
+    },
+    "depth_3_q": {
+      "dimension": 958464,
+      "reference_energy_fraction": 0.04509956284763359,
+      "reference_check_cosine": 0.12658672668674614
+    },
+    "depth_3_v": {
+      "dimension": 516096,
+      "reference_energy_fraction": 0.06724134763055181,
+      "reference_check_cosine": 0.10892289754721662
+    }
+  },
+  "basis_blocks": {
+    "global64": {
+      "global": {
+        "dimension": 5898240,
+        "actual_rank": 64,
+        "segments": [
+          [
+            0,
+            5898240
+          ]
+        ]
+      }
+    },
+    "layer_qv64": {
+      "depth_0_q": {
+        "dimension": 958464,
+        "actual_rank": 8,
+        "segments": [
+          [
+            0,
+            40960
+          ],
+          [
+            40960,
+            106496
+          ],
+          [
+            163840,
+            204800
+          ],
+          [
+            204800,
+            270336
+          ],
+          [
+            327680,
+            368640
+          ],
+          [
+            368640,
+            434176
+          ],
+          [
+            491520,
+            532480
+          ],
+          [
+            532480,
+            598016
+          ],
+          [
+            655360,
+            696320
+          ],
+          [
+            696320,
+            761856
+          ],
+          [
+            819200,
+            860160
+          ],
+          [
+            860160,
+            925696
+          ],
+          [
+            983040,
+            1024000
+          ],
+          [
+            1024000,
+            1089536
+          ],
+          [
+            1146880,
+            1187840
+          ],
+          [
+            1187840,
+            1253376
+          ],
+          [
+            1310720,
+            1351680
+          ],
+          [
+            1351680,
+            1417216
+          ]
+        ]
+      },
+      "depth_0_v": {
+        "dimension": 516096,
+        "actual_rank": 8,
+        "segments": [
+          [
+            106496,
+            147456
+          ],
+          [
+            147456,
+            163840
+          ],
+          [
+            270336,
+            311296
+          ],
+          [
+            311296,
+            327680
+          ],
+          [
+            434176,
+            475136
+          ],
+          [
+            475136,
+            491520
+          ],
+          [
+            598016,
+            638976
+          ],
+          [
+            638976,
+            655360
+          ],
+          [
+            761856,
+            802816
+          ],
+          [
+            802816,
+            819200
+          ],
+          [
+            925696,
+            966656
+          ],
+          [
+            966656,
+            983040
+          ],
+          [
+            1089536,
+            1130496
+          ],
+          [
+            1130496,
+            1146880
+          ],
+          [
+            1253376,
+            1294336
+          ],
+          [
+            1294336,
+            1310720
+          ],
+          [
+            1417216,
+            1458176
+          ],
+          [
+            1458176,
+            1474560
+          ]
+        ]
+      },
+      "depth_1_q": {
+        "dimension": 958464,
+        "actual_rank": 8,
+        "segments": [
+          [
+            1474560,
+            1515520
+          ],
+          [
+            1515520,
+            1581056
+          ],
+          [
+            1638400,
+            1679360
+          ],
+          [
+            1679360,
+            1744896
+          ],
+          [
+            1802240,
+            1843200
+          ],
+          [
+            1843200,
+            1908736
+          ],
+          [
+            1966080,
+            2007040
+          ],
+          [
+            2007040,
+            2072576
+          ],
+          [
+            2129920,
+            2170880
+          ],
+          [
+            2170880,
+            2236416
+          ],
+          [
+            2293760,
+            2334720
+          ],
+          [
+            2334720,
+            2400256
+          ],
+          [
+            2457600,
+            2498560
+          ],
+          [
+            2498560,
+            2564096
+          ],
+          [
+            2621440,
+            2662400
+          ],
+          [
+            2662400,
+            2727936
+          ],
+          [
+            2785280,
+            2826240
+          ],
+          [
+            2826240,
+            2891776
+          ]
+        ]
+      },
+      "depth_1_v": {
+        "dimension": 516096,
+        "actual_rank": 8,
+        "segments": [
+          [
+            1581056,
+            1622016
+          ],
+          [
+            1622016,
+            1638400
+          ],
+          [
+            1744896,
+            1785856
+          ],
+          [
+            1785856,
+            1802240
+          ],
+          [
+            1908736,
+            1949696
+          ],
+          [
+            1949696,
+            1966080
+          ],
+          [
+            2072576,
+            2113536
+          ],
+          [
+            2113536,
+            2129920
+          ],
+          [
+            2236416,
+            2277376
+          ],
+          [
+            2277376,
+            2293760
+          ],
+          [
+            2400256,
+            2441216
+          ],
+          [
+            2441216,
+            2457600
+          ],
+          [
+            2564096,
+            2605056
+          ],
+          [
+            2605056,
+            2621440
+          ],
+          [
+            2727936,
+            2768896
+          ],
+          [
+            2768896,
+            2785280
+          ],
+          [
+            2891776,
+            2932736
+          ],
+          [
+            2932736,
+            2949120
+          ]
+        ]
+      },
+      "depth_2_q": {
+        "dimension": 958464,
+        "actual_rank": 8,
+        "segments": [
+          [
+            2949120,
+            2990080
+          ],
+          [
+            2990080,
+            3055616
+          ],
+          [
+            3112960,
+            3153920
+          ],
+          [
+            3153920,
+            3219456
+          ],
+          [
+            3276800,
+            3317760
+          ],
+          [
+            3317760,
+            3383296
+          ],
+          [
+            3440640,
+            3481600
+          ],
+          [
+            3481600,
+            3547136
+          ],
+          [
+            3604480,
+            3645440
+          ],
+          [
+            3645440,
+            3710976
+          ],
+          [
+            3768320,
+            3809280
+          ],
+          [
+            3809280,
+            3874816
+          ],
+          [
+            3932160,
+            3973120
+          ],
+          [
+            3973120,
+            4038656
+          ],
+          [
+            4096000,
+            4136960
+          ],
+          [
+            4136960,
+            4202496
+          ],
+          [
+            4259840,
+            4300800
+          ],
+          [
+            4300800,
+            4366336
+          ]
+        ]
+      },
+      "depth_2_v": {
+        "dimension": 516096,
+        "actual_rank": 8,
+        "segments": [
+          [
+            3055616,
+            3096576
+          ],
+          [
+            3096576,
+            3112960
+          ],
+          [
+            3219456,
+            3260416
+          ],
+          [
+            3260416,
+            3276800
+          ],
+          [
+            3383296,
+            3424256
+          ],
+          [
+            3424256,
+            3440640
+          ],
+          [
+            3547136,
+            3588096
+          ],
+          [
+            3588096,
+            3604480
+          ],
+          [
+            3710976,
+            3751936
+          ],
+          [
+            3751936,
+            3768320
+          ],
+          [
+            3874816,
+            3915776
+          ],
+          [
+            3915776,
+            3932160
+          ],
+          [
+            4038656,
+            4079616
+          ],
+          [
+            4079616,
+            4096000
+          ],
+          [
+            4202496,
+            4243456
+          ],
+          [
+            4243456,
+            4259840
+          ],
+          [
+            4366336,
+            4407296
+          ],
+          [
+            4407296,
+            4423680
+          ]
+        ]
+      },
+      "depth_3_q": {
+        "dimension": 958464,
+        "actual_rank": 8,
+        "segments": [
+          [
+            4423680,
+            4464640
+          ],
+          [
+            4464640,
+            4530176
+          ],
+          [
+            4587520,
+            4628480
+          ],
+          [
+            4628480,
+            4694016
+          ],
+          [
+            4751360,
+            4792320
+          ],
+          [
+            4792320,
+            4857856
+          ],
+          [
+            4915200,
+            4956160
+          ],
+          [
+            4956160,
+            5021696
+          ],
+          [
+            5079040,
+            5120000
+          ],
+          [
+            5120000,
+            5185536
+          ],
+          [
+            5242880,
+            5283840
+          ],
+          [
+            5283840,
+            5349376
+          ],
+          [
+            5406720,
+            5447680
+          ],
+          [
+            5447680,
+            5513216
+          ],
+          [
+            5570560,
+            5611520
+          ],
+          [
+            5611520,
+            5677056
+          ],
+          [
+            5734400,
+            5775360
+          ],
+          [
+            5775360,
+            5840896
+          ]
+        ]
+      },
+      "depth_3_v": {
+        "dimension": 516096,
+        "actual_rank": 8,
+        "segments": [
+          [
+            4530176,
+            4571136
+          ],
+          [
+            4571136,
+            4587520
+          ],
+          [
+            4694016,
+            4734976
+          ],
+          [
+            4734976,
+            4751360
+          ],
+          [
+            4857856,
+            4898816
+          ],
+          [
+            4898816,
+            4915200
+          ],
+          [
+            5021696,
+            5062656
+          ],
+          [
+            5062656,
+            5079040
+          ],
+          [
+            5185536,
+            5226496
+          ],
+          [
+            5226496,
+            5242880
+          ],
+          [
+            5349376,
+            5390336
+          ],
+          [
+            5390336,
+            5406720
+          ],
+          [
+            5513216,
+            5554176
+          ],
+          [
+            5554176,
+            5570560
+          ],
+          [
+            5677056,
+            5718016
+          ],
+          [
+            5718016,
+            5734400
+          ],
+          [
+            5840896,
+            5881856
+          ],
+          [
+            5881856,
+            5898240
+          ]
+        ]
+      }
+    }
+  },
+  "basis_coefficients": "U_block = G_train_block.T @ basis_coefficients[block]",
+  "train_indices": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    12,
+    13,
+    14,
+    15,
+    18,
+    19,
+    22,
+    23,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    34,
+    35,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    49,
+    50,
+    55,
+    56,
+    58,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    68,
+    69,
+    72,
+    73,
+    74,
+    75,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    94,
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113,
+    114,
+    115,
+    118,
+    122,
+    124,
+    125,
+    130,
+    131,
+    132,
+    134,
+    135,
+    136,
+    140,
+    141,
+    142,
+    143,
+    145,
+    146,
+    147,
+    148,
+    153,
+    154,
+    155,
+    156,
+    157,
+    158,
+    164,
+    165,
+    166,
+    169,
+    170,
+    171,
+    176,
+    177,
+    178,
+    179,
+    180,
+    181,
+    182,
+    185,
+    186,
+    187,
+    188,
+    190,
+    191,
+    192,
+    193,
+    194,
+    195,
+    196,
+    198,
+    199,
+    200,
+    201,
+    203,
+    204,
+    205,
+    206,
+    207,
+    208,
+    209,
+    210,
+    211,
+    214,
+    215,
+    216,
+    217,
+    221,
+    225,
+    226,
+    227,
+    228,
+    229,
+    230,
+    236,
+    237,
+    238,
+    239,
+    240,
+    241,
+    242,
+    243,
+    244,
+    245,
+    246,
+    249,
+    250,
+    251,
+    252,
+    253,
+    254,
+    255,
+    258,
+    259,
+    260,
+    261,
+    262,
+    263,
+    264,
+    265,
+    266,
+    267,
+    268,
+    270,
+    271,
+    275,
+    276,
+    277,
+    278,
+    279,
+    280,
+    281,
+    286,
+    287,
+    288,
+    289,
+    294,
+    295,
+    296,
+    297,
+    308,
+    309,
+    310,
+    313,
+    314,
+    317,
+    318,
+    321,
+    322,
+    323,
+    328,
+    329,
+    330,
+    331,
+    332,
+    340,
+    341,
+    342,
+    344,
+    345,
+    346,
+    347,
+    348,
+    349,
+    350,
+    351,
+    352,
+    354,
+    357,
+    358,
+    364,
+    365,
+    366,
+    369,
+    370,
+    371,
+    372,
+    373,
+    375,
+    376,
+    377,
+    378,
+    379
+  ],
+  "scalar_rows": [
+    {
+      "feature_set": "legacy",
+      "model": "zero",
+      "validation_mse": 5088.257801495461,
+      "diagnostic": {
+        "mse": 3264.920822112928,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.0029504228602765803,
+        "sign_accuracy_nonzero": 0.0
+      }
+    },
+    {
+      "feature_set": "legacy",
+      "model": "constant",
+      "validation_mse": 5101.368329554027,
+      "diagnostic": {
+        "mse": 3255.3162625943396,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": 0.0,
+        "sign_accuracy_nonzero": 0.5522388059701493
+      }
+    },
+    {
+      "feature_set": "legacy",
+      "model": "ridge_l2_1",
+      "validation_mse": 5389.255770567611,
+      "diagnostic": {
+        "mse": 5435.871445323723,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.6698443428631968,
+        "sign_accuracy_nonzero": 0.43283582089552236
+      }
+    },
+    {
+      "feature_set": "legacy",
+      "model": "ridge_l2_10",
+      "validation_mse": 5386.445789702772,
+      "diagnostic": {
+        "mse": 5423.073290133454,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.6659128799398157,
+        "sign_accuracy_nonzero": 0.43283582089552236
+      }
+    },
+    {
+      "feature_set": "legacy",
+      "model": "ridge_l2_100",
+      "validation_mse": 5362.676612975703,
+      "diagnostic": {
+        "mse": 5306.21354028054,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.6300147550185271,
+        "sign_accuracy_nonzero": 0.43283582089552236
+      }
+    },
+    {
+      "feature_set": "legacy_plus_multiwindow",
+      "model": "zero",
+      "validation_mse": 5088.257801495461,
+      "diagnostic": {
+        "mse": 3264.920822112928,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.0029504228602765803,
+        "sign_accuracy_nonzero": 0.0
+      }
+    },
+    {
+      "feature_set": "legacy_plus_multiwindow",
+      "model": "constant",
+      "validation_mse": 5101.368329554027,
+      "diagnostic": {
+        "mse": 3255.3162625943396,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": 0.0,
+        "sign_accuracy_nonzero": 0.5522388059701493
+      }
+    },
+    {
+      "feature_set": "legacy_plus_multiwindow",
+      "model": "ridge_l2_1",
+      "validation_mse": 5336.4915105650925,
+      "diagnostic": {
+        "mse": 3895.432805930128,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.1966372824327811,
+        "sign_accuracy_nonzero": 0.5522388059701493
+      }
+    },
+    {
+      "feature_set": "legacy_plus_multiwindow",
+      "model": "ridge_l2_10",
+      "validation_mse": 5335.0430983651895,
+      "diagnostic": {
+        "mse": 3894.253646785771,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.19627505675354162,
+        "sign_accuracy_nonzero": 0.5522388059701493
+      }
+    },
+    {
+      "feature_set": "legacy_plus_multiwindow",
+      "model": "ridge_l2_100",
+      "validation_mse": 5320.936222086094,
+      "diagnostic": {
+        "mse": 3882.781703397699,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.19275099258813566,
+        "sign_accuracy_nonzero": 0.5522388059701493
+      }
+    }
+  ],
+  "basis_rows": [
+    {
+      "basis": "global64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy",
+      "model": "zero",
+      "validation_full_residual_mean": 40073.35827670035,
+      "diagnostic_full_residual_mean": 44187.510806501035,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.12154748004949324,
+      "diagnostic_gain_from_gradient": {
+        "mse": 3264.920822112928,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.0029504228602765803,
+        "sign_accuracy_nonzero": 0.0
+      }
+    },
+    {
+      "basis": "global64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy",
+      "model": "constant",
+      "validation_full_residual_mean": 40168.63065287511,
+      "diagnostic_full_residual_mean": 44244.38540281453,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.12154748004949324,
+      "diagnostic_gain_from_gradient": {
+        "mse": 3241.808680495649,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": 0.004149391644032163,
+        "sign_accuracy_nonzero": 0.5522388059701493
+      }
+    },
+    {
+      "basis": "global64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy",
+      "model": "ridge_l2_1",
+      "validation_full_residual_mean": 42682.50897575982,
+      "diagnostic_full_residual_mean": 50734.264893681895,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.12154748004949324,
+      "diagnostic_gain_from_gradient": {
+        "mse": 4862.425829841862,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.4936876904140579,
+        "sign_accuracy_nonzero": 0.417910447761194
+      }
+    },
+    {
+      "basis": "global64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy",
+      "model": "ridge_l2_10",
+      "validation_full_residual_mean": 42671.97490278289,
+      "diagnostic_full_residual_mean": 50704.60369604622,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.12154748004949324,
+      "diagnostic_gain_from_gradient": {
+        "mse": 4854.877189976018,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.491368825131264,
+        "sign_accuracy_nonzero": 0.417910447761194
+      }
+    },
+    {
+      "basis": "global64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy",
+      "model": "ridge_l2_100",
+      "validation_full_residual_mean": 42573.432363876025,
+      "diagnostic_full_residual_mean": 50423.39630699771,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.12154748004949324,
+      "diagnostic_gain_from_gradient": {
+        "mse": 4785.325911917,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.47000338090140326,
+        "sign_accuracy_nonzero": 0.43283582089552236
+      }
+    },
+    {
+      "basis": "global64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy_plus_multiwindow",
+      "model": "zero",
+      "validation_full_residual_mean": 40073.35827670035,
+      "diagnostic_full_residual_mean": 44187.510806501035,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.12154748004949324,
+      "diagnostic_gain_from_gradient": {
+        "mse": 3264.920822112928,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.0029504228602765803,
+        "sign_accuracy_nonzero": 0.0
+      }
+    },
+    {
+      "basis": "global64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy_plus_multiwindow",
+      "model": "constant",
+      "validation_full_residual_mean": 40168.63065287511,
+      "diagnostic_full_residual_mean": 44244.38540281453,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.12154748004949324,
+      "diagnostic_gain_from_gradient": {
+        "mse": 3241.808680495649,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": 0.004149391644032163,
+        "sign_accuracy_nonzero": 0.5522388059701493
+      }
+    },
+    {
+      "basis": "global64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy_plus_multiwindow",
+      "model": "ridge_l2_1",
+      "validation_full_residual_mean": 42021.86020817894,
+      "diagnostic_full_residual_mean": 47514.5307137954,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.12154748004949324,
+      "diagnostic_gain_from_gradient": {
+        "mse": 3931.1040065763864,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.20759511195495173,
+        "sign_accuracy_nonzero": 0.5074626865671642
+      }
+    },
+    {
+      "basis": "global64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy_plus_multiwindow",
+      "model": "ridge_l2_10",
+      "validation_full_residual_mean": 42017.93913639236,
+      "diagnostic_full_residual_mean": 47506.275668763294,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.12154748004949324,
+      "diagnostic_gain_from_gradient": {
+        "mse": 3930.0635925493707,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.20727550736262046,
+        "sign_accuracy_nonzero": 0.5074626865671642
+      }
+    },
+    {
+      "basis": "global64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy_plus_multiwindow",
+      "model": "ridge_l2_100",
+      "validation_full_residual_mean": 41979.580292850755,
+      "diagnostic_full_residual_mean": 47425.6844130441,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.12154748004949324,
+      "diagnostic_gain_from_gradient": {
+        "mse": 3919.9177085873557,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.20415879514679136,
+        "sign_accuracy_nonzero": 0.5074626865671642
+      }
+    },
+    {
+      "basis": "layer_qv64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy",
+      "model": "zero",
+      "validation_full_residual_mean": 40073.35827670035,
+      "diagnostic_full_residual_mean": 44187.510806501035,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.08031741429121628,
+      "diagnostic_gain_from_gradient": {
+        "mse": 3264.920822112928,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.0029504228602765803,
+        "sign_accuracy_nonzero": 0.0
+      }
+    },
+    {
+      "basis": "layer_qv64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy",
+      "model": "constant",
+      "validation_full_residual_mean": 40129.93656155171,
+      "diagnostic_full_residual_mean": 44216.50013776708,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.08031741429121628,
+      "diagnostic_gain_from_gradient": {
+        "mse": 3247.7259902357823,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": 0.002331654360522295,
+        "sign_accuracy_nonzero": 0.5522388059701493
+      }
+    },
+    {
+      "basis": "layer_qv64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy",
+      "model": "ridge_l2_1",
+      "validation_full_residual_mean": 41123.73953758363,
+      "diagnostic_full_residual_mean": 46761.94526639669,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.08031741429121628,
+      "diagnostic_gain_from_gradient": {
+        "mse": 3749.3987900532798,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.15177712013307687,
+        "sign_accuracy_nonzero": 0.417910447761194
+      }
+    },
+    {
+      "basis": "layer_qv64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy",
+      "model": "ridge_l2_10",
+      "validation_full_residual_mean": 41119.359768739596,
+      "diagnostic_full_residual_mean": 46749.29893611456,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.08031741429121628,
+      "diagnostic_gain_from_gradient": {
+        "mse": 3748.074456311911,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.15137029829625992,
+        "sign_accuracy_nonzero": 0.417910447761194
+      }
+    },
+    {
+      "basis": "layer_qv64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy",
+      "model": "ridge_l2_100",
+      "validation_full_residual_mean": 41078.64379694634,
+      "diagnostic_full_residual_mean": 46629.834176790486,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.08031741429121628,
+      "diagnostic_gain_from_gradient": {
+        "mse": 3735.553039136194,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.14752384647233252,
+        "sign_accuracy_nonzero": 0.40298507462686567
+      }
+    },
+    {
+      "basis": "layer_qv64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy_plus_multiwindow",
+      "model": "zero",
+      "validation_full_residual_mean": 40073.35827670035,
+      "diagnostic_full_residual_mean": 44187.510806501035,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.08031741429121628,
+      "diagnostic_gain_from_gradient": {
+        "mse": 3264.920822112928,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.0029504228602765803,
+        "sign_accuracy_nonzero": 0.0
+      }
+    },
+    {
+      "basis": "layer_qv64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy_plus_multiwindow",
+      "model": "constant",
+      "validation_full_residual_mean": 40129.93656155171,
+      "diagnostic_full_residual_mean": 44216.50013776708,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.08031741429121628,
+      "diagnostic_gain_from_gradient": {
+        "mse": 3247.7259902357823,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": 0.002331654360522295,
+        "sign_accuracy_nonzero": 0.5522388059701493
+      }
+    },
+    {
+      "basis": "layer_qv64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy_plus_multiwindow",
+      "model": "ridge_l2_1",
+      "validation_full_residual_mean": 40691.85185808624,
+      "diagnostic_full_residual_mean": 45280.51650972822,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.08031741429121628,
+      "diagnostic_gain_from_gradient": {
+        "mse": 3535.4102149137034,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.08604200935491946,
+        "sign_accuracy_nonzero": 0.5671641791044776
+      }
+    },
+    {
+      "basis": "layer_qv64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy_plus_multiwindow",
+      "model": "ridge_l2_10",
+      "validation_full_residual_mean": 40690.33308023808,
+      "diagnostic_full_residual_mean": 45276.9016583572,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.08031741429121628,
+      "diagnostic_gain_from_gradient": {
+        "mse": 3535.0163672384447,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.08592102336047591,
+        "sign_accuracy_nonzero": 0.5671641791044776
+      }
+    },
+    {
+      "basis": "layer_qv64",
+      "requested_rank": 64,
+      "actual_rank": 64,
+      "feature_set": "legacy_plus_multiwindow",
+      "model": "ridge_l2_100",
+      "validation_full_residual_mean": 40675.47310413789,
+      "diagnostic_full_residual_mean": 45241.65181989003,
+      "diagnostic_zero_residual_mean": 44187.510806501035,
+      "diagnostic_oracle_mean_energy_fraction": 0.08031741429121628,
+      "diagnostic_gain_from_gradient": {
+        "mse": 3531.175172745051,
+        "mean_target": -7.019897966989757,
+        "r2_vs_train_mean": -0.08474104753522904,
+        "sign_accuracy_nonzero": 0.5671641791044776
+      }
+    }
+  ],
+  "selected_by_validation_residual": {
+    "basis": "global64",
+    "requested_rank": 64,
+    "actual_rank": 64,
+    "feature_set": "legacy",
+    "model": "zero",
+    "validation_full_residual_mean": 40073.35827670035,
+    "diagnostic_full_residual_mean": 44187.510806501035,
+    "diagnostic_zero_residual_mean": 44187.510806501035,
+    "diagnostic_oracle_mean_energy_fraction": 0.12154748004949324,
+    "diagnostic_gain_from_gradient": {
+      "mse": 3264.920822112928,
+      "mean_target": -7.019897966989757,
+      "r2_vs_train_mean": -0.0029504228602765803,
+      "sign_accuracy_nonzero": 0.0
+    }
+  },
+  "wall_seconds": 37.07237677834928
+}
