@@ -12,7 +12,8 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from grace_gc.audit.benefit_replay import replay_means, replay_config, continuation_digest
+from grace_gc.audit.benefit_replay import (replay_means, replay_config,
+                                           continuation_digest, check_replayed_gradient)
 from grace_gc.audit.expected_gain import (fit_global_basis, full_space_residual,
                                           load_replay, problem_split, project_means,
                                           reference_gradient, start_experiment_run)
@@ -67,6 +68,26 @@ class ExpectedGainExperimentTest(unittest.TestCase):
         self.assertEqual(cfg["lora"]["compute_dtype"], "bfloat16")
         self.assertEqual(cfg["optim"]["grad_clip"], .03)
 
+    def test_replay_records_numerical_drift_without_rejecting_it(self):
+        row = {"true_grad_norm_sq": [1.]}
+        norm, norm_error, sketch_error = check_replayed_gradient(np.array([2.]), row, 0)
+        self.assertEqual((norm, norm_error, sketch_error), (4., 3., None))
+        row["projection"] = {"stored_dim": 1, "seed": 17}
+        row["grads"] = [np.zeros(1)]
+        _, _, sketch_error = check_replayed_gradient(np.array([2., 0.]), row, 0)
+        self.assertGreater(sketch_error, .1)
+        row.pop("projection")
+        row.pop("grads")
+        with tempfile.TemporaryDirectory() as tmp:
+            row.update({"problem_id": "p", "path_id": "p:0", "t": 0,
+                        "continuation_records": [{"token_ids": [1, 2], "prompt_len": 1,
+                                                  "reward": 1., "baseline": 0.}]})
+            summary = replay_means([row], lambda *_: np.array([2.]), 1, tmp)
+            info, _ = load_replay(tmp)
+            self.assertEqual(info[0]["replay_errors"]["0"]["norm_relative_error"], 3.)
+            self.assertEqual(summary["max_norm_relative_error"], 3.)
+            self.assertNotIn("replay_numerical_tolerance", summary)
+
     def test_allocation_uses_observed_cost_and_pointwise_probability(self):
         before = _fixed_probability([0., 1.], [1., 1.], 1e8, .2)[0]
         after = _fixed_probability([0., 1e12], [1., 1.], 1e8, .2)[0]
@@ -87,7 +108,7 @@ class ExpectedGainExperimentTest(unittest.TestCase):
 
     def test_adamw_probe_restores_moments_groups_and_shared_clip_order(self):
         import torch
-        from grace_gc.audit.update_probe import adamw_update_direction
+        from grace_gc.audit.update_probe import adamw_update_direction, adamw_update_vector
         from grace_gc.core.layout import collect_lora_layout
         from grace_gc.trainer.state_io import optimizer_state
 
@@ -105,7 +126,12 @@ class ExpectedGainExperimentTest(unittest.TestCase):
         g, ref = np.array([3., 4., 0.]), np.array([1., -2., 3.])
         first = adamw_update_direction(actor, layout, snapshot, {}, g, ref, .5)
         again = adamw_update_direction(actor, layout, snapshot, {}, g, ref, .5)
+        vector, vector_stats = adamw_update_vector(actor, layout, snapshot, {}, g, .5)
+        vector_again, _ = adamw_update_vector(actor, layout, snapshot, {}, g, .5)
         self.assertEqual(first, again)
+        np.testing.assert_array_equal(vector, vector_again)
+        self.assertAlmostEqual(float(ref @ vector), first["reference_dot_delta"])
+        self.assertEqual(vector_stats["clip_triggered"], first["clip_triggered"])
         for key, state in original["state"].items():
             for name, value in state.items():
                 np.testing.assert_array_equal(snapshot["state"][key][name], value)
@@ -114,6 +140,7 @@ class ExpectedGainExperimentTest(unittest.TestCase):
         optimizer.step()
         delta = np.concatenate([(param.detach() - start).numpy()
                                 for param, start in zip(params, starts)])
+        np.testing.assert_allclose(vector, delta, rtol=0., atol=1e-8)
         self.assertAlmostEqual(first["reference_dot_delta"], float(delta @ ref), places=7)
         self.assertTrue(first["clip_triggered"])
 

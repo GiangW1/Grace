@@ -7,6 +7,20 @@ import numpy as np
 POOL_LAST = 64
 
 
+def multiwindow_hidden_features(last_seq: np.ndarray, prompt_len: int,
+                                width: int = 128) -> np.ndarray:
+    """Four parameter-free context means to append to the existing prefix features."""
+    hidden = np.asarray(last_seq, dtype=np.float64)
+    if hidden.ndim != 2 or not 0 < prompt_len < len(hidden) or width <= 0:
+        raise ValueError("need a nonempty prompt and response with positive window width")
+    response = hidden[prompt_len:]
+    middle = response[width:-width]
+    parts = [hidden[:prompt_len].mean(axis=0), response[:width].mean(axis=0),
+             np.zeros(hidden.shape[1]) if len(middle) == 0 else middle.mean(axis=0),
+             response[-width:].mean(axis=0)]
+    return np.concatenate(parts)
+
+
 def pool_last_hidden(seq_row: np.ndarray, end: int, width: int = POOL_LAST) -> np.ndarray:
     """Paper φ(h): mean-pool the last 64 tokens of the prefix, not the whole prefix."""
     end = max(min(int(end), int(seq_row.shape[0])), 1)

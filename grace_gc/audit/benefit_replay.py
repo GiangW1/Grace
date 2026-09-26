@@ -8,6 +8,7 @@ from pathlib import Path
 from time import perf_counter
 
 import numpy as np
+from grace_gc.versions import sha256_array
 
 
 def audit_file(path):
@@ -19,6 +20,16 @@ def continuation_digest(record):
     content = {key: record.get(key) for key in
                ("token_ids", "prompt_len", "reward", "baseline", "generated_suffix_tokens")}
     return hashlib.sha256(json.dumps(content, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def prefix_keys_sha256(rows):
+    """Hash replay row identity and order for scalar sidecar alignment checks."""
+    keys = [{"problem_id": str(row["problem_id"]),
+             "path_id": str(row.get("path_id") or row.get("index") or i),
+             "t": int(row["t"])}
+            for i, row in enumerate(rows)]
+    payload = json.dumps(keys, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(payload).hexdigest()
 
 
 def replay_config(payload, model_path, config_paths=(), bundles=None):
@@ -57,7 +68,39 @@ def audit_rows(path: str | Path, decision_tokens: int | None = 512):
             row = json.loads(_without_large_grads(line))
             if decision_tokens is not None and int(row["t"]) != int(decision_tokens):
                 continue
+            projection = row.get("projection") or {}
+            if 0 < int(projection.get("stored_dim") or 0) <= 1024:
+                row["grads"] = np.asarray(json.loads(line)["grads"], dtype=np.float32)
             yield row
+
+
+def check_replayed_gradient(grad, row, index: int) -> tuple[float, float | None, float | None]:
+    """Measure BF16 replay drift against the saved norm and audit sketch."""
+    grad = np.asarray(grad, dtype=np.float64)
+    if grad.ndim != 1 or not np.all(np.isfinite(grad)):
+        raise ValueError(f"continuation {index} has an invalid gradient")
+    norm = float(grad @ grad)
+    if not np.isfinite(norm):
+        raise ValueError(f"continuation {index} has a non-finite gradient norm")
+    expected_norms = row.get("true_grad_norm_sq") or []
+    if not expected_norms:
+        return norm, None, None
+    expected = float(expected_norms[index])
+    if not np.isfinite(expected) or expected < 0:
+        raise ValueError(f"continuation {index} has an invalid saved gradient norm")
+    norm_error = abs(norm - expected) / max(expected, 1e-12)
+    sketches = row.get("grads")
+    if sketches is None:
+        return norm, norm_error, None
+    from grace_gc.audit.prefix_audit import jl_project
+
+    projection = row.get("projection") or {}
+    saved = np.asarray(sketches[index], dtype=np.float64)
+    actual = jl_project(grad, int(projection["stored_dim"]), int(projection["seed"]))
+    if saved.shape != actual.shape or not np.all(np.isfinite(saved)) or not np.all(np.isfinite(actual)):
+        raise ValueError(f"continuation {index} has an invalid saved gradient sketch")
+    sketch_error = float(np.linalg.norm(actual - saved) / max(np.linalg.norm(saved), 1e-12))
+    return norm, norm_error, sketch_error
 
 
 def replay_means(rows, grad_fn, dimension: int, output: str | Path,
@@ -65,14 +108,21 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                  prompt_feature_fn=None, reference_direction=None) -> dict:
     """Stream exact G labels, storing one FP64 mean per live prefix.
 
+    When ``reference_direction`` is supplied, also store the scalar dot
+    product for each sampled continuation so later n-grid stability checks do
+    not need to replay the model.
+
     `grad_fn` receives (token_ids, prompt_len, reward, baseline). This small
     seam also permits a CPU test of the replay bookkeeping without a model.
     """
     if dimension <= 0 or (max_continuations is not None and max_continuations <= 0):
         raise ValueError("dimension and max_continuations must be positive")
     direction = None if reference_direction is None else np.asarray(reference_direction, dtype=np.float64)
-    if direction is not None and direction.shape != (dimension,):
-        raise ValueError("reference direction and full gradient layout differ")
+    if direction is not None:
+        if direction.shape != (dimension,):
+            raise ValueError("reference direction and full gradient layout differ")
+        if not np.all(np.isfinite(direction)):
+            raise ValueError("reference direction must be finite")
     rows = list(rows)
     selected = [row for row in rows if not bool(row.get("finished", False))]
     if not selected:
@@ -81,7 +131,25 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
     target.mkdir(parents=True, exist_ok=True)
     matrix = np.lib.format.open_memmap(target / "mean_grads.npy", mode="w+",
                                        dtype=np.float64, shape=(len(selected), dimension))
+    directional_values = None
+    if direction is not None:
+        # Keep the per-continuation scalar only.  This is tiny compared with
+        # the full gradients and lets the offline audit check n=16/64/256
+        # without replaying the model a second time.
+        capacities = [min(len(row.get("continuation_records") or []),
+                           max_continuations if max_continuations is not None else
+                           len(row.get("continuation_records") or []))
+                      for row in selected]
+        if any(capacity <= 0 for capacity in capacities):
+            raise ValueError("directional replay needs at least one continuation per prefix")
+        capacity = max(capacities)
+        directional_values = np.lib.format.open_memmap(
+            target / "directional_values.npy", mode="w+", dtype=np.float64,
+            shape=(len(selected), capacity))
+        directional_values[:] = np.nan
     metadata = []
+    max_norm_error = 0.0
+    max_sketch_error = 0.0
     started = perf_counter()
     with (target / "prefixes.jsonl").open("w", encoding="utf-8") as handle:
         for i, row in enumerate(selected):
@@ -97,6 +165,7 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
             second = np.zeros(dimension, dtype=np.float64)
             norm_sum = 0.0
             rewards, costs = [], []
+            replay_errors = {}
             expected_norms = row.get("true_grad_norm_sq") or []
             if expected_norms and len(expected_norms) < len(records):
                 raise ValueError(f"prefix {i} has fewer stored norms than trajectories")
@@ -114,10 +183,18 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                         np.asarray(grad_fn(tokens, prompt_len, reward, baseline), dtype=np.float64))
                 if grad.shape != (dimension,) or not np.all(np.isfinite(grad)):
                     raise ValueError(f"prefix {i} continuation {j} has an invalid gradient")
-                norm = float(grad @ grad)
-                if expected_norms and not np.isclose(norm, float(expected_norms[int(original_index)]),
-                                                     rtol=5e-3, atol=1e-5):
-                    raise ValueError(f"prefix {i} continuation {j} does not replay its saved gradient norm")
+                try:
+                    norm, norm_error, sketch_error = check_replayed_gradient(grad, row, int(original_index))
+                except ValueError as exc:
+                    raise ValueError(f"prefix {i} continuation {j}: {exc}") from exc
+                max_norm_error = max(max_norm_error, norm_error or 0.0)
+                max_sketch_error = max(max_sketch_error, sketch_error or 0.0)
+                replay_errors[str(int(original_index))] = {
+                    "norm_relative_error": norm_error,
+                    "sketch_relative_error": sketch_error,
+                }
+                if directional_values is not None:
+                    directional_values[i, j] = float(grad @ direction)
                 mean += grad
                 (first if j < n // 2 else second)[:] += grad
                 norm_sum += norm
@@ -134,6 +211,7 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                 "n_continuations": n, "continuation_indices": chosen.tolist(),
                 "continuation_sha256": {str(int(index)): continuation_digest(records[int(index)])
                                          for index in chosen},
+                "replay_errors": replay_errors,
                 "mean_norm_sq": norm_sum / n,
                 "half_mean_dot": half_dot, "mean_reward": float(np.mean(rewards)),
                 "half_directional_gain": ([float((first / first_n) @ direction),
@@ -150,10 +228,25 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
             matrix.flush()
             print(f"replay={i + 1}/{len(selected)} problem={info['problem_id']}", flush=True)
     del matrix
+    if directional_values is not None:
+        directional_values.flush()
+        del directional_values
     summary = {"n_prefixes": len(selected), "n_problems": len({x["problem_id"] for x in metadata}),
                "input_prefixes": len(rows), "finished_input_prefixes": len(rows) - len(selected),
                "dimension": dimension, "n_continuations": sum(x["n_continuations"] for x in metadata),
                "wall_seconds": perf_counter() - started,
+               "max_norm_relative_error": max_norm_error,
+               "max_sketch_relative_error": max_sketch_error,
+               "directional_values": (None if direction is None else
+                                       {"path": "directional_values.npy",
+                                        "shape": [len(selected), capacity],
+                                        "direction_sha256": sha256_array(direction),
+                                        "prefix_keys_sha256": prefix_keys_sha256(metadata)}),
                "note": "exact frozen-actor ascent gradients; prefix means stored in FP64"}
+    if direction is not None:
+        (target / "directional_values_provenance.json").write_text(
+            json.dumps({"direction_sha256": sha256_array(direction),
+                        "prefix_keys_sha256": prefix_keys_sha256(metadata),
+                        "shape": [len(metadata), capacity]}, indent=2), encoding="utf-8")
     (target / "replay_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     return summary

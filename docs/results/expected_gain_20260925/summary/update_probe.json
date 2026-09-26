@@ -1,0 +1,13 @@
+{
+  "n_prefixes": 16,
+  "n_rows": 192,
+  "n_start": 16,
+  "backgrounds": 3,
+  "clip": 1.0,
+  "actor_sha256": "a4f00eda762b12237f5e909ad806804283d643229aea1c9651a9989bfccf7460",
+  "optimizer_execution": "CPU PyTorch using saved groups/moments and shared training clip path; not bitwise CUDA validation",
+  "background_pool": "training-only t=0 full trajectories, sampled with replacement",
+  "label_scope": "fixed-actor reference-gradient local proxy; not observed reward change",
+  "max_norm_relative_error": 0.006408059501899981,
+  "max_sketch_relative_error": 0.014056553527541087
+}

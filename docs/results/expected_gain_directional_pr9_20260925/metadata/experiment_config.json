@@ -1,0 +1,14 @@
+{
+  "replay_dir": "/SSD/00/wja/GRACE/runs/directional-pr9-945e0f1-retry4/predictor-replay-merged",
+  "direction": "reference",
+  "reference_dir": "/SSD/00/wja/GRACE/runs/directional-pr9-945e0f1-retry4/reference-replay",
+  "reference_check_dir": "/SSD/00/wja/GRACE/runs/directional-pr9-945e0f1-retry4/reference-check-replay",
+  "direction_file": null,
+  "directional_values": null,
+  "run_dir": "/SSD/00/wja/GRACE/runs/directional-pr9-945e0f1-retry4/audit",
+  "split_manifest": "/SSD/00/wja/GRACE/runs/expected-gain-fixed-36ae00c/global-suite/split.json",
+  "features": "legacy",
+  "models": "zero,constant,ridge",
+  "n_grid": "8,16",
+  "seed": 17
+}

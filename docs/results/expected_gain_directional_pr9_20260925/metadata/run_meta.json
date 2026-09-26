@@ -1,0 +1,7 @@
+{
+  "kind": "expected_gain_directional_audit",
+  "started": "2026-09-25T08:54:19.919641+00:00",
+  "run_dir": "/SSD/00/wja/GRACE/runs/directional-pr9-945e0f1-retry4/audit",
+  "requested_run_dir": "/SSD/00/wja/GRACE/runs/directional-pr9-945e0f1-retry4/audit",
+  "redirected": false
+}
