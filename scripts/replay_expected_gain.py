@@ -39,6 +39,8 @@ def main(argv=None) -> int:
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--skip-prompt-features", action="store_true",
                         help="omit the prompt-only forward baseline to save replay time")
+    parser.add_argument("--store-half-means", action="store_true",
+                        help="store independent A/B gradient means and second moments for stages A/B")
     parser.add_argument("--run-dir", required=True)
     args = parser.parse_args(argv)
 
@@ -142,7 +144,7 @@ def main(argv=None) -> int:
                           partial(_policy_grad_vec, engines, layout), layout.dim,
                           destination, args.max_continuations, args.seed,
                           None if args.skip_prompt_features else prompt_features,
-                          reference)
+                          reference, store_half_means=args.store_half_means)
     provenance = {"checkpoint": str(Path(args.checkpoint).resolve()),
                   "checkpoint_sha256": sha256_file(args.checkpoint),
                   "actor_sha256": sha256_named(named),
@@ -152,6 +154,7 @@ def main(argv=None) -> int:
                   "max_continuations": args.max_continuations,
                   "seed": args.seed,
                   "prompt_features_replayed": not args.skip_prompt_features,
+                  "half_means_stored": bool(args.store_half_means),
                   "reference_dir": args.reference_dir,
                    "direction_file": (None if args.direction_file is None else
                                        str(Path(args.direction_file).resolve())),

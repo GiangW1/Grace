@@ -1,0 +1,62 @@
+# Dynamic score-gradient experiments
+
+This experiment sequence isolates the next hypothesis without changing the
+online GRACE estimator.
+
+Stage A asks whether the exact prefix score gradient can represent the
+conditional gradient mean.  For each live prefix, the replay is randomly split
+into independent halves.  The coefficient of the prefix score-gradient basis
+is fitted on half A and evaluated on half B.  The report includes the
+per-prefix oracle, a zero predictor, the full-space second-moment residual,
+and the conditional-mean reconstruction error.  A positive result is a
+representation result only; it does not establish a learned predictor or a
+training gain.
+
+Stage B keeps the score-gradient basis exact and learns only its coefficients
+from prefix features.  Coefficients are still fitted on half A, while the
+feature model is split by problem and evaluated against half B.  The report
+selects models using the validation residual and leaves the diagnostic
+problems untouched.  This is the first coefficient-learning test for the
+dynamic form; the value-head cross term can be added after this stage has
+evidence.
+
+The GPU replay must save the independent halves:
+
+```bash
+python scripts/replay_expected_gain.py \
+  --bundles runs/phase12-predictor-audit \
+  --checkpoint "$CHECKPOINT" --model-path "$MODEL_PATH" \
+  --store-half-means --run-dir runs/dynamic-replay
+```
+
+Extract the score-gradient basis with the same frozen checkpoint and replay
+rows:
+
+```bash
+python scripts/extract_prefix_score_gradients.py \
+  --replay-dir runs/dynamic-replay \
+  --checkpoint "$CHECKPOINT" --model-path "$MODEL_PATH" \
+  --run-dir runs/dynamic-score-gradients
+```
+
+Run the CPU-only oracle and coefficient predictor.  The `--score-gradients`
+path is the `score_gradients.npy` file in the extraction run directory.
+
+```bash
+python scripts/expected_gain_dynamic_oracle.py \
+  --replay-dir runs/dynamic-replay \
+  --score-gradients runs/dynamic-score-gradients/score_gradients.npy \
+  --run-dir runs/dynamic-oracle
+
+python scripts/expected_gain_dynamic_predictor.py \
+  --replay-dir runs/dynamic-replay \
+  --score-gradients runs/dynamic-score-gradients/score_gradients.npy \
+  --features legacy --models zero,constant,ridge \
+  --run-dir runs/dynamic-predictor
+```
+
+The code records the score-basis hash, actor/checkpoint identity, replay row
+hash, split, and run configuration.  It rejects missing A/B sidecars, row or
+layout mismatches, non-finite arrays, and overlapping problem splits.  No
+minimum sample count or automatic go/no-go threshold is imposed; the observed
+residuals are the experiment result.

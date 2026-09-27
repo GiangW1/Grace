@@ -67,6 +67,24 @@ baselines under identical trajectories. The paired batch-size serve protocol
 from #5 should be run separately so systems efficiency is not conflated with
 predictor quality.
 
+## Dynamic score A/B implementation
+
+This branch now includes the next offline falsification sequence, with no new
+measurement claimed yet. `--store-half-means` in
+`scripts/replay_expected_gain.py` saves independent A/B gradient means and
+second moments. `scripts/extract_prefix_score_gradients.py` extracts the exact
+prefix score-gradient basis from the same frozen actor. Stage A
+(`scripts/expected_gain_dynamic_oracle.py`) measures the per-prefix
+representation ceiling, and Stage B
+(`scripts/expected_gain_dynamic_predictor.py`) learns only the basis
+coefficients from prefix features, using problem-disjoint validation and
+diagnostic rows. The full protocol and command examples are in
+[`EXPECTED_GAIN_DYNAMIC_SCORE_EXPERIMENT.md`](EXPECTED_GAIN_DYNAMIC_SCORE_EXPERIMENT.md).
+
+These scripts are deliberately offline: they do not change GRACE's online
+estimator, actor updates, scheduler, or claim boundary. A/B output is required
+before deciding whether to add the value-head cross term or an online run.
+
 ## Verification
 
 - `tests/test_phase12_experiments.py`: `12 passed, 1 skipped` in the local

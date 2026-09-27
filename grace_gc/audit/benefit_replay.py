@@ -105,7 +105,8 @@ def check_replayed_gradient(grad, row, index: int) -> tuple[float, float | None,
 
 def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                  max_continuations: int | None = 16, seed: int = 17,
-                 prompt_feature_fn=None, reference_direction=None) -> dict:
+                 prompt_feature_fn=None, reference_direction=None,
+                 store_half_means: bool = False) -> dict:
     """Stream exact G labels, storing one FP64 mean per live prefix.
 
     When ``reference_direction`` is supplied, also store the scalar dot
@@ -131,6 +132,20 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
     target.mkdir(parents=True, exist_ok=True)
     matrix = np.lib.format.open_memmap(target / "mean_grads.npy", mode="w+",
                                        dtype=np.float64, shape=(len(selected), dimension))
+    half_a_matrix = half_b_matrix = half_a_norms = half_b_norms = None
+    if store_half_means:
+        half_a_matrix = np.lib.format.open_memmap(
+            target / "half_mean_grads_a.npy", mode="w+", dtype=np.float64,
+            shape=(len(selected), dimension))
+        half_b_matrix = np.lib.format.open_memmap(
+            target / "half_mean_grads_b.npy", mode="w+", dtype=np.float64,
+            shape=(len(selected), dimension))
+        half_a_norms = np.lib.format.open_memmap(
+            target / "half_mean_norm_sq_a.npy", mode="w+", dtype=np.float64,
+            shape=(len(selected),))
+        half_b_norms = np.lib.format.open_memmap(
+            target / "half_mean_norm_sq_b.npy", mode="w+", dtype=np.float64,
+            shape=(len(selected),))
     directional_values = None
     if direction is not None:
         # Keep the per-continuation scalar only.  This is tiny compared with
@@ -164,6 +179,7 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
             first = np.zeros(dimension, dtype=np.float64)
             second = np.zeros(dimension, dtype=np.float64)
             norm_sum = 0.0
+            norms = []
             rewards, costs = [], []
             replay_errors = {}
             expected_norms = row.get("true_grad_norm_sq") or []
@@ -198,6 +214,7 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                 mean += grad
                 (first if j < n // 2 else second)[:] += grad
                 norm_sum += norm
+                norms.append(norm)
                 rewards.append(reward)
                 costs.append(float(rec.get("generated_suffix_tokens", 0)))
             mean /= n
@@ -205,6 +222,13 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
             first_n, second_n = n // 2, n - n // 2
             half_dot = (float((first / first_n) @ (second / second_n))
                         if first_n and second_n else None)
+            if store_half_means:
+                if not first_n or not second_n:
+                    raise ValueError("half means need at least two continuations")
+                half_a_matrix[i] = first / first_n
+                half_b_matrix[i] = second / second_n
+                half_a_norms[i] = float(np.mean(norms[:first_n]))
+                half_b_norms[i] = float(np.mean(norms[first_n:]))
             info = {
                 "index": i, "problem_id": str(row["problem_id"]),
                 "path_id": str(row.get("path_id") or i), "t": int(row["t"]),
@@ -214,6 +238,9 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                 "replay_errors": replay_errors,
                 "mean_norm_sq": norm_sum / n,
                 "half_mean_dot": half_dot, "mean_reward": float(np.mean(rewards)),
+                "half_counts": ([first_n, second_n] if store_half_means else None),
+                "half_mean_norm_sq": ([float(half_a_norms[i]), float(half_b_norms[i])]
+                                       if store_half_means else None),
                 "half_directional_gain": ([float((first / first_n) @ direction),
                                             float((second / second_n) @ direction)]
                                            if direction is not None and first_n and second_n else None),
@@ -228,6 +255,10 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
             matrix.flush()
             print(f"replay={i + 1}/{len(selected)} problem={info['problem_id']}", flush=True)
     del matrix
+    if store_half_means:
+        for array in (half_a_matrix, half_b_matrix, half_a_norms, half_b_norms):
+            array.flush()
+        del half_a_matrix, half_b_matrix, half_a_norms, half_b_norms
     if directional_values is not None:
         directional_values.flush()
         del directional_values
@@ -237,6 +268,7 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                "wall_seconds": perf_counter() - started,
                "max_norm_relative_error": max_norm_error,
                "max_sketch_relative_error": max_sketch_error,
+               "half_means": bool(store_half_means),
                "directional_values": (None if direction is None else
                                        {"path": "directional_values.npy",
                                         "shape": [len(selected), capacity],
