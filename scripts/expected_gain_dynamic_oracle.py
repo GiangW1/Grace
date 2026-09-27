@@ -21,7 +21,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from grace_gc.audit.dynamic_score import (coefficient_diagnostics, fit_prefix_coefficients,
-                                           load_dynamic_replay, q_strata,
+                                           difficulty_strata, load_dynamic_replay, q_strata,
                                            residual_metrics, split_roles)
 from grace_gc.audit.expected_gain import start_experiment_run
 
@@ -70,22 +70,27 @@ def _mechanism_report(rows, basis, target_b, metric_norm_b, metric, indices, coe
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--replay-dir", required=True)
-    parser.add_argument("--score-gradients", required=True,
-                        help="score_gradients.npy from extract_prefix_score_gradients.py")
+    parser.add_argument("--score-gradients", default=None,
+                        help="score_gradients.npy; trajectory replays can use their stored basis")
+    parser.add_argument("--gradient-target", choices=("suffix", "trajectory"), default="suffix",
+                        help="fit/evaluate suffix gradients or full G=(R-b)(g_h+g_s)")
     parser.add_argument("--metric-file", default=None,
                         help="optional fixed diagonal metric weights; defaults to replay metric")
     parser.add_argument("--run-dir", required=True)
     parser.add_argument("--split-manifest", default=None)
     parser.add_argument("--seed", type=int, default=17)
+    parser.add_argument("--difficulty-manifest", default=None,
+                        help="predeclared problem_id-to-easy/medium/hard JSON mapping")
     args = parser.parse_args(argv)
     started = perf_counter()
 
     rows, target_a, target_b, metric_norm_b, basis, metric, metric_name = load_dynamic_replay(
-        args.replay_dir, args.score_gradients, args.metric_file)
+        args.replay_dir, args.score_gradients, args.metric_file, args.gradient_target)
     split, roles = split_roles(rows, args.split_manifest, args.seed)
     coefficients = fit_prefix_coefficients(basis, target_a, metric)
     metrics = {}
     strata, strata_available = q_strata(rows)
+    difficulty, difficulty_available = difficulty_strata(rows, args.difficulty_manifest)
     for role, indices in roles.items():
         subset_basis = np.asarray(basis[indices], dtype=np.float64)
         subset_coefficients = coefficients[indices]
@@ -106,6 +111,14 @@ def main(argv=None) -> int:
                 for role_selected in [np.intersect1d(indices, selected)]
                 if len(role_selected)
             },
+            "difficulty_strata": {
+                name: {"n_prefixes": int(len(selected)),
+                       "mechanism": _mechanism_report(
+                           rows, basis, target_b, metric_norm_b, metric,
+                           np.intersect1d(indices, selected), coefficients)}
+                for name, selected in difficulty.items()
+                if len(np.intersect1d(indices, selected))
+            },
         }
     destination = start_experiment_run(args.run_dir, "expected_gain_dynamic_oracle", vars(args))
     (destination / "split.json").write_text(json.dumps(split, indent=2), encoding="utf-8")
@@ -113,6 +126,7 @@ def main(argv=None) -> int:
     result = {
         "stage": "A",
         "basis_kind": "prefix_score_gradient",
+        "gradient_target": args.gradient_target,
         "basis_shape": list(map(int, basis.shape)),
         "gradient_dimension": int(target_a.shape[1]),
         "coefficients": int(basis.shape[2]),
@@ -122,6 +136,10 @@ def main(argv=None) -> int:
         "basis_diagnostics": coefficient_diagnostics(basis),
         "q_stratification": {"available": bool(strata_available),
                               "definition": "half A observed reward mean: 0, (0,1), 1"},
+        "difficulty_stratification": {"available": bool(difficulty_available),
+                                       "manifest": (None if args.difficulty_manifest is None else
+                                                     str(Path(args.difficulty_manifest).resolve())),
+                                       "definition": "predeclared problem difficulty; no outcome labels used"},
         "split": split,
         "roles": metrics,
         "wall_seconds": perf_counter() - started,

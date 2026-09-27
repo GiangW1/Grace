@@ -67,6 +67,53 @@ def test_replay_can_store_independent_half_means():
         assert len(metadata["half_mean_advantage"]) == 2
 
 
+def test_replay_stores_full_trajectory_decomposition():
+    rows = [{"problem_id": "p", "path_id": "p:0", "t": 1,
+             "prompt_token_ids": [1], "prefix_token_ids": [1, 2],
+             "continuation_records": [
+                 {"token_ids": [1, 2, i + 3], "prompt_len": 1,
+                  "reward": float(i % 2), "baseline": .25,
+                  "generated_suffix_tokens": 1}
+                 for i in range(4)]}]
+    with tempfile.TemporaryDirectory() as tmp:
+        replay_means(
+            rows,
+            lambda tokens, *_: np.asarray([float(tokens[-1]), 0.]),
+            2, tmp, max_continuations=4, seed=7, store_half_means=True,
+            store_trajectory_decomposition=True,
+            prefix_grad_fn=lambda row: np.asarray([10., 20.]),
+        )
+        full_a = np.load(Path(tmp) / "half_mean_full_grads_a.npy")
+        full_b = np.load(Path(tmp) / "half_mean_full_grads_b.npy")
+        suffix_a = np.load(Path(tmp) / "half_mean_grads_a.npy")
+        suffix_b = np.load(Path(tmp) / "half_mean_grads_b.npy")
+        rows_out = [json.loads(line) for line in (Path(tmp) / "prefixes.jsonl").read_text().splitlines()]
+        assert np.load(Path(tmp) / "prefix_score_gradients.npy").shape == (1, 2)
+        assert not np.allclose(full_a, suffix_a)
+        assert not np.allclose(full_b, suffix_b)
+        assert rows_out[0]["trajectory_decomposition"]["target"] == "full_trajectory"
+
+
+def test_dynamic_loader_reads_full_trajectory_target_from_replay():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        replay, _score, split = _write_replay(root)
+        full_a = np.load(replay / "half_mean_grads_a.npy") + 1.
+        full_b = np.load(replay / "half_mean_grads_b.npy") + 1.
+        np.save(replay / "half_mean_full_grads_a.npy", full_a)
+        np.save(replay / "half_mean_full_grads_b.npy", full_b)
+        np.save(replay / "half_mean_full_norm_sq_b.npy", np.sum(full_b * full_b, axis=1))
+        np.save(replay / "prefix_score_gradients.npy", np.load(_score)[:, :, 0])
+        np.save(replay / "half_full_metric_norm_sq_b.npy", np.sum(full_b * full_b, axis=1))
+        rows, target_a, target_b, _norm, basis, _metric, _name = load_dynamic_replay(
+            replay, None, gradient_target="trajectory")
+        assert len(rows) == 6
+        np.testing.assert_allclose(target_a, full_a)
+        np.testing.assert_allclose(target_b, full_b)
+        assert basis.shape == (6, 3, 1)
+        del rows, target_a, target_b, _norm, basis, _metric, _name
+
+
 def test_dynamic_oracle_and_predictor_use_a_b_split_without_torch():
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -158,3 +205,15 @@ def test_calibrated_baseline_rewrites_each_continuation_and_checks_checkpoint():
         assert updated[0]["continuation_records"][0]["baseline"] == .75
         with pytest.raises(ValueError, match="checkpoint"):
             _load_problem_baselines(calibration, "checkpoint-b")
+
+
+def test_calibrated_baseline_metadata_catches_decision_mismatch():
+    with tempfile.TemporaryDirectory() as tmp:
+        calibration = Path(tmp) / "baseline.json"
+        calibration.write_text(json.dumps({
+            "checkpoint_sha256": "checkpoint-a",
+            "calibration": {"decision_tokens": 0},
+            "problems": {"p": .75},
+        }), encoding="utf-8")
+        with pytest.raises(ValueError, match="decision_tokens"):
+            _load_problem_baselines(calibration, "checkpoint-a", {"decision_tokens": 512})

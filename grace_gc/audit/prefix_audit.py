@@ -47,6 +47,10 @@ class PrefixBundle:
     baseline_samples: list[dict] | None = None
     prompt_token_ids: list[int] | None = None
     prefix_token_ids: list[int] | None = None
+    prefix_score_grad: np.ndarray | None = None
+    trajectory_grads: np.ndarray | None = None
+    trajectory_grad_norm_sq: list[float] | None = None
+    trajectory_coords: list[list[float]] | None = None
     continuation_records: list[dict] | None = None
     prefix_request_seed: int | None = None
     true_grad_norm_sq: list[float] | None = None
@@ -70,7 +74,8 @@ def bundle_to_dict(bundle: PrefixBundle) -> dict:
 
 def bundle_from_dict(raw: dict) -> PrefixBundle:
     values = {f.name: raw[f.name] for f in fields(PrefixBundle) if f.name in raw}
-    for key in ("grads", "rewards", "coords", "suffix_cost", "m_pred", "features", "cost_feat"):
+    for key in ("grads", "rewards", "coords", "suffix_cost", "m_pred", "features", "cost_feat",
+                "prefix_score_grad", "trajectory_grads"):
         if values.get(key) is not None:
             values[key] = np.asarray(values[key], dtype=np.float64)
     return PrefixBundle(**values)
@@ -270,6 +275,22 @@ def audit_bundles(
 ) -> dict:
     if not bundles:
         return {"n_bundles": 0, "note": "no prefixes"}
+    gradient_target = str(analysis.get("gradient_target", "suffix"))
+    if gradient_target not in {"suffix", "trajectory"}:
+        raise ValueError("gradient_target must be suffix or trajectory")
+    if gradient_target == "trajectory":
+        missing = [b.problem_id for b in bundles if b.trajectory_grads is None]
+        if missing:
+            raise ValueError("trajectory gradient target requested but bundles lack trajectory_grads")
+        # Keep the legacy suffix fields intact on disk while running every
+        # existing rho/LAG/ELF calculation on the paper's full trajectory G.
+        bundles = [replace(
+            b,
+            grads=np.asarray(b.trajectory_grads, dtype=np.float64),
+            true_grad_norm_sq=(b.trajectory_grad_norm_sq or
+                               np.sum(np.asarray(b.trajectory_grads, dtype=np.float64) ** 2, axis=1).tolist()),
+            true_grad_coords=b.trajectory_coords,
+        ) for b in bundles]
     grouped = _by_problem(bundles)
     var_r = []
     cond_var = []
@@ -369,7 +390,8 @@ def audit_bundles(
     path_ids = [getattr(b, "path_id", None) for b in bundles]
     have_paths = all(pid is not None for pid in path_ids) and len({(b.path_id, b.t) for b in bundles}) > len({b.path_id for b in bundles})
     result = {
-        "measurement_version": 2,
+        "measurement_version": 3,
+        "gradient_target": gradient_target,
         "n_bundles": len(bundles),
         "rho_a_all": float(np.nanmean(rho_a_vals)) if np.any(np.isfinite(rho_a_vals)) else float("nan"),
         "rho_l_all": float(np.nanmean(rho_l_vals)) if np.any(np.isfinite(rho_l_vals)) else float("nan"),

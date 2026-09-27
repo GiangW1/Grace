@@ -93,6 +93,18 @@ def _policy_grad_vec(engines, layout, token_ids, prompt_len: int, reward: float,
     return pack_grads(packed, layout) * (float(reward) - float(baseline))
 
 
+def _score_grad_vec(engines, layout, token_ids, prompt_len: int) -> np.ndarray:
+    """Unweighted prefix score gradient g_h for the full trajectory target."""
+    torch = __import__("torch")
+    lp = engines.logprob_one(token_ids, int(prompt_len))
+    grads = torch.autograd.grad(lp, engines.trainable_params(), allow_unused=True)
+    packed = []
+    for (name, param), gi in zip(engines.named_lora(), grads):
+        packed.append((name, np.zeros(tuple(param.shape), dtype=np.float64)
+                       if gi is None else gi.detach().float().cpu().numpy()))
+    return pack_grads(packed, layout)
+
+
 def _audit_method_spec(cfg: dict[str, Any] | None, payload=None):
     from grace_gc.trainer.methods import method_spec
 
@@ -164,6 +176,7 @@ def _bundles_from_engines(
     control_variate: bool = True,
     baseline_policy=None,
     store_features: bool = False,
+    store_trajectory_gradients: bool = False,
 ) -> list[PrefixBundle]:
     from grace_gc.core.rng import IsolatedRNG
 
@@ -320,9 +333,12 @@ def _bundles_from_engines(
                         suffix_seeds.append(_request_seeds(engines, 1)[0])
                 rewards = []
                 grads = []
+                trajectory_grads = []
                 costs = []
                 suffix_texts = []
                 continuation_records = []
+                prefix_score_grad = (_score_grad_vec(engines, layout, prefix, prompt_len)
+                                     if store_trajectory_gradients else None)
                 for full, cont_fr, suffix_seed in zip(fulls, finish_reasons, suffix_seeds):
                     if full is None:
                         raise ValueError("audit continuation produced an empty sequence")
@@ -355,17 +371,29 @@ def _bundles_from_engines(
                         "extracted": extract_answer(text), "truncated": truncated,
                         "natural_finish": traj_fin, "finish_reason": cont_fr,
                         "generated_suffix_tokens": gen_cont, "baseline": b_grad})
-                    grads.append(
-                        _policy_grad_vec(engines, layout, full, prompt_len, reward, b_grad)
-                    )
+                    suffix_grad = _policy_grad_vec(engines, layout, full, prompt_len, reward, b_grad)
+                    grads.append(suffix_grad)
+                    if prefix_score_grad is not None:
+                        trajectory_grads.append(suffix_grad + (reward - b_grad) * prefix_score_grad)
                     costs.append(float(gen_cont))
                 prefix_text = engines.decode(prefix[prompt_len:]) if engines.decode else ""
                 grads_arr = np.stack(grads, axis=0)
                 full_norm = np.sum(grads_arr * grads_arr, axis=1).tolist()
+                trajectory_arr = (None if prefix_score_grad is None else
+                                  np.stack(trajectory_grads, axis=0))
+                trajectory_norm = (None if trajectory_arr is None else
+                                   np.sum(trajectory_arr * trajectory_arr, axis=1).tolist())
                 coord_array = None if u is None else grads_arr @ u
                 full_coords = None if coord_array is None else coord_array.tolist()
+                trajectory_coords = (None if trajectory_arr is None or u is None else
+                                     (trajectory_arr @ u).tolist())
                 full_ortho = None if coord_array is None else float(np.mean(np.maximum(
                     np.asarray(full_norm) - np.sum((coord_array @ gram_inverse) * coord_array, axis=1), 0.0)))
+                trajectory_ortho = (None if trajectory_arr is None or u is None else
+                                    float(np.mean(np.maximum(
+                                        np.asarray(trajectory_norm) -
+                                        np.sum(((trajectory_arr @ u) @ gram_inverse) *
+                                               (trajectory_arr @ u), axis=1), 0.0))))
                 original_dim = int(grads_arr.shape[1])
                 m_pred = None if m_list[loc] is None else np.asarray(m_list[loc], dtype=np.float64)
                 if jl_dim and grads_arr.shape[1] > int(jl_dim):
@@ -393,9 +421,13 @@ def _bundles_from_engines(
                         gold=rec.answer, baseline=b_grad, baseline_samples=baseline_samples,
                         prompt_token_ids=[int(x) for x in prefix[:prompt_len]],
                         prefix_token_ids=[int(x) for x in prefix],
+                        prefix_score_grad=prefix_score_grad,
+                        trajectory_grads=trajectory_arr,
+                        trajectory_grad_norm_sq=trajectory_norm,
+                        trajectory_coords=trajectory_coords,
                         continuation_records=continuation_records, prefix_request_seed=prefix_seeds[idx],
                         true_grad_norm_sq=full_norm, true_grad_coords=full_coords,
-                        full_orthogonal_energy=full_ortho,
+                        full_orthogonal_energy=(trajectory_ortho if trajectory_ortho is not None else full_ortho),
                         basis_gram=None if gram is None else gram.tolist(),
                         effective_coords=None if effective_f_list[loc] is None else effective_f_list[loc].tolist(),
                         control_variate_enabled=control_variate,
@@ -506,6 +538,7 @@ def generate_bundles_tiny(
     cfg: dict[str, Any] | None = None,
     actor=None,
     store_features: bool = False,
+    store_trajectory_gradients: bool = False,
 ) -> list[PrefixBundle]:
     from grace_gc.data.tokenize import encode_records_tiny
     from grace_gc.trainer.tiny_engine import make_tiny_engines
@@ -523,6 +556,9 @@ def generate_bundles_tiny(
         return out
 
     audit_cfg = {} if cfg is None else (cfg.get("audit") or {})
+    store_trajectory_gradients = bool(
+        store_trajectory_gradients or ((cfg or {}).get("analysis") or {}).get("gradient_target") == "trajectory"
+    )
     spec = _audit_method_spec(cfg)
     if store_features and bool(audit_cfg.get("predictor_diagnostic", False)):
         predictor = None
@@ -554,6 +590,7 @@ def generate_bundles_tiny(
         control_variate=bool(((cfg or {}).get("predictor") or {}).get("control_variate", True)),
         baseline_policy=baseline_from_config((cfg or {}).get("baseline")),
         store_features=store_features,
+        store_trajectory_gradients=store_trajectory_gradients,
     )
 
 
@@ -571,6 +608,7 @@ def generate_bundles_gpu(
     cache: dict | None = None,
     payload=None,
     store_features: bool = False,
+    store_trajectory_gradients: bool = False,
 ) -> list[PrefixBundle]:
     if cache and engines is None and cache.get("engines") is not None:
         engines = cache["engines"]
@@ -652,6 +690,9 @@ def generate_bundles_gpu(
     if not records:
         return []
     audit_cfg = cfg.get("audit") or {}
+    store_trajectory_gradients = bool(
+        store_trajectory_gradients or (cfg.get("analysis") or {}).get("gradient_target") == "trajectory"
+    )
     spec = _audit_method_spec(cfg)
     if store_features and bool(audit_cfg.get("predictor_diagnostic", False)):
         predictor = None
@@ -683,6 +724,7 @@ def generate_bundles_gpu(
         control_variate=bool((cfg.get("predictor") or {}).get("control_variate", True)),
         baseline_policy=baseline_from_config(cfg.get("baseline")),
         store_features=store_features,
+        store_trajectory_gradients=store_trajectory_gradients,
     )
 
 
@@ -767,6 +809,8 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
                         (cfg.get("audit") or {}).get("store_features", False)
                         or (cfg.get("predictor") or {}).get("store_features", False)
                     ),
+                    store_trajectory_gradients=bool((cfg.get("audit") or {}).get("store_trajectory_gradients", False)
+                                                    or (cfg.get("analysis") or {}).get("gradient_target") == "trajectory"),
                 )
             else:
                 bundles = generate_bundles_tiny(
@@ -781,6 +825,8 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
                         (cfg.get("audit") or {}).get("store_features", False)
                         or (cfg.get("predictor") or {}).get("store_features", False)
                     ),
+                    store_trajectory_gradients=bool((cfg.get("audit") or {}).get("store_trajectory_gradients", False)
+                                                    or (cfg.get("analysis") or {}).get("gradient_target") == "trajectory"),
                 )
             run.write_jsonl("audit_raw_problems.jsonl", getattr(_bundles_from_engines, "last", []))
             run.write_jsonl("audit_bundles.jsonl", [bundle_to_dict(b) for b in bundles])

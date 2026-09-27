@@ -12,6 +12,15 @@ and the conditional-mean reconstruction error.  A positive result is a
 representation result only; it does not establish a learned predictor or a
 training gain.
 
+The full-trajectory target is available without changing the legacy suffix
+report. Add `--store-trajectory-decomposition` together with
+`--store-half-means` during replay. This stores the unweighted prefix score
+gradient `g_h`, independent A/B means of `G=(R-b)(g_h+g_s)`, and matching
+Euclidean/diagonal second moments. Run Stage A/B with
+`--gradient-target trajectory` (the replay's stored basis is used when
+`--score-gradients` is omitted). The target mode is recorded in every summary
+so suffix and full-trajectory results cannot be silently mixed.
+
 Stage B keeps the score-gradient basis exact and learns only its coefficients
 from prefix features.  Coefficients are still fitted on half A, while the
 feature model is split by problem and evaluated against half B.  The report
@@ -38,6 +47,15 @@ pre-registered name, and pass the same file to replay and both CPU reports:
 python scripts/replay_expected_gain.py ... \
   --store-half-means --metric-file runs/calibration/adam_weights.npy \
   --metric-name adam_diagonal --run-dir runs/dynamic-replay
+```
+
+For a checkpoint-native Adam metric, export the fixed diagonal weights before
+the replay. The exporter uses the checkpoint's `exp_avg_sq` and exact LoRA
+layout order:
+
+```bash
+python scripts/build_adam_metric.py --checkpoint "$CHECKPOINT" \
+  --output runs/calibration/adam_weights.npy
 ```
 
 The replay stores metric-weighted second moments, so the reported residual
@@ -73,13 +91,18 @@ python scripts/replay_expected_gain.py ... \
   --store-half-means --run-dir runs/dynamic-replay-calibrated
 ```
 
+If the calibration JSON includes `calibration.decision_tokens`,
+`calibration.max_new_tokens`, `calibration.temperature`, or `calibration.top_p`,
+the replay checks those settings against the replay configuration.
+
 The GPU replay must save the independent halves:
 
 ```bash
 python scripts/replay_expected_gain.py \
   --bundles runs/phase12-predictor-audit \
   --checkpoint "$CHECKPOINT" --model-path "$MODEL_PATH" \
-  --store-half-means --run-dir runs/dynamic-replay
+  --store-half-means --store-trajectory-decomposition \
+  --run-dir runs/dynamic-replay
 ```
 
 Extract the score-gradient basis with the same frozen checkpoint and replay
@@ -92,20 +115,23 @@ python scripts/extract_prefix_score_gradients.py \
   --run-dir runs/dynamic-score-gradients
 ```
 
-Run the CPU-only oracle and coefficient predictor.  The `--score-gradients`
-path is the `score_gradients.npy` file in the extraction run directory.
+Run the CPU-only oracle and coefficient predictor. For suffix replays,
+`--score-gradients` is the `score_gradients.npy` file in the extraction run
+directory; trajectory replays can use the basis stored by replay.
 
 ```bash
 python scripts/expected_gain_dynamic_oracle.py \
   --replay-dir runs/dynamic-replay \
-  --score-gradients runs/dynamic-score-gradients/score_gradients.npy \
+  --gradient-target trajectory \
   --metric-file runs/dynamic-replay/metric_weights.npy \
+  --difficulty-manifest runs/calibration/difficulty.json \
   --run-dir runs/dynamic-oracle
 
 python scripts/expected_gain_dynamic_predictor.py \
   --replay-dir runs/dynamic-replay \
-  --score-gradients runs/dynamic-score-gradients/score_gradients.npy \
+  --gradient-target trajectory \
   --metric-file runs/dynamic-replay/metric_weights.npy \
+  --difficulty-manifest runs/calibration/difficulty.json \
   --features legacy --models zero,constant,ridge \
   --run-dir runs/dynamic-predictor
 ```

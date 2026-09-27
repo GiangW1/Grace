@@ -23,8 +23,9 @@ def load_diagonal_metric(path: str | Path | None, dimension: int):
     return values
 
 
-def load_dynamic_replay(replay_dir: str | Path, score_gradients: str | Path,
-                        metric_file: str | Path | None = None):
+def load_dynamic_replay(replay_dir: str | Path, score_gradients: str | Path | None,
+                        metric_file: str | Path | None = None,
+                        gradient_target: str = "suffix"):
     """Load the replay rows, A/B labels, and per-prefix score bases.
 
     The A/B arrays are deliberately separate from ``mean_grads.npy``.  A
@@ -33,18 +34,36 @@ def load_dynamic_replay(replay_dir: str | Path, score_gradients: str | Path,
     root = Path(replay_dir)
     rows = [json.loads(line) for line in (root / "prefixes.jsonl").read_text(
         encoding="utf-8").splitlines() if line.strip()]
+    if gradient_target not in {"suffix", "trajectory"}:
+        raise ValueError("gradient_target must be suffix or trajectory")
+    target_prefix = "half_mean_full_grads" if gradient_target == "trajectory" else "half_mean_grads"
     required = {
-        "half_mean_grads_a.npy", "half_mean_grads_b.npy",
-        "half_mean_norm_sq_b.npy",
+        f"{target_prefix}_a.npy", f"{target_prefix}_b.npy",
+        ("half_mean_full_norm_sq_b.npy" if gradient_target == "trajectory"
+         else "half_mean_norm_sq_b.npy"),
     }
+    if gradient_target == "trajectory":
+        required.add("prefix_score_gradients.npy")
     missing = sorted(name for name in required if not (root / name).is_file())
     if missing:
         raise ValueError("replay lacks stage A/B sidecars: " + ", ".join(missing))
-    target_a = np.load(root / "half_mean_grads_a.npy", mmap_mode="r")
-    target_b = np.load(root / "half_mean_grads_b.npy", mmap_mode="r")
-    norm_b = np.load(root / "half_mean_norm_sq_b.npy", mmap_mode="r")
-    basis = np.load(score_gradients, mmap_mode="r")
-    provenance_path = Path(score_gradients).with_name("score_gradient_provenance.json")
+    target_a = np.load(root / f"{target_prefix}_a.npy", mmap_mode="r")
+    target_b = np.load(root / f"{target_prefix}_b.npy", mmap_mode="r")
+    norm_b = np.load(root / ("half_mean_full_norm_sq_b.npy" if gradient_target == "trajectory"
+                             else "half_mean_norm_sq_b.npy"), mmap_mode="r")
+    stored_basis = np.load(root / "prefix_score_gradients.npy", mmap_mode="r") if gradient_target == "trajectory" else None
+    if score_gradients is None:
+        if stored_basis is None:
+            raise ValueError("suffix target needs score_gradients.npy")
+        basis = stored_basis if stored_basis.ndim == 3 else stored_basis[:, :, None]
+    else:
+        basis = np.load(score_gradients, mmap_mode="r")
+        if stored_basis is not None and gradient_target == "trajectory":
+            stored_basis_3d = stored_basis[:, :, None] if stored_basis.ndim == 2 else stored_basis
+            if stored_basis_3d.shape != basis.shape or not np.allclose(stored_basis_3d, basis):
+                raise ValueError("stored and supplied prefix score gradients differ")
+    provenance_path = (Path(score_gradients).with_name("score_gradient_provenance.json")
+                       if score_gradients is not None else root / "score_gradient_provenance.json")
     score_provenance = {}
     if provenance_path.is_file():
         provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
@@ -87,7 +106,8 @@ def load_dynamic_replay(replay_dir: str | Path, score_gradients: str | Path,
         raise ValueError("requested metric is not stored by this replay")
     if uses_replay_metric:
         metric_name = str(replay_provenance.get("metric_name") or metric_name)
-    metric_norm_path = root / "half_metric_norm_sq_b.npy"
+    metric_norm_path = root / ("half_full_metric_norm_sq_b.npy" if gradient_target == "trajectory"
+                               else "half_metric_norm_sq_b.npy")
     metric_norm_b = (np.load(metric_norm_path, mmap_mode="r") if uses_replay_metric and
                      metric_norm_path.is_file() else norm_b if np.all(metric == 1.0) else None)
     if metric_norm_b is None:
@@ -128,6 +148,29 @@ def q_strata(rows):
         else:
             groups["observed_q_uncertain"].append(index)
     return {name: np.asarray(indices, dtype=np.int64) for name, indices in groups.items()}, True
+
+
+def difficulty_strata(rows, manifest: str | Path | None = None):
+    """Return predeclared easy/medium/hard strata without using gradient labels."""
+    mapping = None
+    if manifest is not None:
+        payload = json.loads(Path(manifest).read_text(encoding="utf-8"))
+        mapping = payload.get("difficulty", payload) if isinstance(payload, dict) else None
+        if not isinstance(mapping, dict):
+            raise ValueError("difficulty manifest must be a problem-to-stratum mapping")
+    values = []
+    for row in rows:
+        value = (None if mapping is None else mapping.get(str(row["problem_id"])))
+        if value is None:
+            value = row.get("difficulty")
+        values.append(None if value is None else str(value).lower())
+    if any(value is None for value in values):
+        return {"all": np.arange(len(rows), dtype=np.int64)}, False
+    allowed = {"easy", "medium", "hard"}
+    if any(value not in allowed for value in values):
+        raise ValueError("difficulty labels must be easy, medium, or hard")
+    return {name: np.asarray([i for i, value in enumerate(values) if value == name], dtype=np.int64)
+            for name in ("easy", "medium", "hard")}, True
 
 
 def split_roles(rows, manifest: str | Path | None, seed: int):

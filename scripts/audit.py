@@ -32,6 +32,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--method", default=None)
     parser.add_argument("--split", default="audit", help="split_records bucket used with --generate")
     parser.add_argument("--run-dir", dest="run_dir", default=None, help="default: runs/audit-UTC")
+    parser.add_argument("--gradient-target", choices=("suffix", "trajectory"), default=None,
+                        help="audit legacy suffix gradients or stored full trajectory G")
     args = parser.parse_args(argv)
     overrides = {}
     if args.seed is not None:
@@ -47,6 +49,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.method:
         overrides["method"] = args.method
     cfg = build_run_config(args.config, overrides)
+    if args.gradient_target is not None:
+        cfg["analysis"] = {**(cfg.get("analysis") or {}),
+                            "gradient_target": args.gradient_target}
     if args.generate:
         from grace_gc.audit.run import run_audit
         from grace_gc.data.math_data import load_math_records, records_for_split
