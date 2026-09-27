@@ -67,11 +67,5 @@ Review archive SHA256:
 
 The review archive excludes the four 18,025,021,568-byte full-gradient arrays,
 the 47,186,048-byte metric vector, and the 23,612,264-byte calibration adapter.
-Their hashes remain in the embedded manifest. The complete binary run archive
-is kept separately because committing it would add tens of gigabytes to the
-Git repository.
-
-The separately delivered complete archive is
-`dynamic-pr11-20260927-full.tar.gz` (13,339,169,056 bytes, 107 tar members).
-It passed both `gzip -t` and a complete tar member traversal. SHA256:
-`5b71e4cd0515e21f3911aba955fd8839a5ea511434f4e1ebaf131143aac130bb`.
+Their hashes remain in the embedded manifest. These excluded files remain only
+in the original server run directory; no complete binary archive is attached.
