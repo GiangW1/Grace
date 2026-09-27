@@ -98,12 +98,13 @@ def main(argv=None) -> int:
             "mechanism": _mechanism_report(rows, basis, target_b, metric_norm_b,
                                             metric, indices, coefficients),
             "q_strata": {
-                name: {"n_prefixes": int(len(selected)),
+                name: {"n_prefixes": int(len(role_selected)),
                        "mechanism": _mechanism_report(
                            rows, basis, target_b, metric_norm_b, metric,
-                           np.intersect1d(indices, selected), coefficients)}
+                           role_selected, coefficients)}
                 for name, selected in strata.items()
-                if len(np.intersect1d(indices, selected))
+                for role_selected in [np.intersect1d(indices, selected)]
+                if len(role_selected)
             },
         }
     destination = start_experiment_run(args.run_dir, "expected_gain_dynamic_oracle", vars(args))

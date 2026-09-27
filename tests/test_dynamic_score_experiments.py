@@ -39,8 +39,7 @@ def _write_replay(root: Path):
                 "problem_id": f"p{index}", "features": [float(index), 1.],
                 "prompt_features": [float(index), 1.], "prefix_token_ids": [1, index + 2],
                 "mean_cost": 1., "mean_reward": .5, "baseline": .5,
-                "half_mean_reward_a": [0., .5, 1.][index % 3],
-                "half_mean_reward_b": .5,
+                "half_mean_reward": [[0., .5, 1.][index % 3], .5],
                 "half_mean_advantage": [[-.5, -.5], [0., 0.], [.5, .5]][index % 3],
             }) + "\n")
     split = {"train": ["p0", "p1", "p2"], "validation": ["p3"],
@@ -78,6 +77,8 @@ def test_dynamic_oracle_and_predictor_use_a_b_split_without_torch():
         assert oracle["stage"] == "A"
         assert oracle["roles"]["diagnostic"]["oracle"]["residual_ratio_to_zero"] < 0.1
         assert oracle["q_stratification"]["available"] is True
+        assert sum(row["n_prefixes"] for row in
+                   oracle["roles"]["diagnostic"]["q_strata"].values()) == 2
         assert "reward_only" in oracle["roles"]["diagnostic"]["mechanism"]
         predictor_main(["--replay-dir", str(replay), "--score-gradients", str(score),
                         "--split-manifest", str(split), "--run-dir", str(root / "predictor"),

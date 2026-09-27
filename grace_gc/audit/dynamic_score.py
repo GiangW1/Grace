@@ -110,6 +110,10 @@ def q_strata(rows):
     values = []
     for row in rows:
         value = row.get("half_mean_reward_a")
+        if value is None:
+            half_mean_reward = row.get("half_mean_reward")
+            if isinstance(half_mean_reward, (list, tuple)) and half_mean_reward:
+                value = half_mean_reward[0]
         values.append(None if value is None else float(value))
     if any(value is None for value in values):
         return {"all": np.arange(len(rows), dtype=np.int64)}, False
