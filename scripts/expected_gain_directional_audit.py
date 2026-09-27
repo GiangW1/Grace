@@ -210,6 +210,8 @@ def main(argv=None) -> int:
                         help="optional second disjoint replay for reference-direction cosine")
     parser.add_argument("--direction-file", default=None,
                         help=".npy direction with one entry per replay gradient coordinate")
+    parser.add_argument("--prefix-score-gradients", default=None,
+                        help="optional exact prefix score-gradient basis for shared-term audit")
     parser.add_argument("--directional-values", default=None,
                         help="optional per-prefix scalar matrix; defaults to replay/directional_values.npy")
     parser.add_argument("--run-dir", required=True)
@@ -261,6 +263,25 @@ def main(argv=None) -> int:
     else:
         targets, loo_norms = _loo_targets(rows, means)
         direction_description = "leave_one_problem_out_replay_mean"
+
+    shared_prefix_term = None
+    if args.prefix_score_gradients:
+        if args.direction == "loo":
+            raise ValueError("prefix-score-gradients needs one fixed direction, not --direction loo")
+        score_path = Path(args.prefix_score_gradients)
+        shared_basis = np.load(score_path, mmap_mode="r")
+        if (shared_basis.ndim != 3 or shared_basis.shape[0] != len(rows) or
+                shared_basis.shape[1] != means.shape[1] or shared_basis.shape[2] != 1):
+            raise ValueError("prefix-score-gradients must have shape [n_prefixes, dimension, 1]")
+        sidecar_path = score_path.with_name("score_gradient_provenance.json")
+        if sidecar_path.is_file():
+            sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+            if sidecar.get("replay_prefixes_sha256") != sha256_file(
+                    Path(args.replay_dir) / "prefixes.jsonl"):
+                raise ValueError("prefix score gradients do not match replay prefixes")
+            if sidecar.get("shape") != list(map(int, shared_basis.shape)):
+                raise ValueError("prefix score-gradient provenance shape disagrees")
+        shared_prefix_term = -0.5 * np.asarray(shared_basis[:, :, 0]) @ reference
 
     if args.direction == "file":
         stored = replay_meta.get("direction_sha256")
@@ -329,6 +350,18 @@ def main(argv=None) -> int:
         str(n): _half_reliability(rows, directional_values, n) for n in _csv_ints(args.n_grid, "n-grid")
         if len(directional_values) and np.min(np.sum(np.isfinite(directional_values), axis=1)) >= n
     }
+    shared_term_report = None
+    if shared_prefix_term is not None:
+        shared_term_report = {
+            "formula": "-0.5 * <prefix_score_gradient, direction>",
+            "label_correlation": _correlation(shared_prefix_term, targets),
+            "by_role": {
+                name: {"n_prefixes": int(len(indices)),
+                       "label_correlation": _correlation(shared_prefix_term[indices],
+                                                          targets[indices])}
+                for name, indices in roles.items()
+            },
+        }
     summary = {
         "direction": direction_description,
         "direction_norm": (None if reference is None else float(np.linalg.norm(reference))),
@@ -337,6 +370,7 @@ def main(argv=None) -> int:
         "n_prefixes": len(rows), "n_problems": len({str(row["problem_id"]) for row in rows}),
         "feature_set": args.features, "feature_dimension": int(features.shape[1]),
         "split": split, "half_reliability": reliability,
+        "shared_prefix_term": shared_term_report,
         "predictors_on_mean_label": _fit_rows(features, targets, roles, settings),
         "n_grid": n_rows,
         "directional_values_path": (None if directional_values is None else str(directional_path.resolve())),

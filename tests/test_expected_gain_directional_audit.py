@@ -51,14 +51,18 @@ class DirectionalAuditTest(unittest.TestCase):
             np.save(replay / "directional_values.npy", values)
             direction = root / "direction.npy"
             np.save(direction, np.array([1., -1., .5, .25]))
+            score = root / "score_gradients.npy"
+            np.save(score, means[:, :, None])
             self.assertEqual(main(["--replay-dir", str(replay), "--direction", "file",
                                    "--direction-file", str(direction), "--features", "cheap",
+                                   "--prefix-score-gradients", str(score),
                                    "--models", "zero,constant,ridge", "--n-grid", "2,4",
                                    "--run-dir", str(root / "result")]), 0)
             summary = json.loads((root / "result" / "directional_value_summary.json").read_text())
             self.assertEqual(summary["direction"], "frozen_direction_file")
             self.assertEqual([row["n"] for row in summary["n_grid"]], [2, 4])
             self.assertTrue(summary["predictors_on_mean_label"])
+            self.assertAlmostEqual(abs(summary["shared_prefix_term"]["label_correlation"]), 1.0)
 
     def test_directional_values_reject_all_nan_prefix(self):
         with tempfile.TemporaryDirectory() as tmp:

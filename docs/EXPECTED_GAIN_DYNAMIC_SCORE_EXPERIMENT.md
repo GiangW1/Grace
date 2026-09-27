@@ -20,6 +20,15 @@ problems untouched.  This is the first coefficient-learning test for the
 dynamic form; the value-head cross term can be added after this stage has
 evidence.
 
+When `--store-half-means` is enabled, the replay records reward, baseline, and
+advantage means for both halves.  Stage A and Stage B report the observed
+half-A reward strata `q_hat=0`, `0<q_hat<1`, and `q_hat=1`; these are finite-sample
+strata, not claims that the latent success probability is exactly zero or one.
+Stage A also compares the reward-only oracle
+`(q_hat-b) * g_h` with the freely fitted score-gradient coefficient and reports
+the cross-fitted residual gap and orthogonal energy fraction.  These reports
+are the mechanism audit that must precede any value-head or online experiment.
+
 Every replay also has a fixed diagonal quadratic metric.  With no metric file
 the metric is Euclidean.  To run an optimizer-aware audit, create the metric
 weights from an independent calibration split before replay, record the
@@ -36,6 +45,33 @@ includes continuation noise rather than only the squared error between two
 sample means.  A metric file is a diagonal quadratic form; Adam and Fisher
 variants must be generated from data independent of the A/B continuation
 labels.
+
+The unweighted `half_mean_norm_sq_*` sidecars are retained as the primary
+Euclidean result.  When a replay also contains a weighted metric, pass an
+explicit all-ones `.npy` file as `--metric-file` to the oracle or predictor to
+request the Euclidean report; omit the option to use the replay's recorded
+metric.
+
+The replay can replace the source-record baseline with an independently
+calibrated problem baseline.  The JSON must contain the checkpoint hash and a
+`problems` mapping, for example:
+
+```json
+{
+  "checkpoint_sha256": "...",
+  "problems": {"problem-001": {"baseline": 0.5}}
+}
+```
+
+The calibration completions must use a separate seed and problem pool from
+the A/B continuations.  Pass the file before replay so the gradient labels and
+all baseline-dependent features use the same calibrated value:
+
+```bash
+python scripts/replay_expected_gain.py ... \
+  --baseline-file runs/calibration/problem_baselines.json \
+  --store-half-means --run-dir runs/dynamic-replay-calibrated
+```
 
 The GPU replay must save the independent halves:
 
@@ -72,6 +108,18 @@ python scripts/expected_gain_dynamic_predictor.py \
   --metric-file runs/dynamic-replay/metric_weights.npy \
   --features legacy --models zero,constant,ridge \
   --run-dir runs/dynamic-predictor
+```
+
+For an existing fixed-direction audit, add the exact prefix score gradients to
+measure how much of the scalar label is the shared term
+`-0.5 * <g_h, d>`:
+
+```bash
+python scripts/expected_gain_directional_audit.py \
+  --replay-dir runs/directional-replay \
+  --direction file --direction-file runs/direction.npy \
+  --prefix-score-gradients runs/dynamic-score-gradients/score_gradients.npy \
+  --run-dir runs/directional-overlap
 ```
 
 The code records the score-basis hash, actor/checkpoint identity, replay row

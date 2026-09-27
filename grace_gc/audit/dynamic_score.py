@@ -66,22 +66,30 @@ def load_dynamic_replay(replay_dir: str | Path, score_gradients: str | Path,
             norm_b.shape != (len(rows),) or basis.ndim != 3 or
             basis.shape[0] != len(rows) or basis.shape[1] != target_a.shape[1]):
         raise ValueError("dynamic replay arrays have incompatible shapes")
-    metric_path = metric_file
-    if metric_path is None and (root / "metric_weights.npy").is_file():
-        metric_path = root / "metric_weights.npy"
-    metric = load_diagonal_metric(metric_path, target_a.shape[1])
-    metric_name = str(replay_provenance.get("metric_name") or
-                      ("diagonal_file" if metric_path is not None else "euclidean"))
-    metric_hash = sha256_array(metric)
-    if (replay_provenance.get("metric_name") == "euclidean" and
-            not np.all(metric == 1.0)):
-        raise ValueError("requested metric differs from the replay metric")
     recorded_metric_hash = replay_provenance.get("metric_weights_sha256")
-    if recorded_metric_hash is not None and recorded_metric_hash != metric_hash:
-        raise ValueError("metric weights do not match replay provenance")
+    replay_metric_path = root / "metric_weights.npy"
+    replay_metric = (load_diagonal_metric(replay_metric_path, target_a.shape[1])
+                     if replay_metric_path.is_file() else None)
+    replay_metric_hash = (sha256_array(replay_metric) if replay_metric is not None else None)
+    metric_path = metric_file
+    if metric_path is None and replay_metric is not None:
+        metric = replay_metric
+        metric_name = str(replay_provenance.get("metric_name") or "diagonal_file")
+    else:
+        metric = load_diagonal_metric(metric_path, target_a.shape[1])
+        metric_name = "euclidean" if np.all(metric == 1.0) else "diagonal_file"
+    metric_hash = sha256_array(metric)
+    uses_replay_metric = (replay_metric_hash is not None and metric_hash == replay_metric_hash)
+    if recorded_metric_hash is not None and uses_replay_metric and recorded_metric_hash != metric_hash:
+        raise ValueError("replay metric provenance hash is inconsistent")
+    if (metric_file is not None and not uses_replay_metric and
+            not np.all(metric == 1.0)):
+        raise ValueError("requested metric is not stored by this replay")
+    if uses_replay_metric:
+        metric_name = str(replay_provenance.get("metric_name") or metric_name)
     metric_norm_path = root / "half_metric_norm_sq_b.npy"
-    metric_norm_b = (np.load(metric_norm_path, mmap_mode="r") if metric_norm_path.is_file()
-                     else norm_b if np.all(metric == 1.0) else None)
+    metric_norm_b = (np.load(metric_norm_path, mmap_mode="r") if uses_replay_metric and
+                     metric_norm_path.is_file() else norm_b if np.all(metric == 1.0) else None)
     if metric_norm_b is None:
         raise ValueError("replay lacks half_metric_norm_sq_b.npy for the requested metric")
     if metric_norm_b.shape != (len(rows),):
@@ -90,6 +98,32 @@ def load_dynamic_replay(replay_dir: str | Path, score_gradients: str | Path,
     if any(not np.all(np.isfinite(np.asarray(array))) for array in arrays):
         raise ValueError("dynamic replay arrays must be finite")
     return rows, target_a, target_b, metric_norm_b, basis, metric, metric_name
+
+
+def q_strata(rows):
+    """Partition rows using the observed reward rate in half A.
+
+    These are empirical strata, not claims that the latent success probability
+    is exactly zero or one.  The A-only convention keeps B available for the
+    cross-fitted residual evaluation.
+    """
+    values = []
+    for row in rows:
+        value = row.get("half_mean_reward_a")
+        values.append(None if value is None else float(value))
+    if any(value is None for value in values):
+        return {"all": np.arange(len(rows), dtype=np.int64)}, False
+    groups = {"observed_q_zero": [], "observed_q_uncertain": [], "observed_q_one": []}
+    for index, value in enumerate(values):
+        if not np.isfinite(value) or value < 0.0 or value > 1.0:
+            raise ValueError("binary reward rates must lie in [0, 1]")
+        if value <= 0.0:
+            groups["observed_q_zero"].append(index)
+        elif value >= 1.0:
+            groups["observed_q_one"].append(index)
+        else:
+            groups["observed_q_uncertain"].append(index)
+    return {name: np.asarray(indices, dtype=np.int64) for name, indices in groups.items()}, True
 
 
 def split_roles(rows, manifest: str | Path | None, seed: int):

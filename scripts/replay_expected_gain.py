@@ -23,6 +23,45 @@ from grace_gc.audit.dynamic_score import load_diagonal_metric
 from grace_gc.audit.expected_gain import start_experiment_run
 
 
+def _load_problem_baselines(path, checkpoint_sha256):
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    recorded_checkpoint = payload.get("checkpoint_sha256")
+    if recorded_checkpoint is not None and recorded_checkpoint != checkpoint_sha256:
+        raise ValueError("baseline calibration uses a different checkpoint")
+    values = payload.get("problems") or payload.get("baselines")
+    if not isinstance(values, dict) or not values:
+        raise ValueError("baseline file must contain a nonempty problems mapping")
+    result = {}
+    for problem_id, value in values.items():
+        if isinstance(value, dict):
+            value = value.get("baseline")
+        try:
+            value = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"baseline for {problem_id} is not numeric") from exc
+        if not np.isfinite(value) or not 0.0 <= value <= 1.0:
+            raise ValueError(f"baseline for {problem_id} must lie in [0, 1]")
+        result[str(problem_id)] = value
+    return result
+
+
+def _apply_problem_baselines(rows, baselines):
+    updated = []
+    for row in rows:
+        problem_id = str(row["problem_id"])
+        if problem_id not in baselines:
+            raise ValueError(f"baseline calibration lacks problem {problem_id}")
+        baseline = float(baselines[problem_id])
+        copied = dict(row)
+        copied["baseline"] = baseline
+        copied["continuation_records"] = [
+            {**record, "baseline": baseline}
+            for record in (row.get("continuation_records") or [])
+        ]
+        updated.append(copied)
+    return updated
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundles", required=True)
@@ -46,6 +85,8 @@ def main(argv=None) -> int:
                         help="fixed diagonal metric weights; required before weighted A/B replay")
     parser.add_argument("--metric-name", default=None,
                         help="pre-registered name for the metric, e.g. adam_diagonal or fisher_diagonal")
+    parser.add_argument("--baseline-file", default=None,
+                        help="independent JSON calibration with checkpoint_sha256 and problems mapping")
     parser.add_argument("--run-dir", required=True)
     args = parser.parse_args(argv)
 
@@ -81,6 +122,8 @@ def main(argv=None) -> int:
     metric_weights = load_diagonal_metric(args.metric_file, layout.dim)
     metric_name = (str(args.metric_name) if args.metric_name else
                    ("diagonal_file" if args.metric_file else "euclidean"))
+    baseline_file_sha256 = (None if args.baseline_file is None else
+                            sha256_file(args.baseline_file))
     tok = load_hf_tokenizer(args.model_path)
     pad = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
     if pad is None:
@@ -104,6 +147,8 @@ def main(argv=None) -> int:
                                     .read_text(encoding="utf-8"))
         if ref_provenance.get("actor_sha256") != sha256_named(named):
             raise ValueError("reference replay uses a different actor")
+        if ref_provenance.get("baseline_file_sha256") != baseline_file_sha256:
+            raise ValueError("reference replay and predictor use different baseline calibration")
         reference_rows, reference_means = load_replay(args.reference_dir)
         if reference_means.shape[1] != layout.dim:
             raise ValueError("reference replay LoRA dimension differs")
@@ -144,16 +189,35 @@ def main(argv=None) -> int:
                                      [feature_baseline],
                                      int(pad), eos_id=stop_ids)["prompt_features"][0]
 
+    def calibrated_feature_bundle(row):
+        prefix = row.get("prefix_token_ids")
+        prompt = row.get("prompt_token_ids")
+        if not prefix or not prompt or list(prefix[:len(prompt)]) != list(prompt):
+            raise ValueError("audit lacks aligned prompt/prefix token IDs for calibrated features")
+        bundle = prefix_feature_bundle(actor, [prefix], [len(prompt)],
+                                       [float(row["baseline"])], int(pad), eos_id=stop_ids)
+        return {"features": bundle["features"][0],
+                "prompt_features": (None if args.skip_prompt_features else
+                                     bundle["prompt_features"][0])}
+
     source_rows = list(audit_rows(args.bundles, args.decision_tokens))
+    baseline_calibration = None
+    if args.baseline_file:
+        baseline_calibration = _load_problem_baselines(
+            args.baseline_file, sha256_file(args.checkpoint))
+        source_rows = _apply_problem_baselines(source_rows, baseline_calibration)
     if args.reference_dir and ({str(row["problem_id"]) for row in source_rows} &
                                    {str(row["problem_id"]) for row in reference_rows}):
         raise ValueError("predictor and reference problems overlap")
     result = replay_means(source_rows,
                           partial(_policy_grad_vec, engines, layout), layout.dim,
                           destination, args.max_continuations, args.seed,
-                          None if args.skip_prompt_features else prompt_features,
+                          (None if baseline_calibration else
+                           None if args.skip_prompt_features else prompt_features),
+                          calibrated_feature_bundle if baseline_calibration else None,
                           reference, store_half_means=args.store_half_means,
-                          metric_weights=metric_weights, metric_name=metric_name)
+                          metric_weights=metric_weights, metric_name=metric_name,
+                          verify_saved_gradients=baseline_calibration is None)
     np.save(destination / "metric_weights.npy", metric_weights)
     provenance = {"checkpoint": str(Path(args.checkpoint).resolve()),
                   "checkpoint_sha256": sha256_file(args.checkpoint),
@@ -169,6 +233,14 @@ def main(argv=None) -> int:
                   "metric_file": (None if args.metric_file is None else
                                    str(Path(args.metric_file).resolve())),
                   "metric_weights_sha256": sha256_array(metric_weights),
+                  "baseline_mode": ("independent_calibration" if args.baseline_file else
+                                     "source_records"),
+                  "baseline_file": (None if args.baseline_file is None else
+                                     str(Path(args.baseline_file).resolve())),
+                  "baseline_file_sha256": (None if args.baseline_file is None else
+                                             baseline_file_sha256),
+                  "saved_gradient_validation": ("disabled_for_calibrated_baseline"
+                                                 if baseline_calibration else "enabled"),
                   "reference_dir": args.reference_dir,
                    "direction_file": (None if args.direction_file is None else
                                        str(Path(args.direction_file).resolve())),
