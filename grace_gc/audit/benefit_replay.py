@@ -106,7 +106,8 @@ def check_replayed_gradient(grad, row, index: int) -> tuple[float, float | None,
 def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                  max_continuations: int | None = 16, seed: int = 17,
                  prompt_feature_fn=None, reference_direction=None,
-                 store_half_means: bool = False) -> dict:
+                 store_half_means: bool = False, metric_weights=None,
+                 metric_name: str = "euclidean") -> dict:
     """Stream exact G labels, storing one FP64 mean per live prefix.
 
     When ``reference_direction`` is supplied, also store the scalar dot
@@ -118,6 +119,11 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
     """
     if dimension <= 0 or (max_continuations is not None and max_continuations <= 0):
         raise ValueError("dimension and max_continuations must be positive")
+    metric = (np.ones(dimension, dtype=np.float64) if metric_weights is None else
+              np.asarray(metric_weights, dtype=np.float64).reshape(-1))
+    if (metric.shape != (dimension,) or not np.all(np.isfinite(metric)) or
+            np.any(metric < 0.0) or not np.any(metric > 0.0)):
+        raise ValueError("metric weights must be finite, nonnegative, and match dimension")
     direction = None if reference_direction is None else np.asarray(reference_direction, dtype=np.float64)
     if direction is not None:
         if direction.shape != (dimension,):
@@ -133,6 +139,7 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
     matrix = np.lib.format.open_memmap(target / "mean_grads.npy", mode="w+",
                                        dtype=np.float64, shape=(len(selected), dimension))
     half_a_matrix = half_b_matrix = half_a_norms = half_b_norms = None
+    half_a_metric_norms = half_b_metric_norms = None
     if store_half_means:
         half_a_matrix = np.lib.format.open_memmap(
             target / "half_mean_grads_a.npy", mode="w+", dtype=np.float64,
@@ -145,6 +152,12 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
             shape=(len(selected),))
         half_b_norms = np.lib.format.open_memmap(
             target / "half_mean_norm_sq_b.npy", mode="w+", dtype=np.float64,
+            shape=(len(selected),))
+        half_a_metric_norms = np.lib.format.open_memmap(
+            target / "half_metric_norm_sq_a.npy", mode="w+", dtype=np.float64,
+            shape=(len(selected),))
+        half_b_metric_norms = np.lib.format.open_memmap(
+            target / "half_metric_norm_sq_b.npy", mode="w+", dtype=np.float64,
             shape=(len(selected),))
     directional_values = None
     if direction is not None:
@@ -179,7 +192,7 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
             first = np.zeros(dimension, dtype=np.float64)
             second = np.zeros(dimension, dtype=np.float64)
             norm_sum = 0.0
-            norms = []
+            norms, metric_norms = [], []
             rewards, costs = [], []
             replay_errors = {}
             expected_norms = row.get("true_grad_norm_sq") or []
@@ -215,6 +228,7 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                 (first if j < n // 2 else second)[:] += grad
                 norm_sum += norm
                 norms.append(norm)
+                metric_norms.append(float(np.sum(metric * grad * grad)))
                 rewards.append(reward)
                 costs.append(float(rec.get("generated_suffix_tokens", 0)))
             mean /= n
@@ -229,6 +243,8 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                 half_b_matrix[i] = second / second_n
                 half_a_norms[i] = float(np.mean(norms[:first_n]))
                 half_b_norms[i] = float(np.mean(norms[first_n:]))
+                half_a_metric_norms[i] = float(np.mean(metric_norms[:first_n]))
+                half_b_metric_norms[i] = float(np.mean(metric_norms[first_n:]))
             info = {
                 "index": i, "problem_id": str(row["problem_id"]),
                 "path_id": str(row.get("path_id") or i), "t": int(row["t"]),
@@ -241,6 +257,9 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                 "half_counts": ([first_n, second_n] if store_half_means else None),
                 "half_mean_norm_sq": ([float(half_a_norms[i]), float(half_b_norms[i])]
                                        if store_half_means else None),
+                "half_metric_norm_sq": ([float(half_a_metric_norms[i]),
+                                          float(half_b_metric_norms[i])]
+                                         if store_half_means else None),
                 "half_directional_gain": ([float((first / first_n) @ direction),
                                             float((second / second_n) @ direction)]
                                            if direction is not None and first_n and second_n else None),
@@ -256,9 +275,11 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
             print(f"replay={i + 1}/{len(selected)} problem={info['problem_id']}", flush=True)
     del matrix
     if store_half_means:
-        for array in (half_a_matrix, half_b_matrix, half_a_norms, half_b_norms):
+        for array in (half_a_matrix, half_b_matrix, half_a_norms, half_b_norms,
+                      half_a_metric_norms, half_b_metric_norms):
             array.flush()
-        del half_a_matrix, half_b_matrix, half_a_norms, half_b_norms
+        del (half_a_matrix, half_b_matrix, half_a_norms, half_b_norms,
+             half_a_metric_norms, half_b_metric_norms)
     if directional_values is not None:
         directional_values.flush()
         del directional_values
@@ -269,6 +290,8 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                "max_norm_relative_error": max_norm_error,
                "max_sketch_relative_error": max_sketch_error,
                "half_means": bool(store_half_means),
+               "metric_name": str(metric_name),
+               "metric_weights_sha256": sha256_array(metric),
                "directional_values": (None if direction is None else
                                        {"path": "directional_values.npy",
                                         "shape": [len(selected), capacity],

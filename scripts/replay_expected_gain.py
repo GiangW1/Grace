@@ -19,6 +19,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from grace_gc.audit.benefit_replay import audit_rows, replay_means, audit_file, replay_config
+from grace_gc.audit.dynamic_score import load_diagonal_metric
 from grace_gc.audit.expected_gain import start_experiment_run
 
 
@@ -41,6 +42,10 @@ def main(argv=None) -> int:
                         help="omit the prompt-only forward baseline to save replay time")
     parser.add_argument("--store-half-means", action="store_true",
                         help="store independent A/B gradient means and second moments for stages A/B")
+    parser.add_argument("--metric-file", default=None,
+                        help="fixed diagonal metric weights; required before weighted A/B replay")
+    parser.add_argument("--metric-name", default=None,
+                        help="pre-registered name for the metric, e.g. adam_diagonal or fisher_diagonal")
     parser.add_argument("--run-dir", required=True)
     args = parser.parse_args(argv)
 
@@ -73,6 +78,9 @@ def main(argv=None) -> int:
         raise ValueError("checkpoint LoRA layout dimension does not match actor")
     if payload.get("layout_names") is not None and list(payload["layout_names"]) != layout.names():
         raise ValueError("checkpoint LoRA parameter order does not match actor")
+    metric_weights = load_diagonal_metric(args.metric_file, layout.dim)
+    metric_name = (str(args.metric_name) if args.metric_name else
+                   ("diagonal_file" if args.metric_file else "euclidean"))
     tok = load_hf_tokenizer(args.model_path)
     pad = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
     if pad is None:
@@ -144,7 +152,9 @@ def main(argv=None) -> int:
                           partial(_policy_grad_vec, engines, layout), layout.dim,
                           destination, args.max_continuations, args.seed,
                           None if args.skip_prompt_features else prompt_features,
-                          reference, store_half_means=args.store_half_means)
+                          reference, store_half_means=args.store_half_means,
+                          metric_weights=metric_weights, metric_name=metric_name)
+    np.save(destination / "metric_weights.npy", metric_weights)
     provenance = {"checkpoint": str(Path(args.checkpoint).resolve()),
                   "checkpoint_sha256": sha256_file(args.checkpoint),
                   "actor_sha256": sha256_named(named),
@@ -155,6 +165,10 @@ def main(argv=None) -> int:
                   "seed": args.seed,
                   "prompt_features_replayed": not args.skip_prompt_features,
                   "half_means_stored": bool(args.store_half_means),
+                  "metric_name": metric_name,
+                  "metric_file": (None if args.metric_file is None else
+                                   str(Path(args.metric_file).resolve())),
+                  "metric_weights_sha256": sha256_array(metric_weights),
                   "reference_dir": args.reference_dir,
                    "direction_file": (None if args.direction_file is None else
                                        str(Path(args.direction_file).resolve())),

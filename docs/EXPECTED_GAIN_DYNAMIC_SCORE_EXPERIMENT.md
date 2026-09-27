@@ -20,6 +20,23 @@ problems untouched.  This is the first coefficient-learning test for the
 dynamic form; the value-head cross term can be added after this stage has
 evidence.
 
+Every replay also has a fixed diagonal quadratic metric.  With no metric file
+the metric is Euclidean.  To run an optimizer-aware audit, create the metric
+weights from an independent calibration split before replay, record the
+pre-registered name, and pass the same file to replay and both CPU reports:
+
+```bash
+python scripts/replay_expected_gain.py ... \
+  --store-half-means --metric-file runs/calibration/adam_weights.npy \
+  --metric-name adam_diagonal --run-dir runs/dynamic-replay
+```
+
+The replay stores metric-weighted second moments, so the reported residual
+includes continuation noise rather than only the squared error between two
+sample means.  A metric file is a diagonal quadratic form; Adam and Fisher
+variants must be generated from data independent of the A/B continuation
+labels.
+
 The GPU replay must save the independent halves:
 
 ```bash
@@ -46,11 +63,13 @@ path is the `score_gradients.npy` file in the extraction run directory.
 python scripts/expected_gain_dynamic_oracle.py \
   --replay-dir runs/dynamic-replay \
   --score-gradients runs/dynamic-score-gradients/score_gradients.npy \
+  --metric-file runs/dynamic-replay/metric_weights.npy \
   --run-dir runs/dynamic-oracle
 
 python scripts/expected_gain_dynamic_predictor.py \
   --replay-dir runs/dynamic-replay \
   --score-gradients runs/dynamic-score-gradients/score_gradients.npy \
+  --metric-file runs/dynamic-replay/metric_weights.npy \
   --features legacy --models zero,constant,ridge \
   --run-dir runs/dynamic-predictor
 ```

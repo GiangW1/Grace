@@ -20,8 +20,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from grace_gc.audit.dynamic_score import (fit_prefix_coefficients, load_dynamic_replay,
-                                           residual_metrics, split_roles)
+from grace_gc.audit.dynamic_score import (coefficient_diagnostics, fit_prefix_coefficients,
+                                           load_dynamic_replay, residual_metrics, split_roles)
 from grace_gc.audit.expected_gain import start_experiment_run
 
 
@@ -30,16 +30,18 @@ def main(argv=None) -> int:
     parser.add_argument("--replay-dir", required=True)
     parser.add_argument("--score-gradients", required=True,
                         help="score_gradients.npy from extract_prefix_score_gradients.py")
+    parser.add_argument("--metric-file", default=None,
+                        help="optional fixed diagonal metric weights; defaults to replay metric")
     parser.add_argument("--run-dir", required=True)
     parser.add_argument("--split-manifest", default=None)
     parser.add_argument("--seed", type=int, default=17)
     args = parser.parse_args(argv)
     started = perf_counter()
 
-    rows, target_a, target_b, norm_b, basis = load_dynamic_replay(
-        args.replay_dir, args.score_gradients)
+    rows, target_a, target_b, metric_norm_b, basis, metric, metric_name = load_dynamic_replay(
+        args.replay_dir, args.score_gradients, args.metric_file)
     split, roles = split_roles(rows, args.split_manifest, args.seed)
-    coefficients = fit_prefix_coefficients(basis, target_a)
+    coefficients = fit_prefix_coefficients(basis, target_a, metric)
     metrics = {}
     for role, indices in roles.items():
         subset_basis = np.asarray(basis[indices], dtype=np.float64)
@@ -48,8 +50,8 @@ def main(argv=None) -> int:
             "n_prefixes": int(len(indices)),
             "n_problems": int(len({str(rows[i]["problem_id"]) for i in indices})),
             "oracle": residual_metrics(subset_basis, subset_coefficients,
-                                         np.asarray(target_b[indices]), np.asarray(norm_b[indices])),
-            "zero": {"residual_mean": float(np.mean(norm_b[indices]))},
+                                         np.asarray(target_b[indices]), np.asarray(metric_norm_b[indices]), metric),
+            "zero": {"residual_mean": float(np.mean(metric_norm_b[indices]))},
         }
     destination = start_experiment_run(args.run_dir, "expected_gain_dynamic_oracle", vars(args))
     (destination / "split.json").write_text(json.dumps(split, indent=2), encoding="utf-8")
@@ -60,6 +62,10 @@ def main(argv=None) -> int:
         "basis_shape": list(map(int, basis.shape)),
         "gradient_dimension": int(target_a.shape[1]),
         "coefficients": int(basis.shape[2]),
+        "metric_name": metric_name,
+        "metric_weights": {"min": float(np.min(metric)), "max": float(np.max(metric)),
+                            "positive_count": int(np.count_nonzero(metric > 0.0))},
+        "basis_diagnostics": coefficient_diagnostics(basis),
         "split": split,
         "roles": metrics,
         "wall_seconds": perf_counter() - started,

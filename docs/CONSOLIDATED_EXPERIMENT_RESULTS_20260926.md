@@ -78,7 +78,10 @@ prefix score-gradient basis from the same frozen actor. Stage A
 representation ceiling, and Stage B
 (`scripts/expected_gain_dynamic_predictor.py`) learns only the basis
 coefficients from prefix features, using problem-disjoint validation and
-diagnostic rows. The full protocol and command examples are in
+diagnostic rows. The evaluator accepts a fixed diagonal quadratic metric and
+stores metric-weighted continuation second moments; the metric must be
+prepared from an independent calibration split before replay. The full
+protocol and command examples are in
 [`EXPECTED_GAIN_DYNAMIC_SCORE_EXPERIMENT.md`](EXPECTED_GAIN_DYNAMIC_SCORE_EXPERIMENT.md).
 
 These scripts are deliberately offline: they do not change GRACE's online
