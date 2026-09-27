@@ -1,0 +1,3593 @@
+{
+  "checkpoint_sha256": "f484077fbf5688784ea968be999360a795afedb87c2480fa4b5d7b2339b2373d",
+  "generated_at": "2026-09-27T18:54:30+08:00",
+  "seed": 20260927,
+  "n_baseline": 8,
+  "source": "independent frozen-checkpoint prompt completions",
+  "problems": {
+    "7b94d9ae-87a7-4c0d-99fc-0edea5fb4b86": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "269c1c44-9ccb-4948-805a-e2befa00e33b": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "e440553b-1f00-43aa-8431-a7a4cd99b19e": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "e62793ce-ec83-40c0-b915-742e3b477cd4": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "7ab6f6ce-bc3d-433b-b96e-5a406b7dae7b": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "a3c44e92-c7ed-4f7f-ac1c-abdcb0eddfcd": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "fe0baaa6-9fe1-4df6-b185-babfd07017f0": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ]
+    },
+    "5ae3e585-ce15-4218-9b01-b4d730f1d050": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "6c2e988d-7f11-4536-bac8-fd781c21eae1": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "5fc4fbb4-7341-4fa7-b545-fa0aae6557e1": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "107d3122-08ad-494a-ab57-cc3d39421445": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "f408cd19-2564-426b-bf38-ac719224bf14": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "758bcb14-f97d-4323-b686-0e765a21a8fc": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "0e97a050-c63e-4d05-a5b8-f356709e580d": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "a936380f-cb50-4c0a-bf10-ee9fe441c878": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "c7858eb5-f707-4c71-9c60-27692db1fa05": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "0c10f964-ca0f-40d9-a12f-cd104b35a290": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "f84df893-a442-4a26-add8-3e1e02d909fd": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "8e9418ab-65f7-4a45-894d-1f15669a567a": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "d3065cdf-715b-4694-a101-3b8430556d74": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "b5eea887-271a-4c34-b9b9-c970ac1a9915": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "94a66366-e8db-4541-a175-21193e0be14d": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "043816dc-3fc3-4b90-b646-49bdceb414ce": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "be830149-294d-42df-a71a-d6852473d198": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "0ba04ed5-8af6-42b3-9d59-d4fab41ef124": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "e8c44c00-f194-44ed-bd04-623fd9d61e45": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "11849c02-eaab-49fe-a3f3-98b41d844c76": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "110c4235-cd1d-4a71-b7d6-ba4fc4d1f8de": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "c144fddb-bbb9-4eef-a193-a16af39d32a8": {
+      "baseline": 0.5,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        1
+      ]
+    },
+    "5afcfc8e-bb33-4524-aeb5-2f9fa18afc2e": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "97ba39c8-88e9-4b99-830e-2821e73a0420": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "e59f9abb-d67a-42c2-ab33-4d0c2baba006": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "400f43b0-879f-4158-a88e-b8593004224d": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "76b6914d-2b6f-44e7-80a0-c50c4b0784fe": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "e47cdc9f-da06-4512-a160-8fa59c21118e": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "cc3a8e5e-a558-4d22-b791-82869df20c1f": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "d8a589d5-173c-49e4-be23-6a04ea3bc7c1": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "99e31a56-26b6-4bdb-89d0-09882eb94c45": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "571af440-ad42-4da0-8be3-56376aed1006": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "27f3492b-af8e-4662-9f45-c2cc37527ab8": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "73bc6c5e-3bfa-4ca3-85a9-bcbcf4fe6ca2": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "476716ae-a874-45b2-8af7-dc2c7459a4a4": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "28d9b609-23c7-46d2-a402-ff8b3c1e55f8": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "6d7e21a5-d81a-4a98-9f13-909b9aac28b0": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "30bdd4f3-c482-4ab1-88dd-c40e99166ed3": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "5f99878e-6bf0-45b4-8f5c-59d374c72384": {
+      "baseline": 0.875,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    "affe547e-e5c7-413f-b10e-0a23f925e02b": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "3bdcd15d-0f5e-4e20-b0f8-8934a0713596": {
+      "baseline": 0.375,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        1,
+        0,
+        1,
+        0,
+        0,
+        1
+      ]
+    },
+    "c1525087-bfe3-4add-adc9-5cf55318f12b": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        1,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "3f1b5215-5627-4ce6-b438-7d265f49e3f0": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "71ece1c7-67ab-4932-8078-338d7d1ed7ce": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "11890018-5490-4e5f-991f-eac2ed279c8b": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    "8580e746-6fcc-4901-8563-4aade09090e1": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "c850d151-d85a-443c-93c5-8f2d44443ac3": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "fbfc2f27-8e36-4535-a6fd-20822c50ab81": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    "338a4c07-6ff5-4710-b9a6-057bf9d4e32e": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "6f411433-90bf-4a23-a9f0-f547d73e4f9d": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "e80fe46b-492d-4e94-b00c-8aa3e25f64a0": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "a9def5d6-bef6-461f-9d03-e687d64a60d6": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ]
+    },
+    "faff4537-f93c-4d92-a501-b814af5957d2": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "89e6d07a-b92d-4dfa-b24e-80a231d397ff": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    "441b11f5-a9ab-4c57-8187-960767b911c3": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "35025d98-2c2c-472a-a915-6e3e8c11ee1a": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "9798cd89-553e-4840-80b5-8d08219433b1": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "0161be47-82d1-483e-82ab-96354d02ddb4": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "41ae7683-cf9e-45ae-96e7-4afcc06872de": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "1b5baa9a-b342-49f8-af3a-41299984f4d0": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "07af18f7-a32e-4a85-a1aa-464d5222607f": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "1dc3ed91-17cf-4c8a-be97-756b4b493bbd": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "8579c852-602f-41a1-9026-c12f9d3913d9": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "33b07191-12e8-47bf-8017-668f4dc9b275": {
+      "baseline": 0.5,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        1,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0
+      ]
+    },
+    "96afdf85-dfc8-4d1f-9402-8e777bdcefeb": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "aa75364f-fcde-4d0a-80aa-fff075854f8c": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "a8fcb651-7f7f-4896-ab02-c91732f1c637": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "799fc097-a2a3-480c-8c6d-d2acd0767ad4": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "7a05a514-d6ee-4ad3-8b75-fb48df87b44b": {
+      "baseline": 0.375,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        1,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0
+      ]
+    },
+    "6e40545f-2b75-4ae0-90a0-cb31417175c9": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "f346362b-79d3-4bf2-b225-18ac089ec9fa": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    "a84d8baa-d3df-4a80-9813-32ecbff0d44e": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "4adf92ad-f9f0-49d0-968c-575988345003": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    "155382bb-298c-49c0-8eca-6fdf2a6a4cc1": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "c45c978d-2bb8-41a0-a624-10cb0ca9eb7a": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "6f32232d-bebe-4fa3-9dfc-e1129d1debae": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "e54dee00-5ff2-450c-bdba-00c47b146fc8": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "208c62ec-e721-443d-a2c3-a117bab13aa0": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "fe57099a-df8b-4ab7-b444-584420d81afc": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "3cf13c7d-98dd-42e2-a6ee-a1297b369146": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "460ab09a-0128-470b-b720-83727efa5c69": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "938be778-f847-477b-af49-72655f1c1173": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "8268468a-b6b2-4df2-9d56-e1a020f6dfe7": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "49e8d0ad-6a0f-452a-bd36-1686678d6f31": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ed5d5408-a58d-4c1f-96a6-2e2d82cfc152": {
+      "baseline": 0.75,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    "e64a6860-cffd-4b4b-b4aa-7088c116773b": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "2cde7f4d-92e2-4530-9bd5-8abb24d5bd94": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "8340e9f9-c01d-473b-bac8-986b3545a7d4": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "2d6ca7ea-7940-449a-9e8c-e2e5793bf93d": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    "cd68b21f-1d2c-424d-b6b3-72ecdf7faf57": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "170b7e42-578d-4820-918e-28ec99cf97e5": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "89c3c6f0-d7f7-4381-b0e6-075c1c8f7906": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    "5e360543-8c7c-40a6-880c-d8ffb0e80491": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "938a0114-ebd7-4dd1-99f1-3056d4808d49": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "b4c88dfe-6725-4041-864e-dd54463b7dce": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "45ac3f7a-b24c-4aad-856c-008949eeff74": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "42505fdf-2e74-454e-9da2-141c5367dcaa": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "16fbb61d-de67-4b1d-8343-86384409857e": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "6a69a2de-d714-485f-8f31-7e3a599fac21": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "731ed9fe-a914-41e7-ac18-a3b280fe304f": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "e2f421da-d2c8-46a1-bdae-b73254855479": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "6da9c333-52f6-4e29-b766-05e60e627a57": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "050d4cd0-3b7f-4afa-845c-0585ed7c0d98": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "2e0a5a77-967e-4e64-b20f-1bb846e195c9": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    "cb78152b-12d7-46e8-8764-5512cd60e937": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    "c7ca6ebe-77b9-4f08-8dd4-24bd75d8bee4": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "28f1d742-8a03-4709-abdd-1bac6e78d8c3": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "590bf669-fc0e-4cb3-9392-b3a03a053f2d": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "d6a5922a-76e1-4ad1-9581-f6c602bf8e4f": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "7693b48a-01b7-499b-9859-eea95fb56fdb": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        1,
+        0,
+        0
+      ]
+    },
+    "d59c802c-72cd-4855-b49d-d164e39c5015": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "d7289987-a767-4481-b7e6-3d0ee92c09d7": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "24770512-fa3c-4959-ab23-159f9b8f67f3": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ]
+    },
+    "739be673-f088-4feb-8db4-bd2286ac8203": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "181430a1-90d5-4b7d-9435-708396ea2b66": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "369e9d02-969e-428e-bb35-18389dad6bf9": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "84016ccc-2145-44a1-91d6-bb76f09764cc": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    "f93239e3-7261-4096-8ed3-d1117fc9de2d": {
+      "baseline": 0.625,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        1,
+        1,
+        1,
+        0,
+        1,
+        0,
+        0
+      ]
+    },
+    "7671e17d-57ae-4194-8bd5-4c7d83f1fa3a": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "f22c9aa4-1fa9-44dc-9a58-9e88c477ba8a": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "a98d6ab6-c393-4f26-982e-960f3d3a22bc": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "2d00daf0-e917-4d57-856f-a45ef5750870": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "85fa0b97-ff60-42a3-bb4c-d14fb021b585": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "70d9fcbe-2223-46ec-9764-42d915ee7883": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "75f18e07-033a-4434-bd5f-e1fe955cb9fa": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "37c243d7-361c-46b6-8e19-9a0cde3d1b7a": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "3222d5d6-71cf-4b37-925b-d300f16add01": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "d2d94be6-a510-46c0-89c5-466458a41822": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "df123b2c-373f-4ed2-8955-e016bb9804ba": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "f399477f-55ff-4801-9232-98464b12577e": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "69142055-e8d3-4506-ae3b-ec632d9a1c7a": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "40119b55-ec2b-453e-81f2-0c4805749c90": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "2004b719-fe23-4468-bec9-88537a9f3162": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    "90d99eb4-75aa-4495-8975-84e5ae1a8907": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "0a8567c2-4ecf-4f3b-8b70-9dfdca23cddb": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "c435e318-d08f-461e-aa66-8d606a91e789": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "6137f3cc-cd8e-43dd-9213-2e4c3784c96e": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ba165057-0239-4b18-bce5-e8f52d88eae8": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "7b766156-fbe4-46ee-903b-8dce4378dd74": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "bea116ad-0450-41dc-ac3d-de0dd06baa49": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "9a1fa61a-dbb4-4676-bc35-1003c44ef973": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "b68c1d27-b97c-4316-bc99-601329fe4525": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "c0920ae8-a7dc-49d8-a853-b3f13ca2b6ee": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "747f3da0-3ba9-472a-9b7d-b1b3562d71bc": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1
+      ]
+    },
+    "a0044427-2691-4354-add8-d10e674acf3d": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "769b8648-0af5-4dbf-b82b-7a9e8e52b06b": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "5d21ea89-7190-4dc8-b6c2-540ec349219b": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "2c5d98c6-91c7-4299-812f-68e00c15398f": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        1
+      ]
+    },
+    "fc6013b7-1476-4225-8521-ffbd8295bdcb": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "4e5124aa-2ea7-48d4-9a85-cc846300a6d3": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "2d64afea-0fa4-44cb-b5d9-0fda6fe9df41": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "aa9f472d-f9aa-4f81-9ed4-398351243b6e": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "58c52e09-9e94-47bd-90f8-290cb4941eb5": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "a468cf87-74aa-40ec-bda8-69584353af3b": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "30fa89f5-c94a-4140-9c41-2f2082c096f0": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "0a905be8-ed8d-490b-88b9-02d9eba27602": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    "75c7e49a-120f-47e8-8077-eea6f881fd64": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "114f3961-d158-4b30-8ace-67fc24e86d20": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "bcdeeafc-1254-4802-96c1-b8a684a31614": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "075fc58d-f21c-4203-b36f-5058f6da9a59": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ef4d9843-e72d-4dba-9b8b-68e88346e7e0": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "30271b4e-9dfd-40c6-b402-84c29e9d75d1": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "faf8b8dc-bf58-4531-9993-8710aefa2fb0": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "7fbfb5fc-4521-4de9-99cb-9dc6ff89d3e1": {
+      "baseline": 0.5,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        1,
+        0,
+        1,
+        0,
+        1,
+        1,
+        0
+      ]
+    },
+    "faeec1ec-5f5a-4023-bf3f-6eec78a8ec85": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ecfc384e-7887-439d-be55-958f23e02987": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "141d762f-c395-47d6-a8ed-73f2eebd503b": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0
+      ]
+    },
+    "8ec5b0fa-b743-4cac-89f2-b77655e3b9d9": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "c81b332f-be0f-47a2-9759-597d6e7ed7e0": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "b02aa526-d149-4e0a-a685-400b77e2d891": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "57b570df-7ce8-4a8f-ad79-7ce03d129870": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "4c08396d-f7bd-46f3-a504-9ebf558568cd": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "e4857c22-dcd7-4c3b-b406-bc7a4bb30368": {
+      "baseline": 0.375,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    "eafc01ad-ccec-466f-ab2b-cb39d538f3db": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "408bc4ee-5f1f-4e69-9644-e005ad293056": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "3935f7ba-e09c-4018-9183-b3938936ea09": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "7b8cec4e-9583-4b25-9e72-26ccad2f1091": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "65ca41de-a7cb-47c5-97fd-fa1d7aa9096a": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "2342df75-7478-4d36-ab22-18946e8d261e": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "0a3d137b-59d8-49d0-9601-04e2325a2f2e": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "3e68e15e-951c-43e3-8ccc-2a661f6bf463": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "61a3e42f-9342-4ebc-a4e2-a8f82067197b": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "34c6aee1-b6c3-47f9-a563-1f19d0f01cd8": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "1efb743e-948d-498b-9495-29cefb9cd482": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    "89511d36-6fd2-4960-bfd9-4631f9127e65": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "b7773457-fe92-4ffe-a94e-857f65c21ede": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "de2b78c8-f65d-403f-b06f-2db734a010c3": {
+      "baseline": 0.375,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ee6e753c-3f28-4068-a97b-98a28bb2a2fb": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "b5917ecc-675e-407a-9f26-c913f066385f": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    "b5ead702-7bd4-4e00-a72a-d305ac591892": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        1,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "b2c49136-11ed-442a-9201-db28b66ffdc8": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "fb53e76b-ad17-484f-b13e-d9231aae6803": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "dac883af-7bb5-4f23-b9eb-b628633f4605": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "07e856a6-1edb-44f2-afec-ba56295cc2e1": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        1,
+        0,
+        1,
+        0,
+        0
+      ]
+    },
+    "fa90c7d1-1cc6-49a0-8c8b-13ddd50ab12f": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "6f368787-edea-4761-97ad-f168903e736f": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ce889fc5-9820-4022-a0a3-9ac7ae5c8452": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "06e20141-f9c2-426b-951b-6555fa890a3f": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "1b5f4642-ea10-44c3-991b-143d0fd14450": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "add62b66-44a0-4a7b-b9fc-eccae2affc8d": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "bb631369-a7a1-4fa6-b060-78f2b226c23d": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "02cd07ee-2130-4ae1-90db-5bfbf5534cad": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "6fcd713b-7a91-4523-a018-34026c4bac88": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "357ed618-1aaa-4685-9105-8d8e44a4578d": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "40eb801c-e9e2-462a-a737-9aedbe0913f2": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "384e85d2-ea77-4cf6-bbea-22701800c6c4": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "f5b4cc11-1ceb-43e9-8bc5-ab84dd76157a": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "d27c9bac-6b54-4d19-9d8b-1b7d7d713a11": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        1,
+        0,
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "101db56d-a6bf-4bd0-aa19-f520ba80e31e": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "d731ae4b-45f2-492a-8058-3dbda3e06f4a": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "2517c249-d9de-47de-b421-8bb6c001635d": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "21eb7339-50c8-4401-8f46-c1360869713f": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ece1f315-081c-4a30-8c11-70908139e5c1": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "5e1218b2-7aae-4050-bea1-2cec3735fe7b": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "01614808-71a8-43d2-909e-f53fa3e79efe": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "34212085-a68a-4af2-b2b0-2a1835d3f9a3": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "2aa1383a-c619-4420-93e6-bc8da6e3a32b": {
+      "baseline": 0.5,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        1,
+        0,
+        1,
+        1,
+        1,
+        0
+      ]
+    },
+    "6c441912-b35f-4158-b5d0-c7ac7d6470c6": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "5f7ebb21-c56e-4849-bd70-cb5ad5780c45": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "953581c2-5fd6-4613-af7e-f777293a5758": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    "4859a3b1-2998-4070-add1-29e905ee0a28": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "55b73431-b0c6-41e2-8ac7-e80376a6bae5": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "f65ed4c2-b5a3-42d1-b137-b07f0972c84a": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "f15ec1b1-42c4-447f-9360-f07e483e0409": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "d0cce8e5-0074-4ea4-99c2-22cb6e0bc87f": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "832e3045-1b57-4698-aee1-d2707ca4a327": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "8bf372f7-b87d-401c-9757-5016dc5c8fc5": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "e45ffdc6-ced3-447e-b971-a2f5dfd277b4": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "19b02f3f-fed8-49d8-b4a8-c25ddc9d836c": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "d8de3166-1377-4ff0-a17c-1b74479cfe2b": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "3cee50e7-f055-4259-a662-728dd6f66772": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "1f59568a-4083-49fb-a3f4-ef185d73d78e": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "c943c99b-d19e-40e0-ac5b-5c1dc46bc995": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    "c958796c-bcbc-4d06-bfee-875fb01332d2": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ]
+    },
+    "612d1769-97d6-445e-b096-91fa463f8cc6": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ba8e8430-5336-41cb-9894-58b0497ae0a3": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "d8e2a608-7bba-4f86-85aa-f06699b02000": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "0540b0f1-64a5-405f-b747-52f34fb4ad27": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "cb72c3f4-0eca-47b0-9761-787d36721cc0": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "73ef41bc-e9ea-4e1d-9b31-06c8e3785fea": {
+      "baseline": 0.5,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        0,
+        1,
+        0,
+        0,
+        1,
+        1,
+        0
+      ]
+    },
+    "603847cd-e73d-4e66-8f5c-05606c017a3b": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "e3c5f320-5604-49a8-8cfd-6f1e5611f1af": {
+      "baseline": 0.25,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    "e253dd34-1765-4f5a-8f8b-4df566978064": {
+      "baseline": 0.375,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    "8e23387c-ee16-4d68-ae84-abdea54060b1": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "3e1f2221-5eae-4d1a-9188-f7c2bffadcce": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "f4b6437d-4f58-49af-858e-5d67e77f980c": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "d7fdca23-89b4-4dd7-a282-c68d3aa2fb4e": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "a7db5043-6f23-4493-b3f6-890c61670bd6": {
+      "baseline": 0,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "f1cdb3c1-2050-4a5b-aed9-72e10d353034": {
+      "baseline": 0.125,
+      "n_samples": 8,
+      "rewards": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    }
+  }
+}
