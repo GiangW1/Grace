@@ -438,8 +438,50 @@ def test_sparse_predictor_batches_arriving_prefixes(monkeypatch):
             futures = [executor.submit(predictor.decide, 2, [1, 11, 11], 1, str(i))
                        for i in range(4)]
             results = [future.result() for future in futures]
+        predictor.set_batch_size(1)
+        singleton = predictor.decide(2, [1, 11, 11], 1, "single")
     finally:
         predictor.close()
-    assert sizes == [4]
+    assert sizes == [4, 1]
     assert all(row["feature_batch_size"] == 4 for row in results)
     assert all(row["p"] == pytest.approx(0.5) for row in results)
+    assert singleton["feature_batch_size"] == 1
+
+
+def test_sparse_batch_comparison_keeps_controls_and_checks_workload():
+    from scripts.truncation_refill_serve import (
+        _arms, compared_batch_arms, parse_batch_comparison, summarize_trials,
+    )
+
+    sizes = parse_batch_comparison("1,4")
+    arms = _arms(["full_pg", "single_stream", "learned_single"], 512, 1024,
+                 0.5, 0.65, 0.5)
+    compared = compared_batch_arms(arms, sizes)
+    assert [arm.name for arm in compared] == [
+        "full_pg", "single_stream", "learned_single_batch1", "learned_single_batch4",
+    ]
+    assert [arm.name for arm in reversed(compared)][:2] == [
+        "learned_single_batch4", "learned_single_batch1",
+    ]
+    with pytest.raises(ValueError, match="two distinct positive"):
+        parse_batch_comparison("4,4")
+
+    base = {"repeat": 0, "wall_seconds": 10.0, "generated_tokens": 100,
+            "tail_after_90_percent_seconds": 1.0, "feature_seconds": 2.0,
+            "prediction_seconds": 0.1, "stopped": 2, "hit_max": 1,
+            "decision_latency_mean_seconds": 0.02,
+            "decision_latency_p95_seconds": 0.03,
+            "feature_queue_mean_seconds": 0.001,
+            "feature_queue_p95_seconds": 0.002,
+            "observed_feature_batch_size_mean": 1.0,
+            "selection_sha256": "same", "token_lengths_sha256": "same",
+            "trajectories_sha256": "same"}
+    trials = [{**base, "arm": "learned_single_batch1"},
+              {**base, "arm": "learned_single_batch4", "wall_seconds": 8.0,
+               "observed_feature_batch_size_mean": 3.5}]
+    comparison = summarize_trials(trials, batch_sizes=sizes)["comparisons"][0]
+    assert comparison["wall_ratio_right_over_left"] == pytest.approx(0.8)
+    assert comparison["same_generated_tokens"]
+    assert comparison["same_selection_by_start"]
+    assert comparison["same_token_lengths_by_start"]
+    assert comparison["same_trajectories_by_start"]

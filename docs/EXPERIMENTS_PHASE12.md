@@ -4,6 +4,9 @@ The experiments use a frozen actor snapshot. The serving probe keeps its
 workload fixed, while the predictor analyses reuse stored audit labels; none
 of them updates the actor during measurement.
 
+The fast prefix-conditioned scalar training-value audit is documented in
+[EXPECTED_GAIN_DIRECTIONAL_AUDIT.md](EXPECTED_GAIN_DIRECTIONAL_AUDIT.md).
+
 The later sparse-checkpoint serve experiment, including 512/1024 decisions,
 global-barrier comparison, cost calibration, and frozen-predictor timing, is
 documented in [TRUNCATION_REFILL_SERVE.md](TRUNCATION_REFILL_SERVE.md).

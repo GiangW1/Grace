@@ -1,0 +1,13 @@
+{
+  "n_prefixes": 382,
+  "n_problems": 229,
+  "dimension": 5898240,
+  "merged_sources": 3,
+  "directional_values": {
+    "path": "directional_values.npy",
+    "shape": [
+      382,
+      16
+    ]
+  }
+}

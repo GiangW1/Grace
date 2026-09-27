@@ -12,11 +12,14 @@ import json
 from pathlib import Path
 import sys
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from grace_gc.audit.benefit_replay import audit_rows, replay_means, audit_file, replay_config
+from grace_gc.audit.dynamic_score import load_diagonal_metric
 from grace_gc.audit.expected_gain import start_experiment_run
 
 
@@ -25,6 +28,10 @@ def main(argv=None) -> int:
     parser.add_argument("--bundles", required=True)
     parser.add_argument("--reference-dir", default=None,
                         help="disjoint reference replay; records two independent half-suffix gain means")
+    parser.add_argument("--direction-file", default=None,
+                        help="optional .npy ascent/update direction; mutually exclusive with --reference-dir")
+    parser.add_argument("--direction-sidecar", default=None,
+                        help="optional exported-direction JSON; adjacent .json is checked automatically")
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--model-path", required=True)
     parser.add_argument("--config", action="append", default=[])
@@ -33,6 +40,12 @@ def main(argv=None) -> int:
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--skip-prompt-features", action="store_true",
                         help="omit the prompt-only forward baseline to save replay time")
+    parser.add_argument("--store-half-means", action="store_true",
+                        help="store independent A/B gradient means and second moments for stages A/B")
+    parser.add_argument("--metric-file", default=None,
+                        help="fixed diagonal metric weights; required before weighted A/B replay")
+    parser.add_argument("--metric-name", default=None,
+                        help="pre-registered name for the metric, e.g. adam_diagonal or fisher_diagonal")
     parser.add_argument("--run-dir", required=True)
     args = parser.parse_args(argv)
 
@@ -44,7 +57,7 @@ def main(argv=None) -> int:
                                             prefix_feature_bundle, trainable_params)
     from grace_gc.backends.verl_trainer import load_lora_actor
     from grace_gc.core.layout import collect_lora_layout
-    from grace_gc.data.tokenize import load_hf_tokenizer
+    from grace_gc.data.tokenize import collect_stop_token_ids, load_hf_tokenizer
     from grace_gc.trainer.checkpoint import load_checkpoint
     from grace_gc.trainer.state_io import check_snapshot_identity, load_numpy_module_state
     from grace_gc.versions import sha256_file, sha256_named, sha256_array
@@ -65,17 +78,26 @@ def main(argv=None) -> int:
         raise ValueError("checkpoint LoRA layout dimension does not match actor")
     if payload.get("layout_names") is not None and list(payload["layout_names"]) != layout.names():
         raise ValueError("checkpoint LoRA parameter order does not match actor")
+    metric_weights = load_diagonal_metric(args.metric_file, layout.dim)
+    metric_name = (str(args.metric_name) if args.metric_name else
+                   ("diagonal_file" if args.metric_file else "euclidean"))
     tok = load_hf_tokenizer(args.model_path)
     pad = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
     if pad is None:
         raise ValueError("tokenizer needs a pad or EOS ID")
+    stop_ids = collect_stop_token_ids(tok)
     engines = SimpleNamespace(
-        logprob_one=partial(logprob_one, actor, pad_id=int(pad), eos_id=tok.eos_token_id),
+        logprob_one=partial(logprob_one, actor, pad_id=int(pad), eos_id=stop_ids),
         trainable_params=partial(trainable_params, actor),
         named_lora=partial(named_lora_params, actor),
     )
     destination = start_experiment_run(args.run_dir, "expected_gain_replay", vars(args))
     reference = None
+    direction_kind = None
+    direction_sidecar_kind = None
+    reference_rows = None
+    if args.reference_dir and args.direction_file:
+        raise ValueError("choose at most one of --reference-dir and --direction-file")
     if args.reference_dir:
         from grace_gc.audit.expected_gain import load_replay, reference_gradient
         ref_provenance = json.loads((Path(args.reference_dir) / "replay_provenance.json")
@@ -86,6 +108,32 @@ def main(argv=None) -> int:
         if reference_means.shape[1] != layout.dim:
             raise ValueError("reference replay LoRA dimension differs")
         reference = reference_gradient(reference_rows, reference_means)
+        direction_kind = "reference_gradient"
+    elif args.direction_file:
+        reference = np.asarray(np.load(args.direction_file), dtype=np.float64).reshape(-1)
+        if reference.shape != (layout.dim,) or not np.all(np.isfinite(reference)):
+            raise ValueError("direction-file must contain one finite vector with layout_dim entries")
+        direction_kind = "direction_file"
+        sidecar_path = (Path(args.direction_sidecar) if args.direction_sidecar else
+                        Path(args.direction_file).with_suffix(".json"))
+        if args.direction_sidecar and not sidecar_path.is_file():
+            raise FileNotFoundError(f"direction sidecar is not readable: {sidecar_path}")
+        if sidecar_path.is_file():
+            sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+            if sidecar.get("path") != str(Path(args.direction_file).resolve()):
+                raise ValueError("direction sidecar points to another direction file")
+            if sidecar.get("actor_sha256") != sha256_named(named):
+                raise ValueError("direction sidecar actor differs from checkpoint actor")
+            if sidecar.get("checkpoint_sha256") != sha256_file(args.checkpoint):
+                raise ValueError("direction sidecar checkpoint differs from replay checkpoint")
+            if (sidecar.get("layout_dim") != layout.dim or
+                    sidecar.get("layout_names") != layout.names()):
+                raise ValueError("direction sidecar layout differs from replay layout")
+            if sidecar.get("direction_sha256") != sha256_array(reference):
+                raise ValueError("direction sidecar vector hash differs from direction file")
+            direction_sidecar_kind = sidecar.get("direction_kind")
+        else:
+            sidecar_path = None
     def prompt_features(row):
         tokens = row.get("prompt_token_ids")
         if not tokens:
@@ -94,17 +142,19 @@ def main(argv=None) -> int:
                             else float(row.get("baseline") or 0.))
         return prefix_feature_bundle(actor, [tokens], [len(tokens)],
                                      [feature_baseline],
-                                     int(pad), eos_id=tok.eos_token_id)["prompt_features"][0]
+                                     int(pad), eos_id=stop_ids)["prompt_features"][0]
 
     source_rows = list(audit_rows(args.bundles, args.decision_tokens))
-    if reference is not None and ({str(row["problem_id"]) for row in source_rows} &
+    if args.reference_dir and ({str(row["problem_id"]) for row in source_rows} &
                                    {str(row["problem_id"]) for row in reference_rows}):
         raise ValueError("predictor and reference problems overlap")
     result = replay_means(source_rows,
                           partial(_policy_grad_vec, engines, layout), layout.dim,
                           destination, args.max_continuations, args.seed,
                           None if args.skip_prompt_features else prompt_features,
-                          reference)
+                          reference, store_half_means=args.store_half_means,
+                          metric_weights=metric_weights, metric_name=metric_name)
+    np.save(destination / "metric_weights.npy", metric_weights)
     provenance = {"checkpoint": str(Path(args.checkpoint).resolve()),
                   "checkpoint_sha256": sha256_file(args.checkpoint),
                   "actor_sha256": sha256_named(named),
@@ -114,8 +164,24 @@ def main(argv=None) -> int:
                   "max_continuations": args.max_continuations,
                   "seed": args.seed,
                   "prompt_features_replayed": not args.skip_prompt_features,
+                  "half_means_stored": bool(args.store_half_means),
+                  "metric_name": metric_name,
+                  "metric_file": (None if args.metric_file is None else
+                                   str(Path(args.metric_file).resolve())),
+                  "metric_weights_sha256": sha256_array(metric_weights),
                   "reference_dir": args.reference_dir,
-                  "reference_direction_sha256": None if reference is None else sha256_array(reference),
+                   "direction_file": (None if args.direction_file is None else
+                                       str(Path(args.direction_file).resolve())),
+                   "direction_file_sha256": (None if args.direction_file is None else
+                                               sha256_file(args.direction_file)),
+                   "direction_sidecar": (None if args.direction_file is None or sidecar_path is None else
+                                          str(sidecar_path.resolve())),
+                   "direction_sidecar_sha256": (None if args.direction_file is None or sidecar_path is None else
+                                                 sha256_file(sidecar_path)),
+                   "direction_kind": direction_sidecar_kind or direction_kind,
+                  "direction_sha256": None if reference is None else sha256_array(reference),
+                  "reference_direction_sha256": (None if args.reference_dir is None or reference is None
+                                                  else sha256_array(reference)),
                   "lora": cfg.get("lora"),
                   "source_actor_metadata_available": source_meta.is_file(),
                   "layout_names": layout.names(), "layout_dim": layout.dim,

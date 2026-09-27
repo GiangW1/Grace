@@ -5,24 +5,26 @@ from __future__ import annotations
 import numpy as np
 
 
-def adamw_update_direction(actor_state, layout, optimizer_state, optim_cfg,
-                           ascent_gradient, reference_gradient, clip: float):
-    """Run the actual PyTorch AdamW step and return its reference-direction gain.
+def adamw_update_vector(actor_state, layout, optimizer_state, optim_cfg,
+                        ascent_gradient, clip: float):
+    """Replay one AdamW step and return its flattened parameter delta.
 
     `ascent_gradient` is already averaged over the fixed N starts. The optimizer
     receives its negative; clipping follows actor_update.apply_correction_clip_step.
     Each invocation constructs the same starting weights and optimizer moments.
+
+    The returned vector is the parameter delta. Because AdamW receives the
+    negative ascent gradient, the delta is already ascent-aligned.
     """
     import torch
 
     from grace_gc.audit.batch_audit import OptimizerReplay
 
     g = np.asarray(ascent_gradient, dtype=np.float64).reshape(-1)
-    ref = np.asarray(reference_gradient, dtype=np.float64).reshape(-1)
-    if g.shape != (layout.dim,) or ref.shape != g.shape:
-        raise ValueError("gradient/reference dimension disagrees with checkpoint layout")
-    if not np.all(np.isfinite(g)) or not np.all(np.isfinite(ref)):
-        raise ValueError("counterfactual gradients must be finite")
+    if g.shape != (layout.dim,):
+        raise ValueError("gradient dimension disagrees with checkpoint layout")
+    if not np.all(np.isfinite(g)):
+        raise ValueError("counterfactual gradient must be finite")
     if not optimizer_state or not optimizer_state.get("state"):
         raise ValueError("checkpoint lacks advanced AdamW moment state")
     named = []
@@ -40,6 +42,19 @@ def adamw_update_direction(actor_state, layout, optimizer_state, optim_cfg,
     if replay.kind != "AdamW":
         raise ValueError("expected-gain probe requires an AdamW checkpoint")
     delta, stats = replay.step(g)
+    return np.asarray(delta, dtype=np.float64), stats
+
+
+def adamw_update_direction(actor_state, layout, optimizer_state, optim_cfg,
+                           ascent_gradient, reference_gradient, clip: float):
+    """Run AdamW and return its reference-direction gain."""
+    ref = np.asarray(reference_gradient, dtype=np.float64).reshape(-1)
+    if ref.shape != (layout.dim,):
+        raise ValueError("reference dimension disagrees with checkpoint layout")
+    if not np.all(np.isfinite(ref)):
+        raise ValueError("counterfactual reference gradient must be finite")
+    delta, stats = adamw_update_vector(actor_state, layout, optimizer_state, optim_cfg,
+                                       ascent_gradient, clip)
     return {"reference_dot_delta": float(ref @ delta),
             "delta_norm": stats["parameter_update_norm"],
             "preclip_grad_norm": stats["grad_norm_preclip"],
