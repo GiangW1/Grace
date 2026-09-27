@@ -84,6 +84,15 @@ prepared from an independent calibration split before replay. The full
 protocol and command examples are in
 [`EXPECTED_GAIN_DYNAMIC_SCORE_EXPERIMENT.md`](EXPECTED_GAIN_DYNAMIC_SCORE_EXPERIMENT.md).
 
+The follow-up audit now stores the A/B reward, baseline, and advantage means,
+accepts an independent per-problem baseline calibration with checkpoint hash,
+and reports the observed half-A reward strata. Stage A compares the
+reward-only `(q_hat-b) * g_h` oracle with the freely fitted coefficient and
+reports the cross-fitted residual gap and orthogonal energy fraction. The
+directional audit can also correlate a fixed label with the shared
+`-0.5 * <g_h, d>` prefix term. Euclidean evaluation remains available when a
+weighted replay is loaded, so Adam diagonal weights stay a secondary metric.
+
 These scripts are deliberately offline: they do not change GRACE's online
 estimator, actor updates, scheduler, or claim boundary. A/B output is required
 before deciding whether to add the value-head cross term or an online run.

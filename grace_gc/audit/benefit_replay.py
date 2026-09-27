@@ -105,9 +105,9 @@ def check_replayed_gradient(grad, row, index: int) -> tuple[float, float | None,
 
 def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                  max_continuations: int | None = 16, seed: int = 17,
-                 prompt_feature_fn=None, reference_direction=None,
+                 prompt_feature_fn=None, feature_bundle_fn=None, reference_direction=None,
                  store_half_means: bool = False, metric_weights=None,
-                 metric_name: str = "euclidean") -> dict:
+                 metric_name: str = "euclidean", verify_saved_gradients: bool = True) -> dict:
     """Stream exact G labels, storing one FP64 mean per live prefix.
 
     When ``reference_direction`` is supplied, also store the scalar dot
@@ -193,7 +193,7 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
             second = np.zeros(dimension, dtype=np.float64)
             norm_sum = 0.0
             norms, metric_norms = [], []
-            rewards, costs = [], []
+            rewards, baselines, advantages, costs = [], [], [], []
             replay_errors = {}
             expected_norms = row.get("true_grad_norm_sq") or []
             if expected_norms and len(expected_norms) < len(records):
@@ -212,10 +212,14 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                         np.asarray(grad_fn(tokens, prompt_len, reward, baseline), dtype=np.float64))
                 if grad.shape != (dimension,) or not np.all(np.isfinite(grad)):
                     raise ValueError(f"prefix {i} continuation {j} has an invalid gradient")
-                try:
-                    norm, norm_error, sketch_error = check_replayed_gradient(grad, row, int(original_index))
-                except ValueError as exc:
-                    raise ValueError(f"prefix {i} continuation {j}: {exc}") from exc
+                if verify_saved_gradients:
+                    try:
+                        norm, norm_error, sketch_error = check_replayed_gradient(
+                            grad, row, int(original_index))
+                    except ValueError as exc:
+                        raise ValueError(f"prefix {i} continuation {j}: {exc}") from exc
+                else:
+                    norm, norm_error, sketch_error = float(grad @ grad), None, None
                 max_norm_error = max(max_norm_error, norm_error or 0.0)
                 max_sketch_error = max(max_sketch_error, sketch_error or 0.0)
                 replay_errors[str(int(original_index))] = {
@@ -230,6 +234,8 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                 norms.append(norm)
                 metric_norms.append(float(np.sum(metric * grad * grad)))
                 rewards.append(reward)
+                baselines.append(baseline)
+                advantages.append(reward - baseline)
                 costs.append(float(rec.get("generated_suffix_tokens", 0)))
             mean /= n
             matrix[i] = mean
@@ -245,6 +251,17 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                 half_b_norms[i] = float(np.mean(norms[first_n:]))
                 half_a_metric_norms[i] = float(np.mean(metric_norms[:first_n]))
                 half_b_metric_norms[i] = float(np.mean(metric_norms[first_n:]))
+            feature_bundle = None if feature_bundle_fn is None else feature_bundle_fn(row)
+            if feature_bundle is not None and set(feature_bundle) != {"features", "prompt_features"}:
+                raise ValueError("feature_bundle_fn must return features and prompt_features")
+            if feature_bundle is None:
+                feature_values = row.get("features")
+                prompt_values = (None if prompt_feature_fn is None else
+                                 np.asarray(prompt_feature_fn(row), dtype=np.float64).tolist())
+            else:
+                feature_values = np.asarray(feature_bundle["features"], dtype=np.float64).tolist()
+                prompt_values = (None if feature_bundle["prompt_features"] is None else
+                                 np.asarray(feature_bundle["prompt_features"], dtype=np.float64).tolist())
             info = {
                 "index": i, "problem_id": str(row["problem_id"]),
                 "path_id": str(row.get("path_id") or i), "t": int(row["t"]),
@@ -253,8 +270,23 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                                          for index in chosen},
                 "replay_errors": replay_errors,
                 "mean_norm_sq": norm_sum / n,
-                "half_mean_dot": half_dot, "mean_reward": float(np.mean(rewards)),
+                "half_mean_dot": half_dot,
+                "mean_reward": float(np.mean(rewards)),
+                "mean_baseline": float(np.mean(baselines)),
+                "mean_advantage": float(np.mean(advantages)),
                 "half_counts": ([first_n, second_n] if store_half_means else None),
+                "half_reward_sum": ([float(np.sum(rewards[:first_n])),
+                                      float(np.sum(rewards[first_n:]))]
+                                     if store_half_means else None),
+                "half_mean_reward": ([float(np.mean(rewards[:first_n])),
+                                       float(np.mean(rewards[first_n:]))]
+                                      if store_half_means else None),
+                "half_mean_baseline": ([float(np.mean(baselines[:first_n])),
+                                         float(np.mean(baselines[first_n:]))]
+                                        if store_half_means else None),
+                "half_mean_advantage": ([float(np.mean(advantages[:first_n])),
+                                          float(np.mean(advantages[first_n:]))]
+                                         if store_half_means else None),
                 "half_mean_norm_sq": ([float(half_a_norms[i]), float(half_b_norms[i])]
                                        if store_half_means else None),
                 "half_metric_norm_sq": ([float(half_a_metric_norms[i]),
@@ -264,10 +296,10 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                                             float((second / second_n) @ direction)]
                                            if direction is not None and first_n and second_n else None),
                 "mean_cost": float(np.mean(costs)), "baseline": float(row.get("baseline") or 0),
-                "features": row.get("features"), "prompt_token_ids": row.get("prompt_token_ids"),
+                "features": feature_values,
+                "prompt_token_ids": row.get("prompt_token_ids"),
                 "prefix_token_ids": row.get("prefix_token_ids"),
-                "prompt_features": (None if prompt_feature_fn is None else
-                                    np.asarray(prompt_feature_fn(row), dtype=np.float64).tolist()),
+                "prompt_features": prompt_values,
             }
             metadata.append(info)
             handle.write(json.dumps(info, ensure_ascii=False) + "\n")
