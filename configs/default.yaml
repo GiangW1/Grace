@@ -9,6 +9,7 @@ format_warmup:
   steps: 256
   batch_size: 8
 temperature: 1.0
+enable_thinking: false
 eval_temperature: 0.6
 eval_top_p: 0.95
 eval:

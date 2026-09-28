@@ -1,0 +1,35 @@
+# Next mechanism audit: long reasoning, two early decision points, and both
+# the strong update claim and the independent functional answer gate.
+experiment_variant: reasoning_mechanism_audit
+backend: gpu_verl
+method: full_pg
+enable_thinking: true
+decision_tokens: 1024
+max_new_tokens: 8192
+audit:
+  n_problems: 64
+  n_prefixes: 2
+  n_continuations: 64
+  n_baseline: 16
+  decision_grid: [1024, 2048]
+  max_new_tokens: 8192
+  # Supply the actual pre-registered file with --difficulty-manifest.
+  difficulty_counts: {easy: 16, medium: 32, hard: 16}
+  store_features: true
+  store_trajectory_gradients: true
+  functional_qualification:
+    enabled: true
+    n: 4
+    max_new_tokens: 32
+    majority: 0.5
+analysis:
+  gradient_target: trajectory
+  require_pre_emit: true
+hardware:
+  name: a100
+  n_gpu: 1
+  gpu_memory_gb: 80
+vllm:
+  tensor_parallel: 1
+  dtype: bfloat16
+  gpu_memory_utilization: 0.5

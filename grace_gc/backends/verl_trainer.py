@@ -334,7 +334,8 @@ def _train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None,
             return pr, pi, go, meta
         batch = sample_starts(train_recs, n_prompts, starts_per, draw_rng)
         pr, pi, go = encode_records_hf(
-            batch, tokenizer, int(cfg.get("prompt_max_tokens", 1024)), prompt_meta=meta
+            batch, tokenizer, int(cfg.get("prompt_max_tokens", 1024)), prompt_meta=meta,
+            enable_thinking=bool(cfg.get("enable_thinking", False)),
         )
         return pr, pi, go, meta
 

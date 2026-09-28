@@ -96,6 +96,7 @@ def default_config() -> dict[str, Any]:
         "decision_tokens": 16,
         "max_new_tokens": 32,
         "temperature": 1.0,
+        "enable_thinking": False,
         "eval_temperature": 0.6,
         "eval_top_p": 0.95,
         "allocation": {"p_min": 0.2, "beta": 0.5, "bisection_iters": 20},

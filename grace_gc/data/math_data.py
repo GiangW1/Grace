@@ -46,6 +46,55 @@ def select_records(records: list[MathRecord], n: int, selection: str = "first", 
     return ordered[:n] if n else ordered
 
 
+def select_records_difficulty(records: list[MathRecord], n: int, manifest: str | Path,
+                              counts: dict | None = None, seed: int = 17) -> list[MathRecord]:
+    """Select a fixed, seeded mix of predeclared easy/medium/hard problems."""
+    if n < 0:
+        raise ValueError("n_problems must be non-negative")
+    payload = json.loads(Path(manifest).read_text(encoding="utf-8"))
+    mapping = payload.get("difficulty", payload) if isinstance(payload, dict) else None
+    if not isinstance(mapping, dict):
+        raise ValueError("difficulty manifest must map problem IDs to easy/medium/hard")
+    strata = {label: [] for label in ("easy", "medium", "hard")}
+    for record in records:
+        label = str(mapping.get(str(record.problem_id), "")).lower()
+        if label not in strata:
+            raise ValueError(f"difficulty manifest lacks a valid label for {record.problem_id}")
+        strata[label].append(record)
+    if not n:
+        return [record for label in strata for record in strata[label]]
+    requested = {label: int(counts[label]) for label in strata} if counts else {
+        label: n // 3 for label in strata
+    }
+    if any(value < 0 for value in requested.values()):
+        raise ValueError("difficulty counts must be non-negative")
+    remainder = n - sum(requested.values())
+    for label in ("medium", "hard", "easy"):
+        if remainder <= 0:
+            break
+        requested[label] += 1
+        remainder -= 1
+    if sum(requested.values()) != n:
+        raise ValueError("difficulty counts must sum to n_problems")
+    import numpy as np
+
+    rng = np.random.default_rng(int(seed))
+    selected = []
+    leftovers = []
+    for label in ("easy", "medium", "hard"):
+        pool = sorted(strata[label], key=lambda record: record.problem_id)
+        order = rng.permutation(len(pool))
+        take = min(requested[label], len(pool))
+        selected.extend(pool[int(index)] for index in order[:take])
+        leftovers.extend(pool[int(index)] for index in order[take:])
+    if len(selected) < n:
+        order = rng.permutation(len(leftovers))
+        selected.extend(leftovers[int(index)] for index in order[:n - len(selected)])
+    if len(selected) < n:
+        raise ValueError(f"difficulty manifest has only {len(selected)} selectable problems for n={n}")
+    return selected[:n]
+
+
 def selection_manifest(records: list[MathRecord], selection: str, seed: int) -> dict:
     rows = [{"problem_id": r.problem_id, "prompt_sha256": _hash_text(r.prompt),
              "gold_sha256": hashlib.sha256(str(r.answer).encode("utf-8")).hexdigest()}

@@ -34,6 +34,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run-dir", dest="run_dir", default=None, help="default: runs/audit-UTC")
     parser.add_argument("--gradient-target", choices=("suffix", "trajectory"), default=None,
                         help="select legacy (possibly sketched) or full trajectory gradient storage")
+    parser.add_argument("--difficulty-manifest", default=None,
+                        help="predeclared problem-to-easy/medium/hard mapping for stratified generation")
     args = parser.parse_args(argv)
     overrides = {}
     if args.seed is not None:
@@ -52,6 +54,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.gradient_target is not None:
         cfg["analysis"] = {**(cfg.get("analysis") or {}),
                             "gradient_target": args.gradient_target}
+    if args.difficulty_manifest:
+        cfg["audit"] = {**(cfg.get("audit") or {}),
+                         "difficulty_manifest": args.difficulty_manifest}
     if args.generate:
         from grace_gc.audit.run import run_audit
         from grace_gc.data.math_data import load_math_records, records_for_split

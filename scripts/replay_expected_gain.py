@@ -92,6 +92,8 @@ def main(argv=None) -> int:
                         help="store independent A/B gradient means and second moments for stages A/B")
     parser.add_argument("--store-trajectory-decomposition", action="store_true",
                         help="also store prefix score gradients and full-trajectory G A/B means")
+    parser.add_argument("--statistics-only", action="store_true",
+                        help="stream full scores into scalar Euclidean/Adam statistics; no dense per-prefix arrays")
     parser.add_argument("--include-answer-emitted", action="store_true",
                         help="include prefixes whose audit has answer_emitted=true; disables pre-answer filtering")
     parser.add_argument("--metric-file", default=None,
@@ -102,6 +104,8 @@ def main(argv=None) -> int:
                         help="independent JSON calibration with checkpoint_sha256 and problems mapping")
     parser.add_argument("--run-dir", required=True)
     args = parser.parse_args(argv)
+    if args.statistics_only and (args.reference_dir or args.direction_file):
+        raise ValueError("statistics-only replay does not use a fixed reference direction")
 
     from functools import partial
     from types import SimpleNamespace
@@ -243,7 +247,18 @@ def main(argv=None) -> int:
     if args.reference_dir and ({str(row["problem_id"]) for row in source_rows} &
                                    {str(row["problem_id"]) for row in reference_rows}):
         raise ValueError("predictor and reference problems overlap")
-    result = replay_means(source_rows,
+    if args.statistics_only:
+        from grace_gc.audit.streaming_replay import replay_statistics
+        metrics = {"euclidean": np.ones(layout.dim)}
+        if args.metric_file and not np.all(metric_weights == 1.):
+            metrics[metric_name] = metric_weights
+        result = replay_statistics(
+            source_rows, lambda tokens, prompt_len: _policy_grad_vec(engines, layout, tokens, prompt_len, 1., 0.),
+            prefix_score_gradient, layout.dim, destination,
+            args.max_continuations, args.seed, metrics,
+        )
+    else:
+        result = replay_means(source_rows,
                           partial(_policy_grad_vec, engines, layout), layout.dim,
                           destination, args.max_continuations, args.seed,
                           (None if baseline_calibration else
@@ -266,6 +281,8 @@ def main(argv=None) -> int:
                   "prompt_features_replayed": not args.skip_prompt_features,
                   "half_means_stored": bool(args.store_half_means),
                   "trajectory_decomposition_stored": bool(args.store_trajectory_decomposition),
+                  "statistics_only": bool(args.statistics_only),
+                  "streaming_storage": ("sufficient_statistics" if args.statistics_only else None),
                   "gradient_label": result["gradient_label"],
                   "metric_name": metric_name,
                   "metric_file": (None if args.metric_file is None else
@@ -301,13 +318,15 @@ def main(argv=None) -> int:
                   "model_path": args.model_path}
     (destination / "replay_provenance.json").write_text(
         json.dumps(provenance, indent=2, ensure_ascii=False), encoding="utf-8")
-    if args.store_trajectory_decomposition:
+    if args.store_trajectory_decomposition and not args.statistics_only:
         basis_path = destination / "score_gradient_provenance.json"
         basis_provenance = json.loads(basis_path.read_text(encoding="utf-8"))
         basis_provenance.update({key: provenance[key] for key in
                                 ("actor_sha256", "checkpoint_sha256", "layout_dim",
                                  "layout_names", "layout_sha256", "gradient_label")})
         basis_path.write_text(json.dumps(basis_provenance, indent=2), encoding="utf-8")
+    from grace_gc.audit.expected_gain import finish_experiment_run
+    finish_experiment_run(destination)
     print(json.dumps({**result, "run_dir": str(destination)}, ensure_ascii=False))
     return 0
 
