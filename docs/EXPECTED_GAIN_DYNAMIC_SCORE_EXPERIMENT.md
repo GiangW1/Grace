@@ -12,14 +12,30 @@ and the conditional-mean reconstruction error.  A positive result is a
 representation result only; it does not establish a learned predictor or a
 training gain.
 
-The full-trajectory target is available without changing the legacy suffix
-report. Add `--store-trajectory-decomposition` together with
+The legacy replay already stores the full ascent gradient, including the
+prefix contribution. The CLI value `suffix` is retained as a legacy storage
+selector, not a suffix-only mathematical target. Add
+`--store-trajectory-decomposition` together with
 `--store-half-means` during replay. This stores the unweighted prefix score
 gradient `g_h`, independent A/B means of `G=(R-b)(g_h+g_s)`, and matching
 Euclidean/diagonal second moments. Run Stage A/B with
 `--gradient-target trajectory` (the replay's stored basis is used when
 `--score-gradients` is omitted). The target mode is recorded in every summary
-so suffix and full-trajectory results cannot be silently mixed.
+along with the explicit gradient-label definition. No extra prefix term is
+added to the replayed gradient.
+
+Generated trajectory audits spill each prefix's full gradients and score
+gradient to memory-mapped `.npy` sidecars. JSONL records relative paths,
+shapes and checksums; keep those sidecars with the bundle file when moving it.
+The audit and predictor diagnostic readers verify the sidecars when loading.
+
+Replay excludes finished prefixes and prefixes marked `answer_emitted=true`.
+Its summary records both exclusion counts and the number of retained legacy
+rows whose answer status is unknown; unknown rows do not establish pre-answer
+evidence. Original audit bundles remain available for all-observation reports.
+The built-in score basis carries array, row-order, actor/checkpoint and layout
+provenance. Older trajectory replays without this sidecar must be regenerated;
+external legacy score artifacts retain their existing compatibility path.
 
 Stage B keeps the score-gradient basis exact and learns only its coefficients
 from prefix features.  Coefficients are still fitted on half A, while the
@@ -117,7 +133,7 @@ python scripts/extract_prefix_score_gradients.py \
   --run-dir runs/dynamic-score-gradients
 ```
 
-Run the CPU-only oracle and coefficient predictor. For suffix replays,
+Run the CPU-only oracle and coefficient predictor. For legacy replays,
 `--score-gradients` is the `score_gradients.npy` file in the extraction run
 directory; trajectory replays can use the basis stored by replay.
 

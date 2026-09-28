@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, fields, replace
+from pathlib import Path
 
 import numpy as np
 
@@ -22,6 +23,7 @@ from grace_gc.audit.variance_cost import cluster_bootstrap_variance_cost, fit_ev
 from grace_gc.audit.mechanism import full_space_decomposition, summarize_decompositions
 from grace_gc.predictor.risk import full_space_residual
 from grace_gc.trainer.grace_step import control_variate_coordinates, decide_continuation
+from grace_gc.versions import sha256_file
 
 
 @dataclass
@@ -67,12 +69,36 @@ class PrefixBundle:
     cost_feat: list[float] | None = None
 
 
-def bundle_to_dict(bundle: PrefixBundle) -> dict:
-    return {f.name: (value.tolist() if isinstance(value := getattr(bundle, f.name), np.ndarray) else value)
-            for f in fields(PrefixBundle)}
+def bundle_to_dict(bundle: PrefixBundle, include_trajectory_grads: bool = False) -> dict:
+    result = {}
+    for field in fields(PrefixBundle):
+        value = getattr(bundle, field.name)
+        if field.name in {"trajectory_grads", "prefix_score_grad"} and not include_trajectory_grads:
+            value = None
+        result[field.name] = value.tolist() if isinstance(value, np.ndarray) else value
+    return result
 
 
-def bundle_from_dict(raw: dict) -> PrefixBundle:
+def bundle_from_dict(raw: dict, base_dir: str | Path | None = None) -> PrefixBundle:
+    raw = dict(raw)
+    for field in ("trajectory_grads", "prefix_score_grad"):
+        sidecar = raw.get(field + "_sidecar")
+        if raw.get(field) is not None or sidecar is None:
+            continue
+        if base_dir is None:
+            raise ValueError("trajectory gradient sidecar needs the bundle directory")
+        if not isinstance(sidecar, dict) or not sidecar.get("path"):
+            raise ValueError("invalid trajectory gradient sidecar metadata")
+        path = Path(base_dir) / str(sidecar["path"])
+        if not path.is_file():
+            raise FileNotFoundError(f"trajectory gradient sidecar is not readable: {path}")
+        if sidecar.get("sha256") and sha256_file(path) != sidecar["sha256"]:
+            raise ValueError("trajectory gradient sidecar hash differs from metadata")
+        values = np.load(path, mmap_mode="r")
+        expected_shape = tuple(int(x) for x in sidecar.get("shape", ()))
+        if expected_shape and values.shape != expected_shape:
+            raise ValueError("trajectory gradient sidecar shape differs from metadata")
+        raw[field] = values
     values = {f.name: raw[f.name] for f in fields(PrefixBundle) if f.name in raw}
     for key in ("grads", "rewards", "coords", "suffix_cost", "m_pred", "features", "cost_feat",
                 "prefix_score_grad", "trajectory_grads"):
@@ -276,6 +302,7 @@ def audit_bundles(
     if not bundles:
         return {"n_bundles": 0, "note": "no prefixes"}
     gradient_target = str(analysis.get("gradient_target", "suffix"))
+    unavailable_predictors = []
     if gradient_target not in {"suffix", "trajectory"}:
         raise ValueError("gradient_target must be suffix or trajectory")
     if gradient_target == "trajectory":
@@ -295,6 +322,15 @@ def audit_bundles(
             target_m = (None if b.m_pred is None else np.asarray(b.m_pred, dtype=np.float64))
             if target_m is not None and (target_m.ndim != 1 or target_m.shape[0] != target_grads.shape[1]):
                 target_m = None
+                predicted = b.effective_coords if b.effective_coords is not None else b.coords
+                if (predicted is not None and np.asarray(predicted).shape == (u.shape[1],)
+                        and u.shape[0] == target_grads.shape[1] and u.size):
+                    target_m = u @ np.asarray(predicted, dtype=np.float64)
+                else:
+                    unavailable_predictors.append({
+                        "problem_id": b.problem_id, "path_id": b.path_id, "t": b.t,
+                        "reason": "projected_predictor_cannot_be_reconstructed_in_trajectory_space",
+                    })
             if target_coords is not None and (target_coords.ndim != 2 or
                                                target_coords.shape[0] != target_grads.shape[0] or
                                                target_coords.shape[1] != u.shape[1]):
@@ -303,7 +339,6 @@ def audit_bundles(
                 b,
                 grads=target_grads,
                 m_pred=target_m,
-                coords=target_coords,
                 true_grad_norm_sq=(b.trajectory_grad_norm_sq or
                                    np.sum(target_grads ** 2, axis=1).tolist()),
                 true_grad_coords=target_coords,
@@ -413,6 +448,7 @@ def audit_bundles(
     result = {
         "measurement_version": 3,
         "gradient_target": gradient_target,
+        "unavailable_predictors": unavailable_predictors,
         "n_bundles": len(bundles),
         "rho_a_all": float(np.nanmean(rho_a_vals)) if np.any(np.isfinite(rho_a_vals)) else float("nan"),
         "rho_l_all": float(np.nanmean(rho_l_vals)) if np.any(np.isfinite(rho_l_vals)) else float("nan"),

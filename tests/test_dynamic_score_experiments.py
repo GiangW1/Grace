@@ -7,7 +7,7 @@ import tempfile
 import numpy as np
 import pytest
 
-from grace_gc.audit.benefit_replay import replay_means
+from grace_gc.audit.benefit_replay import replay_means, prefix_keys_sha256
 from grace_gc.audit.dynamic_score import (feature_matrix, fit_prefix_coefficients,
                                            load_dynamic_replay, residual_metrics)
 from grace_gc.versions import sha256_array, sha256_file
@@ -36,7 +36,7 @@ def _write_replay(root: Path):
     with (replay / "prefixes.jsonl").open("w", encoding="utf-8") as handle:
         for index in range(n):
             handle.write(json.dumps({
-                "problem_id": f"p{index}", "features": [float(index), 1.],
+                "problem_id": f"p{index}", "t": 512, "features": [float(index), 1.],
                 "prompt_features": [float(index), 1.], "prefix_token_ids": [1, index + 2],
                 "mean_cost": 1., "mean_reward": .5, "baseline": .5,
                 "half_mean_reward": [[0., .5, 1.][index % 3], .5],
@@ -122,6 +122,65 @@ def test_cross_fitted_orthogonal_energy_removes_b_half_noise():
     assert report["b_only_orthogonal_energy_fraction"] > .9
 
 
+def _trajectory_replay(root):
+    rows = [{"problem_id": f"p{i}", "path_id": f"path{i}", "t": 1,
+             "answer_emitted": False, "continuation_records": [
+                 {"token_ids": [1, 2, 3 + j], "prompt_len": 1,
+                  "reward": 1., "baseline": 0.} for j in range(4)]}
+            for i in range(2)]
+    replay_means(rows, lambda *args: np.array([1., 2.]), 2, root,
+                 store_half_means=True, store_trajectory_decomposition=True,
+                 prefix_grad_fn=lambda row: np.array([1., float(row["t"])]))
+    return rows
+
+
+@pytest.mark.parametrize("corruption", ["missing", "array", "rows", "keys",
+                                      "actor_sha256", "checkpoint_sha256", "layout_sha256"])
+def test_internal_basis_rejects_wrong_provenance(tmp_path, corruption):
+    _trajectory_replay(tmp_path)
+    sidecar = tmp_path / "score_gradient_provenance.json"
+    metadata = json.loads(sidecar.read_text())
+    if corruption == "missing":
+        sidecar.unlink()
+    elif corruption == "array":
+        np.save(tmp_path / "prefix_score_gradients.npy", np.zeros((2, 2)))
+    elif corruption == "rows":
+        path = tmp_path / "prefixes.jsonl"
+        path.write_text("\n".join(reversed(path.read_text().splitlines())) + "\n")
+    elif corruption == "keys":
+        metadata["prefix_keys_sha256"] = "wrong"
+        sidecar.write_text(json.dumps(metadata))
+    else:
+        metadata[corruption] = "old"
+        sidecar.write_text(json.dumps(metadata))
+        (tmp_path / "replay_provenance.json").write_text(json.dumps({corruption: "new"}))
+    with pytest.raises(ValueError, match="provenance|rows"):
+        load_dynamic_replay(tmp_path, None, gradient_target="trajectory")
+
+
+def test_replay_filters_emitted_answers_and_records_unknowns(tmp_path):
+    source = _trajectory_replay(tmp_path / "source")
+    rows = [source[0], {**source[1], "answer_emitted": True},
+            {**source[1], "finished": True}, {**source[1], "answer_emitted": None}]
+    summary = replay_means(rows, lambda *args: np.array([1., 2.]), 2,
+                           tmp_path / "filtered", store_half_means=True)
+    assert summary["n_prefixes"] == 2
+    assert summary["excluded_prefixes"] == 2
+    assert summary["finished_input_prefixes"] == 1
+    assert summary["answer_emitted_input_prefixes"] == 1
+    assert summary["answer_emitted_unknown_prefixes"] == 1
+    saved = [json.loads(line) for line in
+             (tmp_path / "filtered" / "prefixes.jsonl").read_text().splitlines()]
+    assert all(not row["answer_emitted"] for row in saved)
+
+
+def test_internal_basis_writer_and_loader_agree(tmp_path):
+    _trajectory_replay(tmp_path)
+    loaded = load_dynamic_replay(tmp_path, None, gradient_target="trajectory")
+    np.testing.assert_array_equal(loaded[4][:, :, 0], np.ones((2, 2)))
+    del loaded
+
+
 def test_dynamic_loader_reads_full_trajectory_target_from_replay():
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -133,6 +192,13 @@ def test_dynamic_loader_reads_full_trajectory_target_from_replay():
         np.save(replay / "half_mean_full_norm_sq_b.npy", np.sum(full_b * full_b, axis=1))
         np.save(replay / "prefix_score_gradients.npy", np.load(_score)[:, :, 0])
         np.save(replay / "half_full_metric_norm_sq_b.npy", np.sum(full_b * full_b, axis=1))
+        saved_rows = [json.loads(line) for line in (replay / "prefixes.jsonl").read_text().splitlines()]
+        (replay / "score_gradient_provenance.json").write_text(json.dumps({
+            "shape": [6, 3, 1],
+            "replay_prefixes_sha256": sha256_file(replay / "prefixes.jsonl"),
+            "prefix_keys_sha256": prefix_keys_sha256(saved_rows),
+            "score_gradients_sha256": sha256_array(np.load(_score)),
+        }), encoding="utf-8")
         rows, target_a, target_b, _norm, basis, _metric, _name = load_dynamic_replay(
             replay, None, gradient_target="trajectory")
         assert len(rows) == 6

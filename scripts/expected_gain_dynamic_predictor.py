@@ -82,7 +82,7 @@ def main(argv=None) -> int:
     parser.add_argument("--score-gradients", default=None,
                         help="score_gradients.npy; trajectory replays can use their stored basis")
     parser.add_argument("--gradient-target", choices=("suffix", "trajectory"), default="suffix",
-                        help="predict suffix gradients or full G=(R-b)(g_h+g_s)")
+                        help="select legacy or trajectory sidecars; both store full G=(R-b)(g_h+g_s)")
     parser.add_argument("--metric-file", default=None,
                         help="optional fixed diagonal metric weights; defaults to replay metric")
     parser.add_argument("--run-dir", required=True)
@@ -153,6 +153,7 @@ def main(argv=None) -> int:
     result = {
         "stage": "B", "basis_kind": "prefix_score_gradient",
         "gradient_target": args.gradient_target,
+        "gradient_label": "G=(reward-baseline)*grad log p(full_response|original_prompt)",
         "feature_set": args.features, "basis_shape": list(map(int, basis.shape)),
         "split": split, "oracle_by_role": oracle_reports,
         "q_stratification": {"available": bool(strata_available),

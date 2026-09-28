@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from grace_gc.audit.expected_gain import fit_predict, problem_split
+from grace_gc.audit.benefit_replay import prefix_keys_sha256
 from grace_gc.versions import sha256_array, sha256_file
 
 
@@ -62,25 +63,34 @@ def load_dynamic_replay(replay_dir: str | Path, score_gradients: str | Path | No
             stored_basis_3d = stored_basis[:, :, None] if stored_basis.ndim == 2 else stored_basis
             if stored_basis_3d.shape != basis.shape or not np.allclose(stored_basis_3d, basis):
                 raise ValueError("stored and supplied prefix score gradients differ")
-    provenance_path = (Path(score_gradients).with_name("score_gradient_provenance.json")
-                       if score_gradients is not None else root / "score_gradient_provenance.json")
-    score_provenance = {}
-    if provenance_path.is_file():
-        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
-        score_provenance = provenance
-        expected_hash = sha256_file(root / "prefixes.jsonl")
-        if provenance.get("replay_prefixes_sha256") != expected_hash:
-            raise ValueError("score-gradient rows do not match replay prefixes")
-        if provenance.get("shape") != list(map(int, basis.shape)):
-            raise ValueError("score-gradient provenance shape does not match the array")
     replay_provenance_path = root / "replay_provenance.json"
     replay_provenance = (json.loads(replay_provenance_path.read_text(encoding="utf-8"))
                          if replay_provenance_path.is_file() else {})
-    for key in ("actor_sha256", "checkpoint_sha256", "layout_dim", "layout_names"):
-        expected = replay_provenance.get(key)
-        observed = score_provenance.get(key)
-        if expected is not None and observed is not None and expected != observed:
-            raise ValueError(f"score-gradient and replay provenance differ in {key}")
+    sources = []
+    if stored_basis is not None:
+        sources.append((root / "score_gradient_provenance.json",
+                        stored_basis[:, :, None] if stored_basis.ndim == 2 else stored_basis, True))
+    if score_gradients is not None:
+        sources.append((Path(score_gradients).with_name("score_gradient_provenance.json"), basis, False))
+    for provenance_path, source_basis, internal in sources:
+        if not provenance_path.is_file():
+            if internal:
+                raise ValueError("internal score basis lacks provenance; regenerate the trajectory replay")
+            continue
+        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+        if provenance.get("replay_prefixes_sha256") != sha256_file(root / "prefixes.jsonl"):
+            raise ValueError("score-gradient rows do not match replay prefixes")
+        if provenance.get("shape") != list(map(int, source_basis.shape)):
+            raise ValueError("score-gradient provenance shape does not match the array")
+        for key, compute in (("prefix_keys_sha256", lambda: prefix_keys_sha256(rows)),
+                             ("score_gradients_sha256", lambda: sha256_array(source_basis))):
+            if (internal or provenance.get(key) is not None) and provenance.get(key) != compute():
+                raise ValueError(f"score-gradient provenance differs in {key}")
+        for key in ("actor_sha256", "checkpoint_sha256", "layout_dim", "layout_names", "layout_sha256"):
+            expected = replay_provenance.get(key)
+            observed = provenance.get(key)
+            if expected is not None and (internal or observed is not None) and expected != observed:
+                raise ValueError(f"score-gradient and replay provenance differ in {key}")
     if (target_a.ndim != 2 or target_b.shape != target_a.shape or
             norm_b.shape != (len(rows),) or basis.ndim != 3 or
             basis.shape[0] != len(rows) or basis.shape[1] != target_a.shape[1]):

@@ -33,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--split", default="audit", help="split_records bucket used with --generate")
     parser.add_argument("--run-dir", dest="run_dir", default=None, help="default: runs/audit-UTC")
     parser.add_argument("--gradient-target", choices=("suffix", "trajectory"), default=None,
-                        help="audit legacy suffix gradients or stored full trajectory G")
+                        help="select legacy (possibly sketched) or full trajectory gradient storage")
     args = parser.parse_args(argv)
     overrides = {}
     if args.seed is not None:
@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
         if not line.strip():
             continue
         raw = json.loads(line)
-        bundles.append(bundle_from_dict(raw))
+        bundles.append(bundle_from_dict(raw, base_dir=path.parent))
     if not bundles:
         requested = args.run_dir or str(default_run_dir("audit"))
         run_dir = resolve_run_dir(requested)

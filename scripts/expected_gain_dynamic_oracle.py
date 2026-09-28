@@ -104,7 +104,7 @@ def main(argv=None) -> int:
     parser.add_argument("--score-gradients", default=None,
                         help="score_gradients.npy; trajectory replays can use their stored basis")
     parser.add_argument("--gradient-target", choices=("suffix", "trajectory"), default="suffix",
-                        help="fit/evaluate suffix gradients or full G=(R-b)(g_h+g_s)")
+                        help="select legacy or trajectory sidecars; both store full G=(R-b)(g_h+g_s)")
     parser.add_argument("--metric-file", default=None,
                         help="optional fixed diagonal metric weights; defaults to replay metric")
     parser.add_argument("--run-dir", required=True)
@@ -159,6 +159,7 @@ def main(argv=None) -> int:
         "stage": "A",
         "basis_kind": "prefix_score_gradient",
         "gradient_target": args.gradient_target,
+        "gradient_label": "G=(reward-baseline)*grad log p(full_response|original_prompt)",
         "basis_shape": list(map(int, basis.shape)),
         "gradient_dimension": int(target_a.shape[1]),
         "coefficients": int(basis.shape[2]),

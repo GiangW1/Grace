@@ -8,7 +8,7 @@ from pathlib import Path
 from time import perf_counter
 
 import numpy as np
-from grace_gc.versions import sha256_array
+from grace_gc.versions import sha256_array, sha256_file
 
 
 def audit_file(path):
@@ -52,7 +52,8 @@ def replay_config(payload, model_path, config_paths=(), bundles=None):
     return validate_config(apply_method_defaults(cfg))
 
 
-def audit_rows(path: str | Path, decision_tokens: int | None = 512):
+def audit_rows(path: str | Path, decision_tokens: int | None = 512,
+               require_pre_emit: bool = False, stats: dict | None = None):
     """Read the small audit fields; the saved JL sketch is not a full gradient."""
     source = audit_file(path)
     if not source.is_file():
@@ -65,8 +66,16 @@ def audit_rows(path: str | Path, decision_tokens: int | None = 512):
         for line in handle:
             if not line.strip():
                 continue
+            if stats is not None:
+                stats["input_rows"] = stats.get("input_rows", 0) + 1
             row = json.loads(_without_large_grads(line))
             if decision_tokens is not None and int(row["t"]) != int(decision_tokens):
+                if stats is not None:
+                    stats["excluded_decision_tokens"] = stats.get("excluded_decision_tokens", 0) + 1
+                continue
+            if require_pre_emit and bool(row.get("answer_emitted", False)):
+                if stats is not None:
+                    stats["excluded_answer_emitted"] = stats.get("excluded_answer_emitted", 0) + 1
                 continue
             projection = row.get("projection") or {}
             if 0 < int(projection.get("stored_dim") or 0) <= 1024:
@@ -118,7 +127,9 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
     `grad_fn` receives (token_ids, prompt_len, reward, baseline). When
     ``store_trajectory_decomposition`` is enabled, ``prefix_grad_fn`` receives
     the live prefix row and returns the unweighted score gradient ``g_h``. The
-    replay stores ``G=(R-b)(g_h+g_s)`` A/B means alongside legacy suffix means.
+    grad_fn must return the full ascent label G=(R-b)(g_h+g_s), with prompt_len
+    referring to the original problem prompt. Both legacy and trajectory
+    sidecars store this same label; g_h is a separate explanatory basis.
     """
     if dimension <= 0 or (max_continuations is not None and max_continuations <= 0):
         raise ValueError("dimension and max_continuations must be positive")
@@ -136,9 +147,10 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
         if not np.all(np.isfinite(direction)):
             raise ValueError("reference direction must be finite")
     rows = list(rows)
-    selected = [row for row in rows if not bool(row.get("finished", False))]
+    selected = [row for row in rows if not bool(row.get("finished", False))
+                and not bool(row.get("answer_emitted", False))]
     if not selected:
-        raise ValueError("no live prefixes at the requested decision point")
+        raise ValueError("no live pre-answer prefixes at the requested decision point")
     target = Path(output)
     target.mkdir(parents=True, exist_ok=True)
     matrix = np.lib.format.open_memmap(target / "mean_grads.npy", mode="w+",
@@ -391,11 +403,26 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
         del (prefix_matrix, full_half_a_matrix, full_half_b_matrix,
              full_half_a_norms, full_half_b_norms,
              full_half_a_metric_norms, full_half_b_metric_norms)
+        basis = np.load(target / "prefix_score_gradients.npy", mmap_mode="r")
+        (target / "score_gradient_provenance.json").write_text(json.dumps({
+            "basis_kind": "prefix_score_gradient",
+            "shape": [len(metadata), dimension, 1],
+            "replay_prefixes_sha256": sha256_file(target / "prefixes.jsonl"),
+            "prefix_keys_sha256": prefix_keys_sha256(metadata),
+            "score_gradients_sha256": sha256_array(basis),
+        }, indent=2), encoding="utf-8")
+        del basis
     if directional_values is not None:
         directional_values.flush()
         del directional_values
     summary = {"n_prefixes": len(selected), "n_problems": len({x["problem_id"] for x in metadata}),
-               "input_prefixes": len(rows), "finished_input_prefixes": len(rows) - len(selected),
+               "input_prefixes": len(rows),
+               "finished_input_prefixes": sum(bool(row.get("finished", False)) for row in rows),
+               "answer_emitted_input_prefixes": sum(bool(row.get("answer_emitted", False)) for row in rows),
+               "excluded_prefixes": len(rows) - len(selected),
+               "answer_emitted_unknown_prefixes": sum(row.get("answer_emitted") is None for row in selected),
+               "selection": "exclude finished or answer_emitted; unknown answer status retained and counted",
+               "gradient_label": "G=(reward-baseline)*grad log p(full_response|original_prompt)",
                "dimension": dimension, "n_continuations": sum(x["n_continuations"] for x in metadata),
                "wall_seconds": perf_counter() - started,
                "max_norm_relative_error": max_norm_error,

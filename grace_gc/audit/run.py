@@ -16,12 +16,40 @@ from grace_gc.logging_util.forensics import persist_load_report, write_failed
 from grace_gc.logging_util.ledger import ComputeLedger, Timer
 from grace_gc.logging_util.run_dir import RunDirectory, resolve_run_dir, utc_now
 from grace_gc.logging_util.run_log import RunLog
-from grace_gc.versions import collect_environment
+from grace_gc.versions import collect_environment, sha256_file
 from grace_gc.trainer.algorithm import _length_truncated, _traj_natural_finish
 from grace_gc.trainer.checkpoint import load_checkpoint
 from grace_gc.trainer.baseline import baseline_from_config
 from grace_gc.trainer.grace_step import allocation_ready_from_checkpoint, control_variate_coordinates, incremental_token_costs
 from grace_gc.trainer.state_io import load_numpy_module_state
+
+
+def _spill_trajectory_arrays(bundle: PrefixBundle, directory: Path, index: int) -> None:
+    """Release per-prefix dense labels after writing memory-mapped sidecars."""
+    directory.mkdir(parents=True, exist_ok=True)
+    for field in ("trajectory_grads", "prefix_score_grad"):
+        array = getattr(bundle, field)
+        if array is None:
+            continue
+        path = directory / f"{field}_{index:05d}.npy"
+        np.save(path, array)
+        setattr(bundle, field, np.load(path, mmap_mode="r"))
+
+
+def _serialize_audit_bundles(run: RunDirectory, bundles: list[PrefixBundle]):
+    for index, bundle in enumerate(bundles):
+        raw = bundle_to_dict(bundle, include_trajectory_grads=False)
+        for field in ("trajectory_grads", "prefix_score_grad"):
+            array = getattr(bundle, field)
+            if array is None:
+                continue
+            path = Path(run.root) / f"{field}_{index:05d}.npy"
+            if not isinstance(array, np.memmap) or Path(array.filename).resolve() != path.resolve():
+                np.save(path, array)
+            raw[field + "_sidecar"] = {
+                "path": path.name, "shape": list(array.shape), "sha256": sha256_file(path),
+            }
+        yield raw
 
 
 def _prefix_finish_reasons(engines) -> list:
@@ -177,6 +205,7 @@ def _bundles_from_engines(
     baseline_policy=None,
     store_features: bool = False,
     store_trajectory_gradients: bool = False,
+    trajectory_dir: str | Path | None = None,
 ) -> list[PrefixBundle]:
     from grace_gc.core.rng import IsolatedRNG
 
@@ -444,6 +473,8 @@ def _bundles_from_engines(
                                     "normalization": "norm_preserving_in_expectation"},
                     )
                 )
+                if trajectory_dir is not None and trajectory_arr is not None:
+                    _spill_trajectory_arrays(bundles[-1], Path(trajectory_dir), len(bundles) - 1)
                 print(
                     f"phase=audit_prefix_done problem={record_index}/{len(records)} "
                     f"t={t} path={idx} n_bundles={len(bundles)}",
@@ -551,6 +582,7 @@ def generate_bundles_tiny(
     actor=None,
     store_features: bool = False,
     store_trajectory_gradients: bool = False,
+    trajectory_dir: str | Path | None = None,
 ) -> list[PrefixBundle]:
     from grace_gc.data.tokenize import encode_records_tiny
     from grace_gc.trainer.tiny_engine import make_tiny_engines
@@ -603,6 +635,7 @@ def generate_bundles_tiny(
         baseline_policy=baseline_from_config((cfg or {}).get("baseline")),
         store_features=store_features,
         store_trajectory_gradients=store_trajectory_gradients,
+        trajectory_dir=trajectory_dir,
     )
 
 
@@ -621,6 +654,7 @@ def generate_bundles_gpu(
     payload=None,
     store_features: bool = False,
     store_trajectory_gradients: bool = False,
+    trajectory_dir: str | Path | None = None,
 ) -> list[PrefixBundle]:
     if cache and engines is None and cache.get("engines") is not None:
         engines = cache["engines"]
@@ -737,6 +771,7 @@ def generate_bundles_gpu(
         baseline_policy=baseline_from_config(cfg.get("baseline")),
         store_features=store_features,
         store_trajectory_gradients=store_trajectory_gradients,
+        trajectory_dir=trajectory_dir,
     )
 
 
@@ -817,6 +852,7 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
                     seed,
                     cfg,
                     work_dir=Path(run.root) / "audit_lora",
+                    trajectory_dir=Path(run.root),
                     store_features=bool(
                         (cfg.get("audit") or {}).get("store_features", False)
                         or (cfg.get("predictor") or {}).get("store_features", False)
@@ -833,6 +869,7 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
                     max_new,
                     seed,
                     cfg=cfg,
+                    trajectory_dir=Path(run.root),
                     store_features=bool(
                         (cfg.get("audit") or {}).get("store_features", False)
                         or (cfg.get("predictor") or {}).get("store_features", False)
@@ -841,7 +878,7 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
                                                     or (cfg.get("analysis") or {}).get("gradient_target") == "trajectory"),
                 )
             run.write_jsonl("audit_raw_problems.jsonl", getattr(_bundles_from_engines, "last", []))
-            run.write_jsonl("audit_bundles.jsonl", [bundle_to_dict(b) for b in bundles])
+            run.write_jsonl("audit_bundles.jsonl", _serialize_audit_bundles(run, bundles))
             if not bundles:
                 result = {
                     "n_bundles": 0,
