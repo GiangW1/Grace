@@ -26,8 +26,9 @@ from grace_gc.audit.dynamic_score import (coefficient_diagnostics, fit_prefix_co
 from grace_gc.audit.expected_gain import start_experiment_run
 
 
-def _mechanism_report(rows, basis, target_b, metric_norm_b, metric, indices, coefficients):
+def _mechanism_report(rows, basis, target_a, target_b, metric_norm_b, metric, indices, coefficients):
     subset_basis = np.asarray(basis[indices], dtype=np.float64)
+    subset_target_a = np.asarray(target_a[indices], dtype=np.float64)
     subset_target = np.asarray(target_b[indices], dtype=np.float64)
     subset_norm = np.asarray(metric_norm_b[indices], dtype=np.float64)
     free = residual_metrics(subset_basis, coefficients[indices], subset_target,
@@ -46,23 +47,53 @@ def _mechanism_report(rows, basis, target_b, metric_norm_b, metric, indices, coe
     gradient = subset_basis[:, :, 0]
     target_energy = np.sum(metric[None, :] * subset_target * subset_target, axis=1)
     gradient_energy = np.sum(metric[None, :] * gradient * gradient, axis=1)
-    dot = np.sum(metric[None, :] * subset_target * gradient, axis=1)
-    orthogonal = target_energy - dot * dot / np.maximum(gradient_energy, 1e-30)
-    orthogonal = np.where(gradient_energy > 0.0, orthogonal, np.nan)
-    valid = np.isfinite(orthogonal) & (target_energy > 0.0)
+    dot_a = np.sum(metric[None, :] * subset_target_a * gradient, axis=1)
+    dot_b = np.sum(metric[None, :] * subset_target * gradient, axis=1)
+    # The conditional-mean energy must be cross-fitted. Using only B makes
+    # the orthogonal component positive even when the true mean is exactly
+    # aligned with the score-gradient basis, because B contains sampling
+    # noise orthogonal to that basis.
+    cross_target_energy = np.sum(metric[None, :] * subset_target_a * subset_target, axis=1)
+    cross_projected_energy = dot_a * dot_b / np.maximum(gradient_energy, 1e-30)
+    cross_orthogonal = cross_target_energy - cross_projected_energy
+    valid_cross = (np.isfinite(cross_orthogonal) & np.isfinite(cross_target_energy) &
+                   (gradient_energy > 0.0))
+    b_projected_energy = dot_b * dot_b / np.maximum(gradient_energy, 1e-30)
+    b_orthogonal = target_energy - b_projected_energy
+    valid_b = np.isfinite(b_orthogonal) & (target_energy > 0.0) & (gradient_energy > 0.0)
+    cross_denominator = float(np.sum(cross_target_energy[valid_cross]))
+    b_denominator = float(np.sum(target_energy[valid_b]))
     report.update({
         "reward_only": reward_only,
         "free_minus_reward_residual": float(free["residual_mean"] -
                                               reward_only["residual_mean"]),
+        "reward_only_residual_ratio_to_zero": reward_only["residual_ratio_to_zero"],
+        # Kept as a compatibility alias for prior summaries.
         "cross_term_residual_ratio": reward_only["residual_ratio_to_zero"],
-        "orthogonal_energy_fraction": (None if not np.any(valid) else
-                                        float(np.sum(orthogonal[valid]) /
-                                              np.sum(target_energy[valid]))),
-        "projected_energy_fraction": (None if not np.any(valid) else
-                                       float(np.sum((dot[valid] ** 2 /
-                                                     np.maximum(gradient_energy[valid], 1e-30))) /
-                                                    np.sum(target_energy[valid]))),
-        "n_valid_orthogonal_rows": int(np.count_nonzero(valid)),
+        "orthogonal_energy_fraction": (None if not np.any(valid_cross) or cross_denominator <= 0.0 else
+                                        float(np.sum(cross_orthogonal[valid_cross]) /
+                                              cross_denominator)),
+        "projected_energy_fraction": (None if not np.any(valid_cross) or cross_denominator <= 0.0 else
+                                       float(np.sum(cross_projected_energy[valid_cross]) /
+                                             cross_denominator)),
+        "cross_mean_target_energy": (None if not np.any(valid_cross) else
+                                      float(np.mean(cross_target_energy[valid_cross]))),
+        "cross_orthogonal_energy": (None if not np.any(valid_cross) else
+                                     float(np.mean(cross_orthogonal[valid_cross]))),
+        "cross_projected_energy": (None if not np.any(valid_cross) else
+                                    float(np.mean(cross_projected_energy[valid_cross]))),
+        "cross_orthogonal_energy_fraction": (None if not np.any(valid_cross) or cross_denominator <= 0.0 else
+                                              float(np.sum(cross_orthogonal[valid_cross]) /
+                                                    cross_denominator)),
+        "cross_projected_energy_fraction": (None if not np.any(valid_cross) or cross_denominator <= 0.0 else
+                                             float(np.sum(cross_projected_energy[valid_cross]) /
+                                                   cross_denominator)),
+        "b_only_orthogonal_energy_fraction": (None if not np.any(valid_b) or b_denominator <= 0.0 else
+                                                float(np.sum(b_orthogonal[valid_b]) / b_denominator)),
+        "b_only_projected_energy_fraction": (None if not np.any(valid_b) or b_denominator <= 0.0 else
+                                               float(np.sum(b_projected_energy[valid_b]) / b_denominator)),
+        "n_valid_orthogonal_rows": int(np.count_nonzero(valid_cross)),
+        "n_valid_cross_energy": int(np.count_nonzero(valid_cross)),
     })
     return report
 
@@ -100,24 +131,25 @@ def main(argv=None) -> int:
             "oracle": residual_metrics(subset_basis, subset_coefficients,
                                          np.asarray(target_b[indices]), np.asarray(metric_norm_b[indices]), metric),
             "zero": {"residual_mean": float(np.mean(metric_norm_b[indices]))},
-            "mechanism": _mechanism_report(rows, basis, target_b, metric_norm_b,
+            "mechanism": _mechanism_report(rows, basis, target_a, target_b, metric_norm_b,
                                             metric, indices, coefficients),
             "q_strata": {
                 name: {"n_prefixes": int(len(role_selected)),
                        "mechanism": _mechanism_report(
-                           rows, basis, target_b, metric_norm_b, metric,
+                           rows, basis, target_a, target_b, metric_norm_b, metric,
                            role_selected, coefficients)}
                 for name, selected in strata.items()
                 for role_selected in [np.intersect1d(indices, selected)]
                 if len(role_selected)
             },
             "difficulty_strata": {
-                name: {"n_prefixes": int(len(selected)),
+                name: {"n_prefixes": int(len(role_selected)),
                        "mechanism": _mechanism_report(
-                           rows, basis, target_b, metric_norm_b, metric,
-                           np.intersect1d(indices, selected), coefficients)}
+                           rows, basis, target_a, target_b, metric_norm_b, metric,
+                           role_selected, coefficients)}
                 for name, selected in difficulty.items()
-                if len(np.intersect1d(indices, selected))
+                for role_selected in [np.intersect1d(indices, selected)]
+                if len(role_selected)
             },
         }
     destination = start_experiment_run(args.run_dir, "expected_gain_dynamic_oracle", vars(args))

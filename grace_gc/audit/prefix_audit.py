@@ -284,13 +284,31 @@ def audit_bundles(
             raise ValueError("trajectory gradient target requested but bundles lack trajectory_grads")
         # Keep the legacy suffix fields intact on disk while running every
         # existing rho/LAG/ELF calculation on the paper's full trajectory G.
-        bundles = [replace(
-            b,
-            grads=np.asarray(b.trajectory_grads, dtype=np.float64),
-            true_grad_norm_sq=(b.trajectory_grad_norm_sq or
-                               np.sum(np.asarray(b.trajectory_grads, dtype=np.float64) ** 2, axis=1).tolist()),
-            true_grad_coords=b.trajectory_coords,
-        ) for b in bundles]
+        converted = []
+        for b in bundles:
+            target_grads = np.asarray(b.trajectory_grads, dtype=np.float64)
+            target_coords = (None if b.trajectory_coords is None else
+                             np.asarray(b.trajectory_coords, dtype=np.float64))
+            # A JL projection may have been applied to the legacy suffix
+            # fields while trajectory gradients remain in checkpoint space.
+            # Do not subtract incompatible predictors or coordinates.
+            target_m = (None if b.m_pred is None else np.asarray(b.m_pred, dtype=np.float64))
+            if target_m is not None and (target_m.ndim != 1 or target_m.shape[0] != target_grads.shape[1]):
+                target_m = None
+            if target_coords is not None and (target_coords.ndim != 2 or
+                                               target_coords.shape[0] != target_grads.shape[0] or
+                                               target_coords.shape[1] != u.shape[1]):
+                target_coords = None
+            converted.append(replace(
+                b,
+                grads=target_grads,
+                m_pred=target_m,
+                coords=target_coords,
+                true_grad_norm_sq=(b.trajectory_grad_norm_sq or
+                                   np.sum(target_grads ** 2, axis=1).tolist()),
+                true_grad_coords=target_coords,
+            ))
+        bundles = converted
     grouped = _by_problem(bundles)
     var_r = []
     cond_var = []
@@ -322,7 +340,10 @@ def audit_bundles(
                 residuals.append(float(np.mean(np.sum(g*g, axis=1))))
             elif bundle.m_pred is not None:
                 m = np.asarray(bundle.m_pred, dtype=np.float64)
-                residuals.append(float(np.mean(np.sum((g - m) ** 2, axis=1))))
+                if m.ndim != 1 or m.shape[0] != g.shape[1]:
+                    residuals.append(np.nan)
+                else:
+                    residuals.append(float(np.mean(np.sum((g - m) ** 2, axis=1))))
             elif bundle.coords is not None and u.size:
                 f = np.asarray(bundle.coords, dtype=np.float64)
                 if f.ndim == 1:

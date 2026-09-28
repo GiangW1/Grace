@@ -20,3 +20,17 @@ def test_audit_can_switch_existing_lag_calculations_to_full_trajectory_gradient(
     assert result["gradient_target"] == "trajectory"
     assert result["measurement_version"] == 3
 
+
+def test_trajectory_target_drops_incompatible_projected_predictor():
+    full = np.asarray([[1., 0., 1.], [1., 0., 1.]])
+    bundle = PrefixBundle(
+        "p", 1, np.asarray([0., 1.]), np.asarray([[1., 0.], [1., 0.]]),
+        trajectory_grads=full, m_pred=np.asarray([1., 0.]),
+        answer_emitted=False,
+    )
+    result = audit_bundles([bundle], np.zeros((3, 0)),
+                           {"gradient_target": "trajectory", "require_pre_emit": False},
+                           np.random.default_rng(3))
+    assert result["gradient_target"] == "trajectory"
+    assert result["full_space_error_decomposition"]["all"]["n_unavailable_bundles"] == 1
+

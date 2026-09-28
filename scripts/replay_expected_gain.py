@@ -231,7 +231,7 @@ def main(argv=None) -> int:
     if args.baseline_file:
         baseline_calibration = _load_problem_baselines(
             args.baseline_file, sha256_file(args.checkpoint),
-            {"decision_tokens": args.decision_tokens, "max_new_tokens": cfg.get("max_new_tokens"),
+            {"max_new_tokens": cfg.get("max_new_tokens"),
              "temperature": (cfg.get("sampling") or {}).get("temperature"),
              "top_p": (cfg.get("sampling") or {}).get("top_p")})
         source_rows = _apply_problem_baselines(source_rows, baseline_calibration)

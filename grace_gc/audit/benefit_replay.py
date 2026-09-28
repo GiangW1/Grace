@@ -252,8 +252,11 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                         np.asarray(grad_fn(tokens, prompt_len, reward, baseline), dtype=np.float64))
                 if grad.shape != (dimension,) or not np.all(np.isfinite(grad)):
                     raise ValueError(f"prefix {i} continuation {j} has an invalid gradient")
-                full_grad = (grad if prefix_grad is None else
-                             grad + (reward - baseline) * prefix_grad)
+                # ``grad_fn`` returns the complete policy-gradient label for
+                # the saved full sequence. The prefix score gradient is a
+                # separately stored basis vector; adding it here would count
+                # the prefix term twice.
+                full_grad = grad
                 if verify_saved_gradients:
                     try:
                         norm, norm_error, sketch_error = check_replayed_gradient(
@@ -333,6 +336,10 @@ def replay_means(rows, grad_fn, dimension: int, output: str | Path,
                 "half_mean_reward": ([float(np.mean(rewards[:first_n])),
                                        float(np.mean(rewards[first_n:]))]
                                       if store_half_means else None),
+                "half_mean_reward_a": (float(np.mean(rewards[:first_n]))
+                                        if store_half_means and first_n else None),
+                "half_mean_reward_b": (float(np.mean(rewards[first_n:]))
+                                        if store_half_means and second_n else None),
                 "half_mean_baseline": ([float(np.mean(baselines[:first_n])),
                                          float(np.mean(baselines[first_n:]))]
                                         if store_half_means else None),

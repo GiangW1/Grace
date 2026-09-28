@@ -11,7 +11,7 @@ from grace_gc.audit.benefit_replay import replay_means
 from grace_gc.audit.dynamic_score import (feature_matrix, fit_prefix_coefficients,
                                            load_dynamic_replay, residual_metrics)
 from grace_gc.versions import sha256_array, sha256_file
-from scripts.expected_gain_dynamic_oracle import main as oracle_main
+from scripts.expected_gain_dynamic_oracle import _mechanism_report, main as oracle_main
 from scripts.expected_gain_dynamic_predictor import main as predictor_main
 from scripts.replay_expected_gain import _apply_problem_baselines, _load_problem_baselines
 
@@ -65,6 +65,8 @@ def test_replay_can_store_independent_half_means():
         assert metadata["half_counts"] == [2, 2]
         assert len(metadata["half_mean_norm_sq"]) == 2
         assert len(metadata["half_mean_advantage"]) == 2
+        assert metadata["half_mean_reward_a"] == metadata["half_mean_reward"][0]
+        assert metadata["half_mean_reward_b"] == metadata["half_mean_reward"][1]
 
 
 def test_replay_stores_full_trajectory_decomposition():
@@ -89,9 +91,35 @@ def test_replay_stores_full_trajectory_decomposition():
         suffix_b = np.load(Path(tmp) / "half_mean_grads_b.npy")
         rows_out = [json.loads(line) for line in (Path(tmp) / "prefixes.jsonl").read_text().splitlines()]
         assert np.load(Path(tmp) / "prefix_score_gradients.npy").shape == (1, 2)
-        assert not np.allclose(full_a, suffix_a)
-        assert not np.allclose(full_b, suffix_b)
+        # The policy-gradient callback already returns the full trajectory
+        # target. The prefix score gradient is stored as a separate basis and
+        # must not be added a second time.
+        np.testing.assert_allclose(full_a, suffix_a)
+        np.testing.assert_allclose(full_b, suffix_b)
+        np.testing.assert_allclose(
+            np.load(Path(tmp) / "prefix_score_gradients.npy"), [[10., 20.]])
         assert rows_out[0]["trajectory_decomposition"]["target"] == "full_trajectory"
+
+
+def test_q_strata_accepts_legacy_half_reward_pair():
+    from grace_gc.audit.dynamic_score import q_strata
+
+    rows = [{"half_mean_reward": [0., .5]}, {"half_mean_reward": [1., .5]}]
+    strata, available = q_strata(rows)
+    assert available is True
+    np.testing.assert_array_equal(strata["observed_q_zero"], [0])
+    np.testing.assert_array_equal(strata["observed_q_one"], [1])
+
+
+def test_cross_fitted_orthogonal_energy_removes_b_half_noise():
+    basis = np.asarray([[[1.], [0.]]])
+    target_a = np.asarray([[1., 0.]])
+    target_b = np.asarray([[1., 10.]])
+    report = _mechanism_report(
+        [{"half_mean_advantage": [1., 1.]}], basis, target_a, target_b,
+        np.asarray([101.]), np.ones(2), np.asarray([0]), np.asarray([[1.]]))
+    assert report["orthogonal_energy_fraction"] == pytest.approx(0.0)
+    assert report["b_only_orthogonal_energy_fraction"] > .9
 
 
 def test_dynamic_loader_reads_full_trajectory_target_from_replay():

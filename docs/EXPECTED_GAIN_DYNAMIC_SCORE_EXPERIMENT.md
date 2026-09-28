@@ -91,9 +91,11 @@ python scripts/replay_expected_gain.py ... \
   --store-half-means --run-dir runs/dynamic-replay-calibrated
 ```
 
-If the calibration JSON includes `calibration.decision_tokens`,
-`calibration.max_new_tokens`, `calibration.temperature`, or `calibration.top_p`,
-the replay checks those settings against the replay configuration.
+The calibration JSON may record `calibration.decision_tokens` for provenance.
+It is not required to equal the replay decision point: a problem-level
+baseline calibrated at `t=0` is valid for replay rows at a later decision
+point. When present, the replay checks `max_new_tokens`, `temperature`, and
+`top_p` against the replay configuration.
 
 The GPU replay must save the independent halves:
 

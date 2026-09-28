@@ -371,10 +371,16 @@ def _bundles_from_engines(
                         "extracted": extract_answer(text), "truncated": truncated,
                         "natural_finish": traj_fin, "finish_reason": cont_fr,
                         "generated_suffix_tokens": gen_cont, "baseline": b_grad})
-                    suffix_grad = _policy_grad_vec(engines, layout, full, prompt_len, reward, b_grad)
-                    grads.append(suffix_grad)
+                    # The policy-gradient helper sums log-probability over
+                    # the response after the original problem prompt, so it
+                    # already returns full G=(R-b)(g_h+g_s).
+                    full_grad = _policy_grad_vec(engines, layout, full, prompt_len, reward, b_grad)
+                    grads.append(full_grad)
                     if prefix_score_grad is not None:
-                        trajectory_grads.append(suffix_grad + (reward - b_grad) * prefix_score_grad)
+                        # Keep the full trajectory target identical to the
+                        # replayed policy gradient. The prefix score gradient
+                        # is stored as the explanatory basis, not added again.
+                        trajectory_grads.append(full_grad)
                     costs.append(float(gen_cont))
                 prefix_text = engines.decode(prefix[prompt_len:]) if engines.decode else ""
                 grads_arr = np.stack(grads, axis=0)
@@ -462,7 +468,14 @@ def _baseline_fn(cfg: dict[str, Any] | None):
 
 def _audit_u(bundles: list[PrefixBundle], cfg: dict[str, Any]) -> np.ndarray:
     # No saved basis means unavailable, not an invented coordinate subspace.
-    u = np.zeros((bundles[0].grads.shape[1], 0))
+    analysis = cfg.get("analysis") or {}
+    gdim = int(bundles[0].grads.shape[1])
+    if analysis.get("gradient_target") == "trajectory":
+        trajectory = next((b.trajectory_grads for b in bundles
+                           if b.trajectory_grads is not None), None)
+        if trajectory is not None:
+            gdim = int(np.asarray(trajectory).shape[1])
+    u = np.zeros((gdim, 0))
     ckpt = cfg.get("checkpoint") or cfg.get("resume")
     if not ckpt:
         return u
@@ -471,7 +484,6 @@ def _audit_u(bundles: list[PrefixBundle], cfg: dict[str, Any]) -> np.ndarray:
     if stored is None:
         return u
     arr = np.asarray(stored, dtype=np.float64)
-    gdim = int(bundles[0].grads.shape[1])
     if arr.ndim != 2:
         raise ValueError("checkpoint basis U does not match audit G dimension")
     if arr.shape[0] == gdim:
