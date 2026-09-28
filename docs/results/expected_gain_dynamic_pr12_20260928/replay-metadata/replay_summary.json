@@ -1,0 +1,37 @@
+{
+  "n_prefixes": 376,
+  "n_problems": 227,
+  "input_prefixes": 125,
+  "finished_input_prefixes": 0,
+  "answer_emitted_input_prefixes": 0,
+  "excluded_prefixes": 0,
+  "answer_emitted_unknown_prefixes": 0,
+  "selection": "exclude finished or answer_emitted; unknown answer status retained and counted",
+  "gradient_label": "G=(reward-baseline)*grad log p(full_response|original_prompt)",
+  "dimension": 5898240,
+  "n_continuations": 6016,
+  "wall_seconds": 744.9098326209933,
+  "max_norm_relative_error": 0.0,
+  "max_sketch_relative_error": 0.0,
+  "half_means": true,
+  "trajectory_decomposition": true,
+  "trajectory_files": {
+    "prefix_score_gradients": "prefix_score_gradients.npy",
+    "half_mean_full_grads_a": "half_mean_full_grads_a.npy",
+    "half_mean_full_grads_b": "half_mean_full_grads_b.npy",
+    "half_mean_full_norm_sq_a": "half_mean_full_norm_sq_a.npy",
+    "half_mean_full_norm_sq_b": "half_mean_full_norm_sq_b.npy",
+    "half_full_metric_norm_sq_a": "half_full_metric_norm_sq_a.npy",
+    "half_full_metric_norm_sq_b": "half_full_metric_norm_sq_b.npy"
+  },
+  "metric_name": "euclidean",
+  "metric_weights_sha256": "596ebc77c27e88ebf6449d6923d4dbbe7d12d50e77d29abd1ba9385fe294e7c6",
+  "directional_values": null,
+  "note": "exact frozen-actor ascent gradients; prefix means stored in FP64",
+  "merged_shards": 3,
+  "source_shards": [
+    "/SSD/00/wja/grace-pr12-20260928/replays/shard-0",
+    "/SSD/00/wja/grace-pr12-20260928/replays/shard-1",
+    "/SSD/00/wja/grace-pr12-20260928/replays/shard-2"
+  ]
+}

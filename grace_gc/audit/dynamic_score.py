@@ -219,8 +219,22 @@ def fit_prefix_coefficients(basis, targets, metric=None):
     if (weights.shape != (targets.shape[1],) or not np.all(np.isfinite(weights)) or
             np.any(weights < 0.0) or not np.any(weights > 0.0)):
         raise ValueError("metric has the wrong shape or invalid weights")
-    root_weights = np.sqrt(weights)
     coefficients = np.empty((len(targets), basis.shape[2]), dtype=np.float64)
+    # The trajectory audit currently has one score-gradient column. Avoid an
+    # SVD over millions of coordinates for each prefix; the weighted one-column
+    # least-squares solution is a scalar projection.
+    if basis.shape[2] == 1:
+        for start in range(0, len(targets), 8):
+            stop = min(start + 8, len(targets))
+            matrix = np.asarray(basis[start:stop, :, 0], dtype=np.float64)
+            target = np.asarray(targets[start:stop], dtype=np.float64)
+            weighted = matrix * weights
+            denominator = np.sum(weighted * matrix, axis=1)
+            numerator = np.sum(weighted * target, axis=1)
+            coefficients[start:stop, 0] = np.divide(
+                numerator, denominator, out=np.zeros_like(numerator), where=denominator > 0.0)
+        return coefficients
+    root_weights = np.sqrt(weights)
     for index, (matrix, target) in enumerate(zip(basis, targets)):
         coefficients[index] = np.linalg.lstsq(matrix * root_weights[:, None],
                                                target * root_weights, rcond=None)[0]
@@ -235,25 +249,39 @@ def reconstruct(basis, coefficients):
     return np.einsum("ndw,nw->nd", basis, coefficients)
 
 
-def _residual_metrics_with_metric(basis, coefficients, target, norm_sq, metric):
-    prediction = reconstruct(basis, coefficients)
-    target = np.asarray(target, dtype=np.float64)
+def _residual_metrics_with_metric(basis, coefficients, target, norm_sq, metric,
+                                  block_size=65536):
+    basis = np.asarray(basis)
+    coefficients = np.asarray(coefficients, dtype=np.float64)
+    target = np.asarray(target)
     norm_sq = np.asarray(norm_sq, dtype=np.float64).reshape(-1)
     metric = np.asarray(metric, dtype=np.float64).reshape(-1)
-    if target.shape != prediction.shape or norm_sq.shape != (len(prediction),):
+    if basis.ndim != 3 or coefficients.shape != (len(basis), basis.shape[2]):
+        raise ValueError("basis and coefficients dimensions disagree")
+    if target.shape != basis.shape[:2] or norm_sq.shape != (len(basis),):
         raise ValueError("residual labels and predictions disagree")
-    if metric.shape != (prediction.shape[1],) or np.any(metric < 0) or not np.all(np.isfinite(metric)):
+    if metric.shape != (basis.shape[1],) or np.any(metric < 0) or not np.all(np.isfinite(metric)):
         raise ValueError("metric has the wrong shape or invalid weights")
-    residual = norm_sq - 2.0 * np.sum(metric * prediction * target, axis=1) + np.sum(
-        metric * prediction * prediction, axis=1)
+    cross = np.zeros(len(basis), dtype=np.float64)
+    prediction_energy = np.zeros(len(basis), dtype=np.float64)
+    unweighted_squared_error = np.zeros(len(basis), dtype=np.float64)
+    for start in range(0, basis.shape[1], block_size):
+        stop = min(start + block_size, basis.shape[1])
+        prediction = np.einsum("ndw,nw->nd", basis[:, start:stop], coefficients,
+                               optimize=True)
+        target_block = target[:, start:stop]
+        metric_block = metric[start:stop]
+        cross += np.sum(metric_block * prediction * target_block, axis=1)
+        prediction_energy += np.sum(metric_block * prediction * prediction, axis=1)
+        unweighted_squared_error += np.sum((prediction - target_block) ** 2, axis=1)
+    residual = norm_sq - 2.0 * cross + prediction_energy
     zero = norm_sq
-    mean_target_mse = np.mean((prediction - target) ** 2, axis=1)
     return {
         "residual_mean": float(np.mean(residual)),
         "zero_residual_mean": float(np.mean(zero)),
         "residual_ratio_to_zero": (None if float(np.mean(zero)) == 0.0
                                     else float(np.mean(residual) / np.mean(zero))),
-        "mean_gradient_mse": float(np.mean(mean_target_mse)),
+        "mean_gradient_mse": float(np.mean(unweighted_squared_error / basis.shape[1])),
         "mean_gradient_energy": float(np.mean(np.sum(target * target, axis=1))),
         "metric_weighted_target_energy": float(np.mean(np.sum(metric * target * target, axis=1))),
     }

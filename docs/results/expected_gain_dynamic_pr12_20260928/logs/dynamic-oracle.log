@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "/tmp/grace-pr12-run/scripts/expected_gain_dynamic_oracle.py", line 187, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/tmp/grace-pr12-run/scripts/expected_gain_dynamic_oracle.py", line 131, in main
+    "oracle": residual_metrics(subset_basis, subset_coefficients,
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/grace-pr12-run/grace_gc/audit/dynamic_score.py", line 265, in residual_metrics
+    return _residual_metrics_with_metric(basis, coefficients, target, norm_sq, metric)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/grace-pr12-run/grace_gc/audit/dynamic_score.py", line 247, in _residual_metrics_with_metric
+    residual = norm_sq - 2.0 * np.sum(metric * prediction * target, axis=1) + np.sum(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/SSD/00/wja/GRACE/runs/conda/envs/grace/lib/python3.11/site-packages/numpy/_core/fromnumeric.py", line 2333, in _sum_dispatcher
+    def _sum_dispatcher(a, axis=None, dtype=None, out=None, keepdims=None,
+    
+KeyboardInterrupt
