@@ -6,6 +6,7 @@ import numpy as np
 from grace_gc.audit.learning_stats import mechanism_values, problem_bootstrap_report
 from grace_gc.audit.qualification import classify_functional_recovery
 from grace_gc.audit.streaming_replay import replay_statistics
+from grace_gc.backends.verl_trainer import cap_colocated_vllm_config
 from grace_gc.data.math_data import MathRecord, select_records_difficulty
 
 
@@ -74,3 +75,13 @@ def test_difficulty_selection_respects_preregistered_mix(tmp_path: Path):
               "h0": "hard", "h1": "hard"}
     assert {label: sum(labels[r.problem_id] == label for r in selected)
             for label in ("easy", "medium", "hard")} == {"easy": 1, "medium": 3, "hard": 2}
+
+
+def test_colocated_vllm_cap_preserves_lower_explicit_limit():
+    capped = cap_colocated_vllm_config({}, {"gpu_memory_utilization": 0.5})
+    assert capped["gpu_memory_utilization"] == 0.3
+    assert capped["max_num_seqs"] == 2
+    lower = cap_colocated_vllm_config({"colocated_vllm_memory_utilization": 0.2},
+                                      {"gpu_memory_utilization": 0.1, "max_num_seqs": 1})
+    assert lower["gpu_memory_utilization"] == 0.1
+    assert lower["max_num_seqs"] == 1

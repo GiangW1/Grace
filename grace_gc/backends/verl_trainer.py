@@ -71,8 +71,26 @@ def load_lora_actor(model_path: str, lora_cfg: dict[str, Any]):
     )
     model = get_peft_model(model, cfg)
     model._grace_compute_dtype = str(lora_cfg.get("compute_dtype", "native"))
-    # Dropout-free behavior for scoring and generation; gradients remain enabled.
-    model.eval()
+    model.config.use_cache = False
+    checkpointing = bool(lora_cfg.get("gradient_checkpointing", True))
+    if checkpointing and not hasattr(model, "gradient_checkpointing_enable"):
+        checkpointing = False
+    if checkpointing:
+        try:
+            model.gradient_checkpointing_enable(
+                gradient_checkpointing_kwargs={"use_reentrant": False}
+            )
+        except TypeError:
+            model.gradient_checkpointing_enable()
+        if hasattr(model, "enable_input_require_grads"):
+            model.enable_input_require_grads()
+        # LoRA dropout defaults to zero. Keep train mode so Hugging Face
+        # actually activates checkpointed transformer blocks.
+        model.train()
+    else:
+        # Dropout-free behavior for scoring and generation; gradients remain enabled.
+        model.eval()
+    model._grace_gradient_checkpointing = checkpointing
     if torch.cuda.is_available():
         model = model.cuda()
     return model
@@ -110,6 +128,20 @@ def vllm_needed_max_model_len(cfg: dict[str, Any], max_new: int | None = None) -
     return max(have, 5120, prompt + int(gen) + 64)
 
 
+def cap_colocated_vllm_config(cfg: dict[str, Any], vllm_cfg: dict[str, Any]) -> dict[str, Any]:
+    """Leave enough of one GPU for the HF actor and its backward pass."""
+    result = dict(vllm_cfg)
+    requested = float(result.get("gpu_memory_utilization", 0.5))
+    cap = float(cfg.get("colocated_vllm_memory_utilization", 0.3))
+    if not 0.0 < cap <= 1.0:
+        raise ValueError("colocated_vllm_memory_utilization must be in (0, 1]")
+    result["gpu_memory_utilization"] = min(requested, cap)
+    result.setdefault("max_num_seqs", int(cfg.get("colocated_vllm_max_num_seqs", 2)))
+    if int(result["max_num_seqs"]) <= 0:
+        raise ValueError("colocated_vllm_max_num_seqs must be positive")
+    return result
+
+
 def build_vllm_engine(model_path: str, cfg: dict[str, Any], lora_rank: int):
     from grace_gc.backends.vllm_two_phase import _require_vllm
 
@@ -137,6 +169,9 @@ def build_vllm_engine(model_path: str, cfg: dict[str, Any], lora_rank: int):
         # would silently cap eval.
         "max_model_len": int(cfg.get("max_model_len", 5120)),
     }
+    for key in ("max_num_seqs", "max_num_batched_tokens"):
+        if cfg.get(key) is not None:
+            kwargs[key] = int(cfg[key])
     dropped: list[str] = []
     try:
         llm = LLM(**kwargs)
@@ -256,6 +291,7 @@ def _train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None,
         resources["pool"] = llm
         run.write_json("vllm_engine.json", llm.metadata)
     else:
+        vllm_cfg = cap_colocated_vllm_config(cfg, vllm_cfg)
         llm = build_vllm_engine(str(model_path), vllm_cfg, int(cfg.get("lora", {}).get("rank", 16)))
     if not workers and getattr(build_vllm_engine, "last", None):
         run.write_json("vllm_engine.json", build_vllm_engine.last)

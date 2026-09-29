@@ -25,6 +25,8 @@ audit:
 analysis:
   gradient_target: trajectory
   require_pre_emit: true
+colocated_vllm_memory_utilization: 0.25
+colocated_vllm_max_num_seqs: 1
 hardware:
   name: a100
   n_gpu: 1

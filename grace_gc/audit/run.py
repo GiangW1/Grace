@@ -682,7 +682,8 @@ def generate_bundles_gpu(
 
         from grace_gc.backends.gpu_engine import make_gpu_engines
         from grace_gc.backends.hf_actor import named_lora_params
-        from grace_gc.backends.verl_trainer import build_vllm_engine, load_lora_actor, vllm_needed_max_model_len
+        from grace_gc.backends.verl_trainer import (build_vllm_engine, cap_colocated_vllm_config,
+                                                    load_lora_actor, vllm_needed_max_model_len)
         from grace_gc.data.reward import require_math_verify
         from grace_gc.data.tokenize import encode_records_hf, load_hf_tokenizer, tokenizer_inventory
         from grace_gc.trainer.state_io import check_snapshot_identity
@@ -711,6 +712,7 @@ def generate_bundles_gpu(
         vllm_cfg = dict(cfg.get("vllm") or {})
         vllm_cfg.setdefault("seed", int(cfg.get("seed", 17)))
         vllm_cfg["max_model_len"] = vllm_needed_max_model_len(cfg, _audit_max_new(cfg))
+        vllm_cfg = cap_colocated_vllm_config(cfg, vllm_cfg)
         llm = build_vllm_engine(str(model_path), vllm_cfg, int(cfg.get("lora", {}).get("rank", 16)))
         if work_dir is not None and getattr(build_vllm_engine, "last", None):
             from grace_gc.logging_util.run_dir import RunDirectory

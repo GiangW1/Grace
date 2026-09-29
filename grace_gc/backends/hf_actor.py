@@ -68,6 +68,7 @@ def actor_compute_context(model):
 def actor_numerics(model):
     return {
         "compute_dtype": getattr(model, "_grace_compute_dtype", "native"),
+        "gradient_checkpointing": bool(getattr(model, "_grace_gradient_checkpointing", False)),
         "lora_parameter_dtypes": {name: str(p.dtype) for name, p in named_lora_params(model)},
         "base_dtype": str(next(model.parameters()).dtype),
         "use_cache": False,

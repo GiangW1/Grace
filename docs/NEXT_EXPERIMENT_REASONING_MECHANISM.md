@@ -9,6 +9,7 @@
 - 每个前缀保存独立的固定预算 probe：强制追加 `</think>\nAnswer:`，采样 4 次，每次 32 token。它只用于资格审计，不进入原始续写或梯度标签；`functional_recoverable` 采用预先固定的多数票规则。
 - replay 的欧氏统计始终保留；Adam 度量必须在 replay 前由 checkpoint 导出，并用偏差修正后的二阶矩权重。流式模式只保存充分统计量，不落盘 `N×D` 全矩阵。
 - `difficulty_manifest` 在分析阶段显式传入，结果按 easy/medium/hard、独立 q 分层、严格答案未定子集和题目聚类 bootstrap 报告。
+- 单卡共置时默认把 vLLM 上限压到 30% 显存并把并发序列限制为 2；reasoning 配置进一步使用 25% 和单序列。HF actor 默认启用 gradient checkpointing，避免 8k 反向和 vLLM KV cache 同时挤满 A100。
 
 ## 运行顺序
 
