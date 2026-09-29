@@ -95,6 +95,21 @@ def test_hf_encode_uses_chat_template_when_present():
     with pytest.raises(ValueError, match="thinking open"):
         encode_prompt_hf(Thinks(), "1+1", 16)
 
+    class Reasoning:
+        chat_template = "dummy"
+
+        def apply_chat_template(self, messages, enable_thinking=None, **kwargs):
+            assert enable_thinking is True
+            return [1, 2]
+
+        def decode(self, ids):
+            return "<think>unfinished"
+
+        def __call__(self, text, **kwargs):
+            return {"input_ids": [1]}
+
+    assert encode_prompt_hf(Reasoning(), "1+1", 16, enable_thinking=True) == [1, 2]
+
     class ClosedThink:
         chat_template = "dummy"
 
@@ -412,6 +427,8 @@ def test_answer_already_emitted_ignores_process_boxed():
     assert answer_already_emitted("the answer is 10\nnow continue") is False
     assert answer_already_emitted("work\nAnswer: 343/27") is True
     assert answer_already_emitted("done \\boxed{27}") is True
+    assert answer_already_emitted("<think>work \\boxed{27}</think>\nAnswer: 27") is True
+    assert answer_already_emitted("<think>work \\boxed{27}") is False
 
 
 def test_extract_prefers_later_answer_line():

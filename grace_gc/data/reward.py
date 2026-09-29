@@ -62,6 +62,14 @@ def answer_already_emitted(text: str | None) -> bool:
     if not text:
         return False
     s = str(text)
+    # In reasoning mode, a boxed value or an ``Answer:`` phrase inside an
+    # unfinished <think> block is working text, not an emitted answer.
+    think_start = s.rfind("<think>")
+    think_end = s.rfind("</think>")
+    if think_start >= 0:
+        if think_end <= think_start:
+            return False
+        s = s[think_end + len("</think>"):]
     finals = list(FINAL.finditer(s))
     if finals and not s[finals[-1].end() :].strip():
         return True

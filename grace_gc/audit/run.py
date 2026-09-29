@@ -10,7 +10,7 @@ import numpy as np
 from grace_gc.audit.prefix_audit import PrefixBundle, audit_bundles, bundle_to_dict, jl_project
 from grace_gc.core.layout import collect_lora_layout, pack_grads
 from grace_gc.data.format_prompt import apply_solve_instruction
-from grace_gc.data.math_data import MathRecord, select_records, selection_manifest
+from grace_gc.data.math_data import MathRecord, select_records, select_records_difficulty, selection_manifest
 from grace_gc.data.reward import REWARD_PROTOCOL_VERSION, answer_already_emitted, extract_answer, rule_reward
 from grace_gc.logging_util.forensics import persist_load_report, write_failed
 from grace_gc.logging_util.ledger import ComputeLedger, Timer
@@ -206,6 +206,7 @@ def _bundles_from_engines(
     store_features: bool = False,
     store_trajectory_gradients: bool = False,
     trajectory_dir: str | Path | None = None,
+    qualification_fn=None,
 ) -> list[PrefixBundle]:
     from grace_gc.core.rng import IsolatedRNG
 
@@ -412,6 +413,12 @@ def _bundles_from_engines(
                         trajectory_grads.append(full_grad)
                     costs.append(float(gen_cont))
                 prefix_text = engines.decode(prefix[prompt_len:]) if engines.decode else ""
+                qualification = {}
+                if (qualification_fn is not None and not finished[loc]
+                        and not answer_already_emitted(prefix_text)):
+                    qualification = qualification_fn(
+                        prefix, prompt_len, rec.answer, rec.problem_id, int(t), int(idx)
+                    )
                 grads_arr = np.stack(grads, axis=0)
                 full_norm = np.sum(grads_arr * grads_arr, axis=1).tolist()
                 trajectory_arr = (None if prefix_score_grad is None else
@@ -450,6 +457,11 @@ def _bundles_from_engines(
                         finished=bool(finished[loc]),
                         prefix_tokens=max(len(prefix) - prompt_len, 0),
                         answer_emitted=answer_already_emitted(prefix_text),
+                        qualification_mean_reward=qualification.get("qualification_mean_reward"),
+                        qualification_n=qualification.get("qualification_n"),
+                        qualification_majority=qualification.get("qualification_majority"),
+                        functional_recoverable=qualification.get("functional_recoverable"),
+                        qualification_protocol=qualification.get("qualification_protocol"),
                         prefix_text=prefix_text,
                         suffix_texts=suffix_texts,
                         prompt_truncated=prompt_truncated,
@@ -656,6 +668,7 @@ def generate_bundles_gpu(
     store_trajectory_gradients: bool = False,
     trajectory_dir: str | Path | None = None,
 ) -> list[PrefixBundle]:
+    qualification_fn = None
     if cache and engines is None and cache.get("engines") is not None:
         engines = cache["engines"]
         layout = cache["layout"]
@@ -669,7 +682,8 @@ def generate_bundles_gpu(
 
         from grace_gc.backends.gpu_engine import make_gpu_engines
         from grace_gc.backends.hf_actor import named_lora_params
-        from grace_gc.backends.verl_trainer import build_vllm_engine, load_lora_actor, vllm_needed_max_model_len
+        from grace_gc.backends.verl_trainer import (build_vllm_engine, cap_colocated_vllm_config,
+                                                    load_lora_actor, vllm_needed_max_model_len)
         from grace_gc.data.reward import require_math_verify
         from grace_gc.data.tokenize import encode_records_hf, load_hf_tokenizer, tokenizer_inventory
         from grace_gc.trainer.state_io import check_snapshot_identity
@@ -698,6 +712,7 @@ def generate_bundles_gpu(
         vllm_cfg = dict(cfg.get("vllm") or {})
         vllm_cfg.setdefault("seed", int(cfg.get("seed", 17)))
         vllm_cfg["max_model_len"] = vllm_needed_max_model_len(cfg, _audit_max_new(cfg))
+        vllm_cfg = cap_colocated_vllm_config(cfg, vllm_cfg)
         llm = build_vllm_engine(str(model_path), vllm_cfg, int(cfg.get("lora", {}).get("rank", 16)))
         if work_dir is not None and getattr(build_vllm_engine, "last", None):
             from grace_gc.logging_util.run_dir import RunDirectory
@@ -711,7 +726,8 @@ def generate_bundles_gpu(
 
         def encode(rec: MathRecord, n: int):
             meta: list = []
-            out = encode_records_hf([rec] * n, tokenizer, max_prompt, prompt_meta=meta)
+            out = encode_records_hf([rec] * n, tokenizer, max_prompt, prompt_meta=meta,
+                                    enable_thinking=bool(cfg.get("enable_thinking", False)))
             encode.last_meta = meta
             return out
 
@@ -728,9 +744,37 @@ def generate_bundles_gpu(
 
         def encode_fn(rec: MathRecord, n: int):
             meta: list = []
-            out = encode_records_hf([rec] * n, tokenizer, max_prompt, prompt_meta=meta)
+            out = encode_records_hf([rec] * n, tokenizer, max_prompt, prompt_meta=meta,
+                                    enable_thinking=bool(cfg.get("enable_thinking", False)))
             encode_fn.last_meta = meta
             return out
+
+    qualification_cfg = (cfg.get("audit") or {}).get("functional_qualification")
+    if qualification_cfg and bool(qualification_cfg.get("enabled", False)):
+        from grace_gc.audit.qualification import classify_functional_recovery, validate_qualification_config
+        probe_cfg = validate_qualification_config(qualification_cfg)
+        if not hasattr(tokenizer, "encode"):
+            raise ValueError("functional qualification needs a tokenizer.encode method")
+        forced = tokenizer.encode("</think>\nAnswer:", add_special_tokens=False)
+        from grace_gc.core.rng import IsolatedRNG
+        from grace_gc.data.reward import rule_reward
+
+        def qualification_fn(prefix, prompt_len, gold, problem_id, t, path_index):
+            _ = prompt_len, problem_id
+            probe_prefix = list(prefix) + [int(x) for x in forced]
+            rng = IsolatedRNG.create(int(cfg.get("seed", 17)) + path_index * 100003
+                                     + int(t) * 1009 + len(prefix))
+            rewards = []
+            for _sample in range(probe_cfg["n"]):
+                result = engines.continue_selected(
+                    [probe_prefix], np.ones(1, dtype=bool), probe_cfg["max_new_tokens"], rng
+                )[0]
+                if result is None:
+                    raise ValueError("functional qualification returned no sequence")
+                text = engines.decode(result[len(probe_prefix):]) if engines.decode else ""
+                reward = rule_reward(text, gold, truncated=False)
+                rewards.append(0.0 if reward is None else float(reward))
+            return classify_functional_recovery(rewards, probe_cfg["majority"])
 
     # A caller may initialize this frozen engine once for another audit design.
     if not records:
@@ -772,6 +816,7 @@ def generate_bundles_gpu(
         store_features=store_features,
         store_trajectory_gradients=store_trajectory_gradients,
         trajectory_dir=trajectory_dir,
+        qualification_fn=qualification_fn,
     )
 
 
@@ -798,6 +843,9 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
     run_dir = resolve_run_dir(run_dir)
     run = RunDirectory(run_dir)
     backend = cfg.get("backend", "cpu_tiny")
+    if ((cfg.get("audit") or {}).get("functional_qualification", {}).get("enabled", False)
+            and backend != "gpu_verl"):
+        raise ValueError("functional qualification requires the gpu_verl audit backend")
     n_gpu = int((cfg.get("hardware") or {}).get("n_gpu", 1 if backend == "gpu_verl" else 0))
     hardware = str((cfg.get("hardware") or {}).get("name", "gpu" if backend == "gpu_verl" else "cpu"))
     ledger = ComputeLedger(n_gpu=n_gpu, hardware=hardware)
@@ -824,7 +872,15 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
         audit_cfg = cfg.get("audit") or {}
         selection = str(audit_cfg.get("selection", "first"))
         selection_seed = int(audit_cfg.get("selection_seed", cfg.get("split_seed", seed)))
-        recs = select_records(records, n_problems, selection, selection_seed)
+        difficulty_manifest = audit_cfg.get("difficulty_manifest")
+        if difficulty_manifest:
+            recs = select_records_difficulty(
+                records, n_problems, difficulty_manifest,
+                counts=audit_cfg.get("difficulty_counts"), seed=selection_seed,
+            )
+            selection = "difficulty_stratified"
+        else:
+            recs = select_records(records, n_problems, selection, selection_seed)
         versions = collect_environment(cfg)
         versions["started"] = started
         run.write_run_meta(kind="audit", started=started, requested=requested)
@@ -833,6 +889,14 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
         manifest = selection_manifest(recs, selection, selection_seed)
         manifest.update(n_baseline=int(audit_cfg.get("n_baseline", n_cont)), n_continuations=n_cont,
                         max_new_tokens=max_new, decision_grid=grid, method=spec.name,
+                        enable_thinking=bool(cfg.get("enable_thinking", False)),
+                        difficulty_manifest=(None if not difficulty_manifest else
+                                             str(Path(difficulty_manifest).resolve())),
+                        difficulty_manifest_sha256=(None if not difficulty_manifest else
+                                                    sha256_file(difficulty_manifest)),
+                        difficulty_counts=audit_cfg.get("difficulty_counts"),
+                        functional_qualification=(audit_cfg.get("functional_qualification") or
+                                                   {"enabled": False}),
                         reward_protocol_version=REWARD_PROTOCOL_VERSION,
                         baseline_configuration=baseline_from_config(cfg.get("baseline")).configuration(),
                         baseline_protocol="Independent prescan with configured prior; explicit audit.baseline or configured fixed mode overrides both gradient and feature baseline.")
@@ -916,6 +980,24 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
             if cfg.get("audit", {}).get("jl_dim"):
                 analysis["jl_dim"] = int(cfg["audit"]["jl_dim"])
             result = audit_bundles(bundles, u, analysis, rng)
+            continuation_rows = [record for bundle in bundles
+                                 for record in (bundle.continuation_records or [])]
+            probe_rows = [bundle for bundle in bundles
+                          if bundle.functional_recoverable is not None]
+            result["trajectory_summary"] = {
+                "n_continuations": len(continuation_rows),
+                "truncation_rate": (None if not continuation_rows else
+                                     float(np.mean([bool(record.get("truncated", False))
+                                                   for record in continuation_rows]))),
+                "answer_emitted_prefix_rate": (None if not bundles else
+                                                float(np.mean([bool(bundle.answer_emitted)
+                                                              for bundle in bundles]))),
+                "functional_probe_rate": (None if not probe_rows else
+                                           float(np.mean([bool(bundle.functional_recoverable)
+                                                         for bundle in probe_rows]))),
+                "functional_probe_prefixes": len(probe_rows),
+                "length_scope": "truncation is R=0 in the gradient label; this rate is descriptive",
+            }
             result["seed"] = seed
             result["audit_manifest"] = manifest
             result["checkpoint"] = cfg.get("checkpoint") or cfg.get("resume")

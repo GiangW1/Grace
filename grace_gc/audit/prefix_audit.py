@@ -41,6 +41,11 @@ class PrefixBundle:
     finished: bool = False
     prefix_tokens: int | None = None
     answer_emitted: bool = False
+    qualification_mean_reward: float | None = None
+    qualification_n: int | None = None
+    qualification_majority: float | None = None
+    functional_recoverable: bool | None = None
+    qualification_protocol: str | None = None
     prefix_text: str | None = None
     suffix_texts: list[str] | None = None
     prompt_truncated: bool | None = None
