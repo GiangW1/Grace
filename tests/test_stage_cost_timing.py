@@ -90,7 +90,7 @@ def test_stage_envelope_includes_setup_and_result_or_failure_persistence(
     monkeypatch.setattr(RunDirectory, "append_jsonl", measured_append)
     monkeypatch.setattr(generate, "_generate_eval_items", generation)
     monkeypatch.setattr(run, "generate_bundles_gpu", generation)
-    monkeypatch.setattr(run, "bundle_to_dict", lambda bundle: {"t": bundle.t})
+    monkeypatch.setattr(run, "_serialize_audit_bundles", lambda run, bundles: [{"t": b.t} for b in bundles])
     monkeypatch.setattr(run, "_audit_u", lambda *args: np.zeros((1, 1)))
     monkeypatch.setattr(run, "audit_bundles", lambda *args: {"n_bundles": 1})
     monkeypatch.setattr(batch_audit, "generate_bundles_gpu",

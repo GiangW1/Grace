@@ -96,7 +96,8 @@ def _load_bundles(path: Path):
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
             if line.strip():
-                bundles.append(bundle_from_dict(json.loads(_without_large_grads(line))))
+                bundles.append(bundle_from_dict(json.loads(_without_large_grads(line)),
+                                                base_dir=path.parent))
     if not bundles:
         raise ValueError(f"bundle file is empty: {path}")
     return bundles

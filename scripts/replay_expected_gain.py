@@ -23,11 +23,20 @@ from grace_gc.audit.dynamic_score import load_diagonal_metric
 from grace_gc.audit.expected_gain import start_experiment_run
 
 
-def _load_problem_baselines(path, checkpoint_sha256):
+def _load_problem_baselines(path, checkpoint_sha256, expected_metadata=None):
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     recorded_checkpoint = payload.get("checkpoint_sha256")
     if recorded_checkpoint is not None and recorded_checkpoint != checkpoint_sha256:
         raise ValueError("baseline calibration uses a different checkpoint")
+    metadata = payload.get("calibration") or payload.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        raise ValueError("baseline calibration metadata must be a mapping")
+    for key, expected in (expected_metadata or {}).items():
+        if expected is None or key not in metadata:
+            continue
+        observed = metadata[key]
+        if observed != expected:
+            raise ValueError(f"baseline calibration {key} differs from replay")
     values = payload.get("problems") or payload.get("baselines")
     if not isinstance(values, dict) or not values:
         raise ValueError("baseline file must contain a nonempty problems mapping")
@@ -81,6 +90,10 @@ def main(argv=None) -> int:
                         help="omit the prompt-only forward baseline to save replay time")
     parser.add_argument("--store-half-means", action="store_true",
                         help="store independent A/B gradient means and second moments for stages A/B")
+    parser.add_argument("--store-trajectory-decomposition", action="store_true",
+                        help="also store prefix score gradients and full-trajectory G A/B means")
+    parser.add_argument("--include-answer-emitted", action="store_true",
+                        help="include prefixes whose audit has answer_emitted=true; disables pre-answer filtering")
     parser.add_argument("--metric-file", default=None,
                         help="fixed diagonal metric weights; required before weighted A/B replay")
     parser.add_argument("--metric-name", default=None,
@@ -94,10 +107,11 @@ def main(argv=None) -> int:
     from types import SimpleNamespace
 
     from grace_gc.audit.run import _policy_grad_vec
+    from grace_gc.core.layout import pack_grads
     from grace_gc.backends.hf_actor import (logprob_one, named_lora_params,
                                             prefix_feature_bundle, trainable_params)
     from grace_gc.backends.verl_trainer import load_lora_actor
-    from grace_gc.core.layout import collect_lora_layout
+    from grace_gc.core.layout import collect_lora_layout, layout_hash
     from grace_gc.data.tokenize import collect_stop_token_ids, load_hf_tokenizer
     from grace_gc.trainer.checkpoint import load_checkpoint
     from grace_gc.trainer.state_io import check_snapshot_identity, load_numpy_module_state
@@ -200,11 +214,31 @@ def main(argv=None) -> int:
                 "prompt_features": (None if args.skip_prompt_features else
                                      bundle["prompt_features"][0])}
 
-    source_rows = list(audit_rows(args.bundles, args.decision_tokens))
+    def prefix_score_gradient(row):
+        prefix = row.get("prefix_token_ids")
+        prompt = row.get("prompt_token_ids")
+        if not prefix or not prompt or list(prefix[:len(prompt)]) != list(prompt):
+            raise ValueError("audit lacks aligned prompt/prefix token IDs for trajectory gradients")
+        torch = __import__("torch")
+        logprob = engines.logprob_one(list(map(int, prefix)), len(prompt))
+        grads = torch.autograd.grad(logprob, engines.trainable_params(), allow_unused=True)
+        packed = []
+        for (name, param), grad in zip(engines.named_lora(), grads):
+            packed.append((name, np.zeros(tuple(param.shape), dtype=np.float64)
+                           if grad is None else grad.detach().float().cpu().numpy()))
+        return pack_grads(packed, layout)
+
+    audit_filter_stats = {}
+    source_rows = list(audit_rows(
+        args.bundles, args.decision_tokens,
+        require_pre_emit=not args.include_answer_emitted, stats=audit_filter_stats))
     baseline_calibration = None
     if args.baseline_file:
         baseline_calibration = _load_problem_baselines(
-            args.baseline_file, sha256_file(args.checkpoint))
+            args.baseline_file, sha256_file(args.checkpoint),
+            {"max_new_tokens": cfg.get("max_new_tokens"),
+             "temperature": (cfg.get("sampling") or {}).get("temperature"),
+             "top_p": (cfg.get("sampling") or {}).get("top_p")})
         source_rows = _apply_problem_baselines(source_rows, baseline_calibration)
     if args.reference_dir and ({str(row["problem_id"]) for row in source_rows} &
                                    {str(row["problem_id"]) for row in reference_rows}):
@@ -217,7 +251,9 @@ def main(argv=None) -> int:
                           calibrated_feature_bundle if baseline_calibration else None,
                           reference, store_half_means=args.store_half_means,
                           metric_weights=metric_weights, metric_name=metric_name,
-                          verify_saved_gradients=baseline_calibration is None)
+                          verify_saved_gradients=baseline_calibration is None,
+                          prefix_grad_fn=prefix_score_gradient if args.store_trajectory_decomposition else None,
+                          store_trajectory_decomposition=args.store_trajectory_decomposition)
     np.save(destination / "metric_weights.npy", metric_weights)
     provenance = {"checkpoint": str(Path(args.checkpoint).resolve()),
                   "checkpoint_sha256": sha256_file(args.checkpoint),
@@ -229,12 +265,16 @@ def main(argv=None) -> int:
                   "seed": args.seed,
                   "prompt_features_replayed": not args.skip_prompt_features,
                   "half_means_stored": bool(args.store_half_means),
+                  "trajectory_decomposition_stored": bool(args.store_trajectory_decomposition),
+                  "gradient_label": result["gradient_label"],
                   "metric_name": metric_name,
                   "metric_file": (None if args.metric_file is None else
                                    str(Path(args.metric_file).resolve())),
                   "metric_weights_sha256": sha256_array(metric_weights),
                   "baseline_mode": ("independent_calibration" if args.baseline_file else
                                      "source_records"),
+                  "pre_answer_only": not args.include_answer_emitted,
+                  "audit_filter_stats": audit_filter_stats,
                   "baseline_file": (None if args.baseline_file is None else
                                      str(Path(args.baseline_file).resolve())),
                   "baseline_file_sha256": (None if args.baseline_file is None else
@@ -257,9 +297,17 @@ def main(argv=None) -> int:
                   "lora": cfg.get("lora"),
                   "source_actor_metadata_available": source_meta.is_file(),
                   "layout_names": layout.names(), "layout_dim": layout.dim,
+                  "layout_sha256": layout_hash(layout),
                   "model_path": args.model_path}
     (destination / "replay_provenance.json").write_text(
         json.dumps(provenance, indent=2, ensure_ascii=False), encoding="utf-8")
+    if args.store_trajectory_decomposition:
+        basis_path = destination / "score_gradient_provenance.json"
+        basis_provenance = json.loads(basis_path.read_text(encoding="utf-8"))
+        basis_provenance.update({key: provenance[key] for key in
+                                ("actor_sha256", "checkpoint_sha256", "layout_dim",
+                                 "layout_names", "layout_sha256", "gradient_label")})
+        basis_path.write_text(json.dumps(basis_provenance, indent=2), encoding="utf-8")
     print(json.dumps({**result, "run_dir": str(destination)}, ensure_ascii=False))
     return 0
 

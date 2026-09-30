@@ -33,7 +33,7 @@ def _load_bundles(path: Path):
     bundles = []
     for line in path.read_text(encoding="utf-8").splitlines():
         if line.strip():
-            bundles.append(bundle_from_dict(json.loads(line)))
+            bundles.append(bundle_from_dict(json.loads(line), base_dir=path.parent))
     if not bundles:
         raise ValueError(f"bundle file is empty: {path}")
     return bundles

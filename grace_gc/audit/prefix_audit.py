@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, fields, replace
+from pathlib import Path
 
 import numpy as np
 
@@ -22,6 +23,7 @@ from grace_gc.audit.variance_cost import cluster_bootstrap_variance_cost, fit_ev
 from grace_gc.audit.mechanism import full_space_decomposition, summarize_decompositions
 from grace_gc.predictor.risk import full_space_residual
 from grace_gc.trainer.grace_step import control_variate_coordinates, decide_continuation
+from grace_gc.versions import sha256_file
 
 
 @dataclass
@@ -47,6 +49,10 @@ class PrefixBundle:
     baseline_samples: list[dict] | None = None
     prompt_token_ids: list[int] | None = None
     prefix_token_ids: list[int] | None = None
+    prefix_score_grad: np.ndarray | None = None
+    trajectory_grads: np.ndarray | None = None
+    trajectory_grad_norm_sq: list[float] | None = None
+    trajectory_coords: list[list[float]] | None = None
     continuation_records: list[dict] | None = None
     prefix_request_seed: int | None = None
     true_grad_norm_sq: list[float] | None = None
@@ -63,14 +69,39 @@ class PrefixBundle:
     cost_feat: list[float] | None = None
 
 
-def bundle_to_dict(bundle: PrefixBundle) -> dict:
-    return {f.name: (value.tolist() if isinstance(value := getattr(bundle, f.name), np.ndarray) else value)
-            for f in fields(PrefixBundle)}
+def bundle_to_dict(bundle: PrefixBundle, include_trajectory_grads: bool = False) -> dict:
+    result = {}
+    for field in fields(PrefixBundle):
+        value = getattr(bundle, field.name)
+        if field.name in {"trajectory_grads", "prefix_score_grad"} and not include_trajectory_grads:
+            value = None
+        result[field.name] = value.tolist() if isinstance(value, np.ndarray) else value
+    return result
 
 
-def bundle_from_dict(raw: dict) -> PrefixBundle:
+def bundle_from_dict(raw: dict, base_dir: str | Path | None = None) -> PrefixBundle:
+    raw = dict(raw)
+    for field in ("trajectory_grads", "prefix_score_grad"):
+        sidecar = raw.get(field + "_sidecar")
+        if raw.get(field) is not None or sidecar is None:
+            continue
+        if base_dir is None:
+            raise ValueError("trajectory gradient sidecar needs the bundle directory")
+        if not isinstance(sidecar, dict) or not sidecar.get("path"):
+            raise ValueError("invalid trajectory gradient sidecar metadata")
+        path = Path(base_dir) / str(sidecar["path"])
+        if not path.is_file():
+            raise FileNotFoundError(f"trajectory gradient sidecar is not readable: {path}")
+        if sidecar.get("sha256") and sha256_file(path) != sidecar["sha256"]:
+            raise ValueError("trajectory gradient sidecar hash differs from metadata")
+        values = np.load(path, mmap_mode="r")
+        expected_shape = tuple(int(x) for x in sidecar.get("shape", ()))
+        if expected_shape and values.shape != expected_shape:
+            raise ValueError("trajectory gradient sidecar shape differs from metadata")
+        raw[field] = values
     values = {f.name: raw[f.name] for f in fields(PrefixBundle) if f.name in raw}
-    for key in ("grads", "rewards", "coords", "suffix_cost", "m_pred", "features", "cost_feat"):
+    for key in ("grads", "rewards", "coords", "suffix_cost", "m_pred", "features", "cost_feat",
+                "prefix_score_grad", "trajectory_grads"):
         if values.get(key) is not None:
             values[key] = np.asarray(values[key], dtype=np.float64)
     return PrefixBundle(**values)
@@ -270,6 +301,49 @@ def audit_bundles(
 ) -> dict:
     if not bundles:
         return {"n_bundles": 0, "note": "no prefixes"}
+    gradient_target = str(analysis.get("gradient_target", "suffix"))
+    unavailable_predictors = []
+    if gradient_target not in {"suffix", "trajectory"}:
+        raise ValueError("gradient_target must be suffix or trajectory")
+    if gradient_target == "trajectory":
+        missing = [b.problem_id for b in bundles if b.trajectory_grads is None]
+        if missing:
+            raise ValueError("trajectory gradient target requested but bundles lack trajectory_grads")
+        # Keep the legacy suffix fields intact on disk while running every
+        # existing rho/LAG/ELF calculation on the paper's full trajectory G.
+        converted = []
+        for b in bundles:
+            target_grads = np.asarray(b.trajectory_grads, dtype=np.float64)
+            target_coords = (None if b.trajectory_coords is None else
+                             np.asarray(b.trajectory_coords, dtype=np.float64))
+            # A JL projection may have been applied to the legacy suffix
+            # fields while trajectory gradients remain in checkpoint space.
+            # Do not subtract incompatible predictors or coordinates.
+            target_m = (None if b.m_pred is None else np.asarray(b.m_pred, dtype=np.float64))
+            if target_m is not None and (target_m.ndim != 1 or target_m.shape[0] != target_grads.shape[1]):
+                target_m = None
+                predicted = b.effective_coords if b.effective_coords is not None else b.coords
+                if (predicted is not None and np.asarray(predicted).shape == (u.shape[1],)
+                        and u.shape[0] == target_grads.shape[1] and u.size):
+                    target_m = u @ np.asarray(predicted, dtype=np.float64)
+                else:
+                    unavailable_predictors.append({
+                        "problem_id": b.problem_id, "path_id": b.path_id, "t": b.t,
+                        "reason": "projected_predictor_cannot_be_reconstructed_in_trajectory_space",
+                    })
+            if target_coords is not None and (target_coords.ndim != 2 or
+                                               target_coords.shape[0] != target_grads.shape[0] or
+                                               target_coords.shape[1] != u.shape[1]):
+                target_coords = None
+            converted.append(replace(
+                b,
+                grads=target_grads,
+                m_pred=target_m,
+                true_grad_norm_sq=(b.trajectory_grad_norm_sq or
+                                   np.sum(target_grads ** 2, axis=1).tolist()),
+                true_grad_coords=target_coords,
+            ))
+        bundles = converted
     grouped = _by_problem(bundles)
     var_r = []
     cond_var = []
@@ -301,7 +375,10 @@ def audit_bundles(
                 residuals.append(float(np.mean(np.sum(g*g, axis=1))))
             elif bundle.m_pred is not None:
                 m = np.asarray(bundle.m_pred, dtype=np.float64)
-                residuals.append(float(np.mean(np.sum((g - m) ** 2, axis=1))))
+                if m.ndim != 1 or m.shape[0] != g.shape[1]:
+                    residuals.append(np.nan)
+                else:
+                    residuals.append(float(np.mean(np.sum((g - m) ** 2, axis=1))))
             elif bundle.coords is not None and u.size:
                 f = np.asarray(bundle.coords, dtype=np.float64)
                 if f.ndim == 1:
@@ -369,7 +446,9 @@ def audit_bundles(
     path_ids = [getattr(b, "path_id", None) for b in bundles]
     have_paths = all(pid is not None for pid in path_ids) and len({(b.path_id, b.t) for b in bundles}) > len({b.path_id for b in bundles})
     result = {
-        "measurement_version": 2,
+        "measurement_version": 3,
+        "gradient_target": gradient_target,
+        "unavailable_predictors": unavailable_predictors,
         "n_bundles": len(bundles),
         "rho_a_all": float(np.nanmean(rho_a_vals)) if np.any(np.isfinite(rho_a_vals)) else float("nan"),
         "rho_l_all": float(np.nanmean(rho_l_vals)) if np.any(np.isfinite(rho_l_vals)) else float("nan"),
