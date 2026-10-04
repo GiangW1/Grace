@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from contextlib import contextmanager
@@ -198,14 +199,44 @@ def reduce_bundle(bundle, rng, directory, seed, metric=None, metric_name="euclid
     bundle.prefix_score_grad = None
 
 
+def validate_metric_record(record, metric_hash, euclidean, *, prefix=False, allow_legacy=False):
+    recorded_hash = record.get("metric_weights_sha256")
+    if recorded_hash is None:
+        name = record.get("metric_name", record.get("metric"))
+        if not (allow_legacy and euclidean and name in (None, "euclidean")):
+            raise ValueError("saved statistics lack metric provenance; use a new run directory")
+    elif recorded_hash != metric_hash:
+        raise ValueError("saved metric weights differ; use a new run directory")
+    if prefix and not euclidean:
+        norms = np.asarray(record.get("half_full_metric_norm_sq"), dtype=np.float64)
+        if norms.shape != (2,) or not np.all(np.isfinite(norms)) or np.any(norms < 0):
+            raise ValueError("prefix lacks valid A/B second moments for the saved metric")
+
+
+def prepare_metric(root, metric):
+    metric_path = root / "metric_weights.npy"
+    metric_hash, euclidean = sha256_array(metric), bool(np.all(metric == 1.0))
+    # Workers share this file; validate before any worker can replace it.
+    with problem_lock(root / ".metric.lock"):
+        if metric_path.is_file():
+            saved = load_diagonal_metric(metric_path, len(metric))
+            if sha256_array(saved) != metric_hash:
+                raise ValueError("saved metric weights differ; use a new run directory")
+        for path in root.glob("worker-*-provenance.json"):
+            validate_metric_record(json.loads(path.read_text()), metric_hash, euclidean)
+        for path in root.glob("problems/*/path-*/bundle.json"):
+            validate_metric_record(json.loads(path.read_text()), metric_hash, euclidean, prefix=True)
+        if not metric_path.is_file():
+            save_array(metric_path, metric)
+
+
 def collect(args):
     import torch
     from grace_gc.backends.gpu_engine import make_gpu_engines
     from grace_gc.backends.hf_actor import actor_numerics, named_lora_params
     from grace_gc.backends.verl_trainer import load_lora_actor
     from grace_gc.core.layout import collect_lora_layout, layout_hash
-    from grace_gc.audit.qualification import classify_functional_recovery
-    from grace_gc.data.reward import score_prefilled_answer
+    from grace_gc.audit.qualification import classify_functional_recovery, score_probe_sample
     from grace_gc.trainer.methods import method_spec
 
     root = Path(args.run_dir)
@@ -303,9 +334,7 @@ def collect(args):
                                     "model_revision": REVISION, "spec": "full_pg", "step": 0,
                                     "layout_dim": layout.dim, "layout_names": layout.names(),
                                     "origin": "Fresh zero-B LoRA on post-trained Qwen3-4B; no optimizer history"})
-    metric_path = root / "metric_weights.npy"
-    if not metric_path.is_file() or args.worker_index == 0 or args.smoke:
-        save_array(metric_path, metric)
+    prepare_metric(root, metric)
     provenance = {"model": "Qwen/Qwen3-4B", "model_revision": REVISION,
                   "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO, text=True).strip(),
                   "audit_source_sha256": sha256_file(REPO / "grace_gc/audit/run.py"),
@@ -360,12 +389,11 @@ def collect(args):
         rng = IsolatedRNG.create(args.seed + path_index * 100003 + int(t) * 1009 + len(prefix))
         fulls, reasons, seeds = repeated(probe, 4, 32, rng)
         texts = [engines.decode(full[len(probe):]) for full in fulls]
-        rewards = [float(score_prefilled_answer(text, gold, truncated=False) or 0.0)
-                   for text in texts]
         probe_records[(pid, f"{pid}:{path_index}", t)] = [
-            {"text": text, "reward": reward, "seed": seed, "finish_reason": reason,
-             "token_ids": full[len(probe):]} for text, reward, seed, reason, full
-            in zip(texts, rewards, seeds, reasons, fulls)]
+            {**score_probe_sample(full, len(probe), text, gold, 32,
+                                  eos_id=engines.eos_id, finish_reason=reason), "seed": seed}
+            for text, seed, reason, full in zip(texts, seeds, reasons, fulls)]
+        rewards = [row["reward"] for row in probe_records[(pid, f"{pid}:{path_index}", t)]]
         return classify_functional_recovery(rewards, 0.5)
 
     started = time.monotonic()
@@ -459,31 +487,52 @@ def merge(args):
                 f"missing={sorted(expected_problem_ids - summary_problem_ids)} "
                 f"extra={sorted(summary_problem_ids - expected_problem_ids)}"
             )
-    replay = root / "replay"
-    replay.mkdir(exist_ok=True)
     rows = [json.loads(path.read_text()) for path in directories]
+    bundle_counts = Counter(str(row["problem_id"]) for row in rows)
     if expected_problem_ids is not None:
-        row_problem_ids = {str(row.get("problem_id")) for row in rows}
-        if row_problem_ids != expected_problem_ids:
+        extra = set(bundle_counts) - expected_problem_ids
+        if extra:
             raise ValueError(
                 "bundle problem IDs differ from selection manifest: "
-                f"missing={sorted(expected_problem_ids - row_problem_ids)} "
-                f"extra={sorted(row_problem_ids - expected_problem_ids)}"
+                f"extra={sorted(extra)}"
             )
         expected_protocol = selection.get("reward_protocol_version")
-        if expected_protocol is not None:
+        if rows and expected_protocol is not None:
             observed = {row.get("reward_protocol_version") for row in rows}
             if observed != {expected_protocol}:
                 raise ValueError(
                     f"bundles use reward protocols {sorted(observed, key=str)}, "
                     f"expected {expected_protocol}; rerun collection before analysis"
                 )
+    for summary in summary_payloads:
+        count = bundle_counts[str(summary.get("problem_id"))]
+        expected = summary.get("n_bundles")
+        if expected is not None and count != int(expected):
+            raise ValueError(f"saved bundle count differs from completed summary for {summary['problem_id']}")
+        if expected_problem_ids is not None and count == 0 and expected != 0:
+            raise ValueError(f"missing bundles without a zero-prefix summary for {summary.get('problem_id')}")
+    no_prefix_ids = sorted(str(summary["problem_id"]) for summary in summary_payloads
+                           if summary.get("n_bundles") == 0)
+    if not rows:
+        result = {"status": "completed", "finished_utc": utc(), "n_original_problems": expected_problems,
+                  "n_observed_problems": 0, "n_prefixes": 0, "lopo": [], "predictor_benefit": None,
+                  "no_surviving_prefix_problem_ids": no_prefix_ids,
+                  "reason": "No paths survived the decision points"}
+        write_json(root / "benefit/predictor_benefit_summary.json", result)
+        write_json(root / "analysis_status.json", result)
+        return
     provenance = json.loads((root / "worker-0-provenance.json").read_text())
     dimension = provenance["layout_dim"]
-    if not rows:
-        write_json(root / "analysis_status.json", {"status": "completed", "n_original_problems": expected_problems,
-                   "n_prefixes": 0, "predictor_benefit": None, "reason": "No paths survived the decision points"})
-        return
+    metric_path = root / "metric_weights.npy"
+    metric = (load_diagonal_metric(metric_path, dimension)
+              if metric_path.is_file() else np.ones(dimension, dtype=np.float64))
+    metric_hash, euclidean = sha256_array(metric), bool(np.all(metric == 1.0))
+    for path in root.glob("worker-*-provenance.json"):
+        validate_metric_record(json.loads(path.read_text()), metric_hash, euclidean, allow_legacy=allow_legacy)
+    for row in rows:
+        validate_metric_record(row, metric_hash, euclidean, prefix=True, allow_legacy=allow_legacy)
+    replay = root / "replay"
+    replay.mkdir(exist_ok=True)
     for name, filename in (("a", "half_mean_full_grads_a.npy"), ("b", "half_mean_full_grads_b.npy"),
                            ("prefix", "prefix_score_gradients.npy")):
         shape = (len(rows), dimension, 1) if name == "prefix" else (len(rows), dimension)
@@ -496,9 +545,6 @@ def merge(args):
                 matrix[index] = np.load(source, mmap_mode="r")
         matrix.flush()
         del matrix
-    metric_path = root / "metric_weights.npy"
-    metric = (load_diagonal_metric(metric_path, dimension)
-              if metric_path.is_file() else np.ones(dimension, dtype=np.float64))
     metric_name = str(provenance.get("metric") or "euclidean")
     save_array(replay / "metric_weights.npy", metric)
     for index, half in enumerate(("a", "b")):
@@ -525,6 +571,8 @@ def merge(args):
         "prefix_keys_sha256": prefix_keys_sha256(compact)})
     write_json(replay / "preparation_summary.json", {
         "status": "completed", "n_original_problems": expected_problems, "n_prefixes": len(rows),
+        "n_observed_problems": len(bundle_counts),
+        "no_surviving_prefix_problem_ids": no_prefix_ids,
         "n_continuations": sum(row["n_continuations"] for row in rows),
         "enable_thinking": True, "functional_qualification_available": True,
         "metric_name": metric_name, "metric_weights_sha256": sha256_array(metric),
@@ -561,6 +609,7 @@ def merge(args):
                    difficulty_manifest=selection.get("difficulty_manifest"))
     write_json(root / "analysis_status.json", {"status": "completed", "finished_utc": utc(),
                "n_original_problems": expected_problems, "n_prefixes": len(rows), "enable_thinking": True,
+               "n_observed_problems": len(bundle_counts), "no_surviving_prefix_problem_ids": no_prefix_ids,
                "metric_name": metric_name, "difficulty_manifest": selection.get("difficulty_manifest"),
                "summary": str(root / "benefit/predictor_benefit_summary.json")})
 

@@ -16,7 +16,6 @@ from grace_gc.data.reward import (
     answer_already_emitted,
     extract_answer,
     rule_reward,
-    score_prefilled_answer,
 )
 from grace_gc.logging_util.forensics import persist_load_report, write_failed
 from grace_gc.logging_util.ledger import ComputeLedger, Timer
@@ -784,13 +783,13 @@ def generate_bundles_gpu(
 
     qualification_cfg = (cfg.get("audit") or {}).get("functional_qualification")
     if qualification_cfg and bool(qualification_cfg.get("enabled", False)):
-        from grace_gc.audit.qualification import classify_functional_recovery, validate_qualification_config
+        from grace_gc.audit.qualification import (classify_functional_recovery,
+                                                  score_probe_sample, validate_qualification_config)
         probe_cfg = validate_qualification_config(qualification_cfg)
         if not hasattr(tokenizer, "encode"):
             raise ValueError("functional qualification needs a tokenizer.encode method")
         forced = tokenizer.encode("</think>\nAnswer:", add_special_tokens=False)
         from grace_gc.core.rng import IsolatedRNG
-        from grace_gc.data.reward import rule_reward
 
         def qualification_fn(prefix, prompt_len, gold, problem_id, t, path_index):
             _ = prompt_len, problem_id
@@ -805,8 +804,10 @@ def generate_bundles_gpu(
                 if result is None:
                     raise ValueError("functional qualification returned no sequence")
                 text = engines.decode(result[len(probe_prefix):]) if engines.decode else ""
-                reward = score_prefilled_answer(text, gold, truncated=False)
-                rewards.append(0.0 if reward is None else float(reward))
+                sample = score_probe_sample(
+                    result, len(probe_prefix), text, gold, probe_cfg["max_new_tokens"],
+                    eos_id=engines.eos_id, finish_reason=_continue_finish_reason(engines))
+                rewards.append(sample["reward"])
             return classify_functional_recovery(rewards, probe_cfg["majority"])
 
     # A caller may initialize this frozen engine once for another audit design.

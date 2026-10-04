@@ -70,7 +70,9 @@ def report_benefit(replay, destination, seed=17, metric_file=None,
     resolved_metric_name = str(metric_name or provenance.get("metric_name") or
                                ("euclidean" if np.all(weights == 1.0) else "diagonal_file"))
     metric_norm_path = replay / "half_full_metric_norm_sq_b.npy"
-    norms = np.load(metric_norm_path if metric_norm_path.is_file() and not np.all(weights == 1.0)
+    if not np.all(weights == 1.0) and not metric_norm_path.is_file():
+        raise ValueError("benefit replay lacks second moments for the saved metric")
+    norms = np.load(metric_norm_path if not np.all(weights == 1.0)
                     else replay / "half_mean_full_norm_sq_b.npy")
     coefficients = fit_prefix_coefficients(basis, a, weights)[:, 0]
     hh, gb, gram = np.zeros(len(rows)), np.zeros(len(rows)), np.zeros((len(rows), len(rows)))
@@ -127,10 +129,13 @@ def report_benefit(replay, destination, seed=17, metric_file=None,
                 item["variance_cost"].append({"p": probability, **moment_product(*inputs),
                     **bootstrap_product(*inputs, pids[indices].tolist(), seed)})
             reports.append(item)
+    preparation_path = replay / "preparation_summary.json"
+    preparation = json.loads(preparation_path.read_text()) if preparation_path.is_file() else {}
     output = {"status": "completed", "finished_utc": datetime.now(timezone.utc).isoformat(),
               "model": "Qwen/Qwen3-4B", "enable_thinking": True,
-              "n_original_problems": len(set(pids)),
+              "n_original_problems": preparation.get("n_original_problems", len(set(pids))),
               "n_observed_problems": len(set(pids)), "n_prefixes": len(rows), "lopo": reports,
+              "no_surviving_prefix_problem_ids": preparation.get("no_surviving_prefix_problem_ids", []),
               "functional_qualification_available": True,
               "strict_pre_answer_undecided_prefixes": len(strict),
               "metric_name": resolved_metric_name,

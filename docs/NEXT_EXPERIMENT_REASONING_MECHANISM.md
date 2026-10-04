@@ -47,3 +47,9 @@ python scripts/analyze_learning_mechanism.py `
 ## 解释边界
 
 截断在奖励和梯度标签中仍然是 `R=0`；只有长度和答案位置的描述把它作为删失。奖励解析只读取闭合 `</think>` 后的答案通道，未闭合 thinking 中的 `\boxed{}` 或 `Answer:` 不会得分。功能 probe 的 decoded continuation 会恢复预填的 `Answer:` 再评分，并和普通续写 q 分开保存。`strict_pre_answer_undecided` 同时要求普通续写 q 位于 0 和 1 之间、文本尚未发出答案、功能 probe 未可靠恢复、且前缀未自然结束。旧 replay 没有显式普通 q 字段时回退到半 A 的普通续写均值；没有功能 probe 时仍可分析，但严格层不会把缺失资格误当成通过。
+
+功能 probe 同样按真实结束原因处理截断：`length` 得分为 0，自然停止或预算末尾 EOS 不视为截断。分离式审计保存每条 probe 的 `finish_reason`、`truncated`、token IDs 和奖励。
+
+某题所有路径在首个观测点前自然结束时，完成摘要记录 `n_bundles: 0`，合并报告保留该题并单列 `no_surviving_prefix_problem_ids`。`n_original_problems` 是原始入选题数，`n_observed_problems` 是实际存在观测前缀的题数；全体没有前缀时输出空分析，不制造收益数值。声明存在但缺失的 bundle 仍报错。
+
+分离式审计在续跑前核对保存的度量文件和各 worker/前缀的权重 hash，不覆盖不一致的旧权重；合并在写 replay 前重复核对。更换度量需使用新 run 目录并重新收集对应的加权二阶矩，不能由旧的欧氏二阶矩推算。`--allow-legacy` 只允许缺失度量登记的欧氏诊断，不允许混用不一致的权重或缺失的加权二阶矩。

@@ -2,6 +2,18 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
+## PR13 thinking audit 修复（2026-10-04，8cac23f 后）
+
+相关 CPU/替身回归：`232 passed, 1 skipped in 29.67s`。
+覆盖合法零前缀题与缺失 bundle 的区分、保留原始题数与观测题数、
+probe 的真实 length/stop/EOS 评分、普通续写 q 与 probe 分层的隔离、
+续跑前保留旧权重、逐前缀和跨 worker 度量校验，以及非均匀对角权重下
+的完整 oracle/predictor/mechanism/benefit 分析。缺失加权二阶矩不会回退欧氏范数。
+
+命令：`OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest tests/test_separated_thinking.py tests/test_learning_mechanism.py tests/test_data_eval_audit.py tests/test_measurement_remediation.py tests/test_dynamic_score_experiments.py tests/test_trajectory_audit.py tests/test_review_audit.py tests/test_review2.py tests/test_fidelity.py -q -o addopts=''`。
+`audit_separated_thinking.py --help` 与 `git diff --check` 通过。
+所有新增分析数据均为合成测试；未启动新的真实 GPU 实验。
+
 ## GPU 运行修复交接（2026-09-21）
 
 服务器执行 `python -m pytest -q`，全量回归退出码 0，1 项跳过。

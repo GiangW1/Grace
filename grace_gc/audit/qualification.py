@@ -5,6 +5,20 @@ from __future__ import annotations
 import numpy as np
 
 
+def score_probe_sample(full_ids, prompt_len, text, gold, max_new_tokens,
+                       eos_id=None, finish_reason=None):
+    """Score a forced-answer sample using its actual rollout termination."""
+    from grace_gc.data.reward import score_prefilled_answer
+    from grace_gc.trainer.algorithm import _length_truncated
+
+    truncated = _length_truncated(full_ids, prompt_len, max_new_tokens, False,
+                                  eos_id, finish_reason=finish_reason)
+    reward = score_prefilled_answer(text, gold, truncated=truncated)
+    return {"text": text, "reward": float(reward or 0.0),
+            "finish_reason": finish_reason, "truncated": truncated,
+            "token_ids": list(map(int, full_ids[prompt_len:]))}
+
+
 def classify_functional_recovery(rewards, majority: float = 0.5,
                                  threshold: float | None = None) -> dict:
     """Summarize fixed-budget forced-answer probes without changing the rollout."""
