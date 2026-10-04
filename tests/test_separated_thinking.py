@@ -334,3 +334,48 @@ def test_benefit_cannot_fall_back_to_euclidean_second_moments(tmp_path):
         "metric_weights_sha256": sha256_array(metric)})
     with pytest.raises(ValueError, match="lacks second moments"):
         script.report_benefit(replay, tmp_path / "benefit")
+
+
+@pytest.mark.parametrize("gpus", [[0, 2], [0, 2, 3]])
+def test_supervisor_assigns_all_problems_to_requested_gradient_workers(tmp_path, monkeypatch, gpus):
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "scripts"))
+    script = load_script("supervise_thinking_audit")
+    model = tmp_path / "model"
+    model.mkdir()
+    (model / "thinking_download_verified.txt").write_text(script.REVISION)
+    for name in ("ROOT", "MODEL", "CHECKPOINT", "URL"):
+        monkeypatch.setattr(script, name, getattr(script, name))
+    monkeypatch.setattr(script.signal, "signal", lambda *args: None)
+    monkeypatch.setattr(script, "cleanup", lambda *args: None)
+    monkeypatch.setattr(script, "wait_for_card", lambda *args: None)
+    monkeypatch.setattr(script, "ready", lambda: True)
+    monkeypatch.setattr(script, "verify_smoke", lambda: None)
+    monkeypatch.setattr(script, "audit_flags", lambda: [])
+    phases, servers, workers, analyses = [], [], [], []
+    monkeypatch.setattr(script, "status", lambda phase, **extra: phases.append((phase, extra)))
+
+    def launch(command, log, gpu=None):
+        if gpu is None:
+            analyses.append(list(map(str, command)))
+        else:
+            servers.append(gpu)
+        return SimpleNamespace(poll=lambda: None, wait=lambda: 0)
+
+    def worker(index, gpu, smoke=False, extra_args=()):
+        workers.append((index, gpu, smoke, extra_args))
+
+    monkeypatch.setattr(script, "launch", launch)
+    monkeypatch.setattr(script, "worker", worker)
+    script.main(["--run-dir", str(tmp_path), "--data-dir", str(tmp_path / "inputs"),
+                 "--model-path", str(model), "--port", "18099", "--gpus", *map(str, gpus)])
+    assert servers == [gpus[-1]]
+    assert sorted((index, gpu) for index, gpu, smoke, _extra in workers if not smoke) == list(enumerate(gpus[:-1]))
+    for _index, _gpu, _smoke, extra in workers:
+        assert extra[extra.index("--workers") + 1] == str(len(gpus) - 1)
+        assert extra[extra.index("--n-problems") + 1] == "32"
+        assert extra[extra.index("--server-url") + 1] == "http://127.0.0.1:18099"
+    scope = json.loads((tmp_path / "scope.json").read_text())
+    assert set(scope["gpu_roles"]) == set(map(str, gpus))
+    assert scope["n_problems"] == 32
+    assert len(analyses) == 1 and "--analyze-only" in analyses[0]
+    assert phases[-1][0] == "completed"
