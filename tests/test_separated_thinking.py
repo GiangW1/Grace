@@ -367,15 +367,18 @@ def test_supervisor_assigns_all_problems_to_requested_gradient_workers(tmp_path,
     monkeypatch.setattr(script, "launch", launch)
     monkeypatch.setattr(script, "worker", worker)
     script.main(["--run-dir", str(tmp_path), "--data-dir", str(tmp_path / "inputs"),
-                 "--model-path", str(model), "--port", "18099", "--gpus", *map(str, gpus)])
+                 "--model-path", str(model), "--port", "18099", "--request-concurrency", "16",
+                 "--gpus", *map(str, gpus)])
     assert servers == [gpus[-1]]
     assert sorted((index, gpu) for index, gpu, smoke, _extra in workers if not smoke) == list(enumerate(gpus[:-1]))
     for _index, _gpu, _smoke, extra in workers:
         assert extra[extra.index("--workers") + 1] == str(len(gpus) - 1)
         assert extra[extra.index("--n-problems") + 1] == "32"
         assert extra[extra.index("--server-url") + 1] == "http://127.0.0.1:18099"
+        assert extra[extra.index("--request-concurrency") + 1] == "16"
     scope = json.loads((tmp_path / "scope.json").read_text())
     assert set(scope["gpu_roles"]) == set(map(str, gpus))
     assert scope["n_problems"] == 32
+    assert scope["request_concurrency"] == 16
     assert len(analyses) == 1 and "--analyze-only" in analyses[0]
     assert phases[-1][0] == "completed"

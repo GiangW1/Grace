@@ -151,6 +151,7 @@ def main(argv=None):
     parser.add_argument("--data-dir", default="/SSD/00/wja/grace-pr13-20260929/input-shards-32")
     parser.add_argument("--checkpoint")
     parser.add_argument("--n-problems", type=int, default=32)
+    parser.add_argument("--request-concurrency", type=int, default=8)
     parser.add_argument("--gpus", type=int, nargs="+", default=[0, 2, 3],
                         help="one or two gradient GPUs followed by the rollout GPU")
     parser.add_argument("--port", type=int, default=18013)
@@ -159,18 +160,22 @@ def main(argv=None):
         parser.error("two or three distinct GPUs are required; the last GPU generates rollouts")
     if args.n_problems < 1:
         parser.error("n_problems must be positive")
+    if args.request_concurrency < 1:
+        parser.error("request concurrency must be positive")
     ROOT, MODEL = Path(args.run_dir).resolve(), Path(args.model_path).resolve()
     CHECKPOINT = Path(args.checkpoint).resolve() if args.checkpoint else ROOT / "frozen-thinking-lora.npz"
     URL = f"http://127.0.0.1:{args.port}"
     gradient_gpus, rollout_gpu = args.gpus[:-1], args.gpus[-1]
     extra = ["--workers", str(len(gradient_gpus)), "--data-dir", str(Path(args.data_dir).resolve()),
              "--n-problems", str(args.n_problems), "--model-path", str(MODEL),
-             "--server-url", URL, "--server-model", "grace-thinking"]
+             "--server-url", URL, "--server-model", "grace-thinking",
+             "--request-concurrency", str(args.request_concurrency)]
     ROOT.mkdir(parents=True, exist_ok=True)
     (ROOT / "logs").mkdir(exist_ok=True)
     write_json(ROOT / "scope.json", {"n_problems": args.n_problems, "append_32": False,
                "model": "Qwen/Qwen3-4B", "model_revision": REVISION, "enable_thinking": True,
                "n_prefixes": 2, "n_continuations": 64, "n_baseline": 16,
+               "request_concurrency": args.request_concurrency,
                "max_new_tokens": 8192, "decision_grid": [1024, 2048],
                "functional_probes": {"n": 4, "max_new_tokens": 32, "threshold": .5},
                "gpu_roles": {**{str(gpu): f"gradient worker {index}" for index, gpu in enumerate(gradient_gpus)},

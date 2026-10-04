@@ -102,11 +102,14 @@ def prefix_directory(directory, path_id, t):
 
 
 class RemoteLLM:
-    def __init__(self, url, model, cache):
+    def __init__(self, url, model, cache, request_concurrency=8):
         self.url = url.rstrip("/") + "/v1/completions"
         self.model = model
         self.cache = Path(cache)
         self.cache.mkdir(parents=True, exist_ok=True)
+        self.request_concurrency = int(request_concurrency)
+        if self.request_concurrency < 1:
+            raise ValueError("request concurrency must be positive")
 
     def generate(self, prompts, sampling_params, **_kwargs):
         params = (list(sampling_params) if isinstance(sampling_params, (list, tuple))
@@ -147,7 +150,7 @@ class RemoteLLM:
                                    finish_reason=choice.get("finish_reason"),
                                    stop_reason=choice.get("stop_reason"), logprobs=None)])
 
-        with ThreadPoolExecutor(max_workers=min(8, max(len(prompts), 1))) as pool:
+        with ThreadPoolExecutor(max_workers=min(self.request_concurrency, max(len(prompts), 1))) as pool:
             return list(pool.map(one, zip(prompts, params)))
 
 
@@ -343,6 +346,7 @@ def collect(args):
                   "layout_dim": layout.dim, "layout_names": layout.names(), "layout_sha256": layout_hash(layout),
                   "actor_numerics": actor_numerics(actor), "enable_thinking": True,
                   "temperature": 1.0, "metric": metric_name,
+                  "request_concurrency": args.request_concurrency,
                   "metric_file": (None if metric_file is None else str(metric_file.resolve())),
                   "metric_weights_sha256": sha256_array(metric),
                   "adam_metric": ("not_requested" if metric_name == "euclidean"
@@ -355,7 +359,8 @@ def collect(args):
     write_json(root / f"worker-{args.worker_index}-provenance.json", provenance)
     tokenizer = load_hf_tokenizer(args.model_path)
     cfg = {"temperature": 1.0, "predictor": {"feature_batch_size": 1, "feature_mode": "legacy"}}
-    remote = RemoteLLM(args.server_url, args.server_model, root / "rollout-cache")
+    remote = RemoteLLM(args.server_url, args.server_model, root / "rollout-cache",
+                       request_concurrency=args.request_concurrency)
     engines, _ = make_gpu_engines(actor, remote, tokenizer, cfg, root / "unused-adapter")
 
     def repeated(prefix, count, max_new, rng):
@@ -626,6 +631,7 @@ def main():
                         help="name recorded for --metric-file (otherwise read its JSON sidecar)")
     parser.add_argument("--server-url", default="http://127.0.0.1:18013")
     parser.add_argument("--server-model", default="grace-thinking")
+    parser.add_argument("--request-concurrency", type=int, default=8)
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--worker-index", type=int, default=0)
     parser.add_argument("--workers", type=int, default=2)
@@ -638,6 +644,8 @@ def main():
     parser.add_argument("--allow-legacy", action="store_true",
                         help="analyze pre-v3 runs only as explicitly unverified diagnostics")
     args = parser.parse_args()
+    if args.request_concurrency < 1:
+        parser.error("request concurrency must be positive")
     if args.analyze_only:
         merge(args)
     else:
