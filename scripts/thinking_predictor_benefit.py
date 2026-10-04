@@ -8,6 +8,7 @@ import numpy as np
 
 from grace_gc.audit.dynamic_score import feature_matrix, fit_prefix_coefficients
 from grace_gc.audit.expected_gain import fit_predict
+from grace_gc.audit.learning_stats import _strict_pre_answer
 
 
 def moment_product(norms, gram, residuals, prefix, suffix, probability, weights=None):
@@ -84,10 +85,7 @@ def report_benefit(replay, destination, seed=17):
     selections = {"all": np.arange(len(rows))}
     for t in sorted({row["t"] for row in rows}):
         selections[f"t={t}"] = np.flatnonzero(np.asarray([row["t"] for row in rows]) == t)
-    strict = [i for i, row in enumerate(rows) if row.get("answer_emitted") is False
-              and row.get("functional_recoverable") is False and not row.get("finished", False)
-              and row.get("qualification_mean_reward") is not None
-              and 0 < row["qualification_mean_reward"] < 1]
+    strict = [i for i, row in enumerate(rows) if _strict_pre_answer(row)]
     if strict:
         selections["strict_pre_answer_undecided"] = np.asarray(strict)
     reports = []

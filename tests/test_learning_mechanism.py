@@ -3,7 +3,12 @@ from pathlib import Path
 
 import numpy as np
 
-from grace_gc.audit.learning_stats import mechanism_values, problem_bootstrap_report
+from grace_gc.audit.learning_stats import (
+    _q_label,
+    _strict_pre_answer,
+    mechanism_values,
+    problem_bootstrap_report,
+)
 from grace_gc.audit.qualification import classify_functional_recovery
 from grace_gc.audit.streaming_replay import replay_statistics
 from grace_gc.backends.verl_trainer import cap_colocated_vllm_config
@@ -59,6 +64,20 @@ def test_functional_qualification_requires_fixed_binary_probe():
     report = classify_functional_recovery([0., 1., 1.], majority=0.5)
     assert report["qualification_mean_reward"] == 2.0 / 3.0
     assert report["functional_recoverable"] is True
+    assert report["qualification_successes"] == 2
+    assert report["qualification_failures"] == 1
+    assert report["qualification_threshold"] == 0.5
+
+
+def test_strict_gate_separates_normal_q_from_functional_probe():
+    row = {"half_mean_reward": [0.5, 0.5], "qualification_mean_reward": 0.0,
+           "normal_q_mean_reward": 0.5, "functional_recoverable": False,
+           "answer_emitted": False, "finished": False}
+    assert _q_label(row)[0] == "observed_q_uncertain"
+    assert _strict_pre_answer(row) is True
+    row["normal_q_mean_reward"] = 0.0
+    assert _q_label(row)[0] == "observed_q_zero"
+    assert _strict_pre_answer(row) is False
 
 
 def test_difficulty_selection_respects_preregistered_mix(tmp_path: Path):

@@ -11,7 +11,13 @@ from grace_gc.audit.prefix_audit import PrefixBundle, audit_bundles, bundle_to_d
 from grace_gc.core.layout import collect_lora_layout, pack_grads
 from grace_gc.data.format_prompt import apply_solve_instruction
 from grace_gc.data.math_data import MathRecord, select_records, select_records_difficulty, selection_manifest
-from grace_gc.data.reward import REWARD_PROTOCOL_VERSION, answer_already_emitted, extract_answer, rule_reward
+from grace_gc.data.reward import (
+    REWARD_PROTOCOL_VERSION,
+    answer_already_emitted,
+    extract_answer,
+    rule_reward,
+    score_prefilled_answer,
+)
 from grace_gc.logging_util.forensics import persist_load_report, write_failed
 from grace_gc.logging_util.ledger import ComputeLedger, Timer
 from grace_gc.logging_util.run_dir import RunDirectory, resolve_run_dir, utc_now
@@ -470,10 +476,17 @@ def _bundles_from_engines(
                         finished=bool(finished[loc]),
                         prefix_tokens=max(len(prefix) - prompt_len, 0),
                         answer_emitted=answer_already_emitted(prefix_text),
+                        normal_q_mean_reward=(
+                            float(np.mean(rewards)) if rewards else None
+                        ),
                         qualification_mean_reward=qualification.get("qualification_mean_reward"),
                         qualification_n=qualification.get("qualification_n"),
+                        qualification_successes=qualification.get("qualification_successes"),
+                        qualification_failures=qualification.get("qualification_failures"),
+                        qualification_threshold=qualification.get("qualification_threshold"),
                         qualification_majority=qualification.get("qualification_majority"),
                         functional_recoverable=qualification.get("functional_recoverable"),
+                        qualification_threshold_rule=qualification.get("qualification_threshold_rule"),
                         qualification_protocol=qualification.get("qualification_protocol"),
                         prefix_text=prefix_text,
                         suffix_texts=suffix_texts,
@@ -787,7 +800,7 @@ def generate_bundles_gpu(
                 if result is None:
                     raise ValueError("functional qualification returned no sequence")
                 text = engines.decode(result[len(probe_prefix):]) if engines.decode else ""
-                reward = rule_reward(text, gold, truncated=False)
+                reward = score_prefilled_answer(text, gold, truncated=False)
                 rewards.append(0.0 if reward is None else float(reward))
             return classify_functional_recovery(rewards, probe_cfg["majority"])
 

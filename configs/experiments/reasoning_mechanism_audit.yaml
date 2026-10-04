@@ -21,7 +21,7 @@ audit:
     enabled: true
     n: 4
     max_new_tokens: 32
-    majority: 0.5
+    threshold: 0.5
 analysis:
   gradient_target: trajectory
   require_pre_emit: true

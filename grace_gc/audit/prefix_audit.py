@@ -41,10 +41,19 @@ class PrefixBundle:
     finished: bool = False
     prefix_tokens: int | None = None
     answer_emitted: bool = False
+    # Mean reward of ordinary continuation samples.  This is the normal q
+    # estimate used for q-strata; when replay materializes A/B, the persisted
+    # row overwrites it with half A.  The forced functional probe has its own
+    # qualification_mean_reward and must never replace this value.
+    normal_q_mean_reward: float | None = None
     qualification_mean_reward: float | None = None
     qualification_n: int | None = None
+    qualification_successes: int | None = None
+    qualification_failures: int | None = None
+    qualification_threshold: float | None = None
     qualification_majority: float | None = None
     functional_recoverable: bool | None = None
+    qualification_threshold_rule: str | None = None
     qualification_protocol: str | None = None
     prefix_text: str | None = None
     suffix_texts: list[str] | None = None

@@ -6,7 +6,11 @@ from __future__ import annotations
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-import fcntl
+from contextlib import contextmanager
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - exercised on Windows workers
+    fcntl = None
 import hashlib
 import json
 import os
@@ -26,7 +30,11 @@ from grace_gc.audit.prefix_audit import bundle_from_dict, bundle_to_dict
 from grace_gc.audit.run import _bundles_from_engines
 from grace_gc.core.rng import IsolatedRNG
 from grace_gc.data.format_prompt import apply_solve_instruction
-from grace_gc.data.math_data import load_math_records
+from grace_gc.data.math_data import (
+    load_math_records,
+    select_records_difficulty,
+    selection_manifest,
+)
 from grace_gc.data.tokenize import encode_records_hf, load_hf_tokenizer
 from grace_gc.trainer.checkpoint import load_checkpoint, save_checkpoint
 from grace_gc.trainer.state_io import load_numpy_module_state, numpy_module_state
@@ -35,6 +43,31 @@ from grace_gc.versions import sha256_array, sha256_file, sha256_named
 REVISION = "1cfa9a7208912126459214e8b04321603b3df60c"
 LORA = {"rank": 16, "alpha": 32, "targets": ["q_proj", "v_proj"],
         "dropout": 0.0, "compute_dtype": "bfloat16", "gradient_checkpointing": True}
+
+
+@contextmanager
+def problem_lock(path):
+    """Use an advisory lock on POSIX and a one-byte msvcrt lock on Windows."""
+    with Path(path).open("a+", encoding="utf-8") as handle:
+        if fcntl is not None:
+            fcntl.flock(handle, fcntl.LOCK_EX)
+        else:  # Windows has no fcntl, but workers still need an atomic guard.
+            import msvcrt
+            handle.seek(0, os.SEEK_END)
+            if handle.tell() == 0:
+                handle.write("0")
+                handle.flush()
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+        try:
+            yield handle
+        finally:
+            if fcntl is not None:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+            else:
+                import msvcrt
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
 
 
 def write_json(path, value):
@@ -132,7 +165,9 @@ def reduce_bundle(bundle, rng, directory, seed):
             mean += gradients[index] / len(indices)
         save_array(target / f"mean_{half}.npy", mean)
     save_array(target / "prefix_score.npy", bundle.prefix_score_grad)
-    raw.update(enable_thinking=True, half_counts=list(map(len, halves)),
+    raw.update(enable_thinking=True,
+               normal_q_mean_reward=float(np.mean(bundle.rewards[halves[0]])),
+               half_counts=list(map(len, halves)),
                half_indices=[part.tolist() for part in halves],
                half_mean_reward=[float(np.mean(bundle.rewards[part])) for part in halves],
                half_mean_advantage=[float(np.mean(bundle.rewards[part]) - bundle.baseline) for part in halves],
@@ -154,7 +189,7 @@ def collect(args):
     from grace_gc.backends.verl_trainer import load_lora_actor
     from grace_gc.core.layout import collect_lora_layout, layout_hash
     from grace_gc.audit.qualification import classify_functional_recovery
-    from grace_gc.data.reward import rule_reward
+    from grace_gc.data.reward import score_prefilled_answer
     from grace_gc.trainer.methods import method_spec
 
     root = Path(args.run_dir)
@@ -163,12 +198,30 @@ def collect(args):
     for path in sorted(Path(args.data_dir).glob("shard-*.jsonl")):
         records.extend(load_math_records(path))
     records = apply_solve_instruction(records)
-    if len(records) != 32 or len({rec.problem_id for rec in records}) != 32:
-        raise ValueError("this test must use the original 32 distinct problems")
-    if args.smoke:
-        records = records[:1]
+    if args.difficulty_manifest:
+        counts = (None if args.difficulty_counts is None
+                  else json.loads(args.difficulty_counts))
+        if counts is not None and not isinstance(counts, dict):
+            raise ValueError("--difficulty-counts must be a JSON object")
+        records = select_records_difficulty(
+            records, args.n_problems, args.difficulty_manifest, counts, seed=args.seed
+        )
+        selection = "difficulty"
     else:
-        records = records[args.worker_index::args.workers]
+        if len(records) != args.n_problems or len({rec.problem_id for rec in records}) != args.n_problems:
+            raise ValueError(f"expected {args.n_problems} distinct problems")
+        selection = "provided"
+    selected_records = list(records)
+    if args.smoke:
+        records = selected_records[:1]
+    else:
+        records = selected_records[args.worker_index::args.workers]
+    # Record the global selection before worker sharding; smoke mode is the
+    # only intentional exception and should advertise its one-problem scope.
+    if args.smoke or args.worker_index == 0:
+        manifest_records = records if args.smoke else selected_records
+        write_json(root / "selection.json", selection_manifest(
+            manifest_records, selection, args.seed))
     write_json(root / f"worker-{args.worker_index}-status.json", {
         "status": "loading_actor", "started_utc": utc(), "gpu": os.environ.get("CUDA_VISIBLE_DEVICES"),
         "problem_ids": [rec.problem_id for rec in records]})
@@ -237,7 +290,8 @@ def collect(args):
         rng = IsolatedRNG.create(args.seed + path_index * 100003 + int(t) * 1009 + len(prefix))
         fulls, reasons, seeds = repeated(probe, 4, 32, rng)
         texts = [engines.decode(full[len(probe):]) for full in fulls]
-        rewards = [float(rule_reward(text, gold, truncated=False) or 0.0) for text in texts]
+        rewards = [float(score_prefilled_answer(text, gold, truncated=False) or 0.0)
+                   for text in texts]
         probe_records[(pid, f"{pid}:{path_index}", t)] = [
             {"text": text, "reward": reward, "seed": seed, "finish_reason": reason,
              "token_ids": full[len(probe):]} for text, reward, seed, reason, full
@@ -248,8 +302,7 @@ def collect(args):
     for problem_index, rec in enumerate(records):
         directory = problem_directory(root, rec.problem_id)
         directory.mkdir(parents=True, exist_ok=True)
-        with (directory / ".lock").open("a") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
+        with problem_lock(directory / ".lock"):
             if (directory / "summary.json").exists():
                 continue
             seed = (args.seed + int.from_bytes(hashlib.sha256(rec.problem_id.encode()).digest()[:4], "little")) % (2**32)
@@ -299,15 +352,24 @@ def merge(args):
     root = Path(args.run_dir)
     directories = sorted((root / "problems").glob("*/path-*/bundle.json"))
     summaries = list((root / "problems").glob("*/summary.json"))
-    if len(summaries) != 32:
-        raise ValueError(f"only {len(summaries)} of the original 32 problems are complete")
+    selection_path = root / "selection.json"
+    if selection_path.is_file():
+        selection = json.loads(selection_path.read_text(encoding="utf-8"))
+        expected_problems = int(selection["n_problems"])
+    else:
+        # PR13 runs predate the frozen selection manifest; preserve their
+        # analysis path while making the missing provenance explicit.
+        expected_problems = len(summaries)
+        selection = {"selection": "legacy_unrecorded", "n_problems": expected_problems}
+    if len(summaries) != expected_problems:
+        raise ValueError(f"only {len(summaries)} of {expected_problems} selected problems are complete")
     replay = root / "replay"
     replay.mkdir(exist_ok=True)
     rows = [json.loads(path.read_text()) for path in directories]
     provenance = json.loads((root / "worker-0-provenance.json").read_text())
     dimension = provenance["layout_dim"]
     if not rows:
-        write_json(root / "analysis_status.json", {"status": "completed", "n_original_problems": 32,
+        write_json(root / "analysis_status.json", {"status": "completed", "n_original_problems": expected_problems,
                    "n_prefixes": 0, "predictor_benefit": None, "reason": "No paths survived the decision points"})
         return
     for name, filename in (("a", "half_mean_full_grads_a.npy"), ("b", "half_mean_full_grads_b.npy"),
@@ -337,7 +399,7 @@ def merge(args):
         "replay_prefixes_sha256": sha256_file(replay / "prefixes.jsonl"),
         "prefix_keys_sha256": prefix_keys_sha256(compact)})
     write_json(replay / "preparation_summary.json", {
-        "status": "completed", "n_original_problems": 32, "n_prefixes": len(rows),
+        "status": "completed", "n_original_problems": expected_problems, "n_prefixes": len(rows),
         "n_continuations": sum(row["n_continuations"] for row in rows),
         "enable_thinking": True, "functional_qualification_available": True,
         "verification": "Collected features, prefix score and gradient moments from the same frozen actor"})
@@ -362,7 +424,7 @@ def merge(args):
     from thinking_predictor_benefit import report_benefit
     report_benefit(replay, root / "benefit", args.seed)
     write_json(root / "analysis_status.json", {"status": "completed", "finished_utc": utc(),
-               "n_original_problems": 32, "n_prefixes": len(rows), "enable_thinking": True,
+               "n_original_problems": expected_problems, "n_prefixes": len(rows), "enable_thinking": True,
                "summary": str(root / "benefit/predictor_benefit_summary.json")})
 
 
@@ -377,6 +439,10 @@ def main():
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--worker-index", type=int, default=0)
     parser.add_argument("--workers", type=int, default=2)
+    parser.add_argument("--n-problems", type=int, default=32)
+    parser.add_argument("--difficulty-manifest", default=None)
+    parser.add_argument("--difficulty-counts", default=None,
+                        help="JSON object such as {\"easy\":8,\"medium\":16,\"hard\":8}")
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--analyze-only", action="store_true")
     args = parser.parse_args()

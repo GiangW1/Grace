@@ -11,7 +11,7 @@ import sys
 
 
 FINAL = re.compile(r"(?:final\s+answer|answer)\s*(?:is\s+|[:=]\s*)(?:\n\s*)?([^\n]+)", re.I)
-REWARD_PROTOCOL_VERSION = 2
+REWARD_PROTOCOL_VERSION = 3
 
 
 def extract_boxed(text: str) -> str | None:
@@ -77,7 +77,28 @@ def answer_already_emitted(text: str | None) -> bool:
     return end is not None and not s[end:].strip()
 
 
+def completed_answer_text(text: str | None) -> str | None:
+    """Return only text that is eligible to contain a final answer.
+
+    Qwen-style reasoning can mention boxed values while ``<think>`` is still
+    open.  Those mentions are working text, so neither reward scoring nor
+    answer extraction may inspect them.  A closed thinking block is followed
+    by the answer channel and is therefore reduced to its tail.
+    """
+    if text is None:
+        return None
+    value = str(text)
+    think_start = value.rfind("<think>")
+    think_end = value.rfind("</think>")
+    if think_start >= 0:
+        if think_end <= think_start:
+            return None
+        return value[think_end + len("</think>"):]
+    return value
+
+
 def extract_answer(text: str) -> str | None:
+    text = completed_answer_text(text)
     if text is None:
         return None
     boxed = extract_boxed(text)
@@ -202,7 +223,11 @@ def require_math_verify() -> None:
 def rule_reward(text: str | None, gold: str, truncated: bool = False) -> float | None:
     if text is None:
         return None
-    _ = truncated
+    # A length-capped trajectory is a failed rollout even if its unfinished
+    # reasoning happened to contain the gold value.  This flag is part of the
+    # policy-gradient label, not merely descriptive metadata.
+    if truncated:
+        return 0.0
     pred = extract_answer(text)
     gold_s = str(gold).replace("\u03c0", r"\pi")
     if pred is not None:
@@ -229,3 +254,24 @@ def rule_reward(text: str | None, gold: str, truncated: bool = False) -> float |
         return float(verify(parse(gold_expr), parse(r"\boxed{" + pred_expr + "}")))
     except Exception as exc:
         raise ValueError("math-verify failed; this is not a scored miss") from exc
+
+
+def score_prefilled_answer(decoded_continuation: str | None, gold: str,
+                           truncated: bool = False) -> float | None:
+    """Score a continuation after a probe prefilled ``Answer:``.
+
+    The decoded string starts *after* the marker supplied in the prompt.  The
+    marker must be restored before applying the normal parser; otherwise a
+    bare correct expression is incorrectly recorded as a miss.
+    """
+    if decoded_continuation is None:
+        return None
+    continuation = str(decoded_continuation)
+    # Some backends echo the marker even though it was supplied in the probe
+    # prefix.  Do not create ``Answer:Answer: ...`` in that case.
+    if re.match(r"\s*(?:(?:final\s+)?answer|the\s+answer)\s*(?:is\s+|[:=])",
+                continuation, re.I):
+        scored = continuation
+    else:
+        scored = "Answer:" + continuation
+    return rule_reward(scored, gold, truncated=truncated)
