@@ -134,3 +134,99 @@ def test_cpu_analysis_accepts_collected_statistics(monkeypatch, tmp_path):
     for row in output["lopo"]:
         full = next(item for item in row["variance_cost"] if item["p"] == 1.)
         assert full["variance_cost_ratio"] == pytest.approx(1.)
+
+
+@pytest.mark.parametrize("finish_reason,expected", [("stop", 1.0), ("length", 0.0)])
+def test_gpu_audit_probe_scores_prefilled_answer_and_real_finish(monkeypatch, finish_reason, expected):
+    from grace_gc.data import tokenize
+
+    monkeypatch.setattr(tokenize, "load_hf_tokenizer", lambda path:
+                        SimpleNamespace(encode=lambda text, **kw: [9]))
+
+    class ProbeEngine(Engine):
+        decode = staticmethod(lambda tokens: " 1")
+
+        def continue_selected(self, prefixes, selected, length, rng):
+            self.last_rollout = {"continue_finish_reasons": {0: finish_reason}}
+            return [prefixes[0] + [3]]
+
+    def capture(*args, **kwargs):
+        assert kwargs["require_complete_answers"] is True
+        result = kwargs["qualification_fn"]([1, 2], 2, "1", "p", 64, 0)
+        assert result["qualification_mean_reward"] == expected
+        return []
+
+    monkeypatch.setattr(run, "_bundles_from_engines", capture)
+    config = {"model_path": "mock", "method": "full_pg", "enable_thinking": True,
+              "audit": {"functional_qualification": {"enabled": True, "n": 1, "max_new_tokens": 32}}}
+    run.generate_bundles_gpu([MathRecord("p", "q", "1")], 1, 2, 64, 128, 17, config,
+                             engines=ProbeEngine(), layout=SimpleNamespace(dim=3))
+
+
+def test_complete_audit_rewards_and_baseline_share_the_same_policy(monkeypatch):
+    class LengthEngine(Engine):
+        def continue_selected(self, *args):
+            result = super().continue_selected(*args)
+            self.last_rollout["continue_finish_reasons"] = dict.fromkeys(range(len(result)), "length")
+            return result
+
+        def continue_repeated(self, *args):
+            fulls, _reasons, seeds = super().continue_repeated(*args)
+            return fulls, ["length"] * len(fulls), seeds
+
+    monkeypatch.setattr(run, "_policy_grad_vec", lambda *a: np.array([1., 2., 3.]))
+    bundles = run._bundles_from_engines(
+        [MathRecord("p", "q", "1")], LengthEngine(), SimpleNamespace(dim=3),
+        2, 4, [1, 2], 8, 17, lambda rec, n: ([[1]] * n, [rec.problem_id] * n, [rec.answer] * n),
+        require_complete_answers=True)
+    for bundle in bundles:
+        assert bundle.baseline == 0.0
+        assert all(row["reward"] == 0.0 for row in bundle.baseline_samples)
+        assert np.all(bundle.rewards == 0.0)
+
+
+def test_learning_completion_sink_writes_directly_readable_replay_shards(monkeypatch, tmp_path):
+    from grace_gc.core.rng import IsolatedRNG
+    from grace_gc.audit.learning_completion import load_replay_rows, position_grams, prefix_scalars
+
+    script = load_script("audit_separated_thinking")
+    reference = collect(monkeypatch)
+    for bundle in reference:
+        gradients = bundle.trajectory_grads.copy()
+        score = bundle.prefix_score_grad.copy()
+        script.reduce_bundle(bundle, IsolatedRNG.create(17), tmp_path, 17, learning_completion=True,
+                             provenance={"actor_sha256": "synthetic", "layout_dim": 3})
+        directory = script.prefix_directory(tmp_path, bundle.path_id, bundle.t)
+        raw = json.loads((directory / "bundle.json").read_text())
+        for half, indices in zip(("a", "b"), raw["half_indices"]):
+            np.testing.assert_allclose(np.load(directory / f"half_mean_full_grads_{half}.npy"),
+                                       gradients[indices].mean(axis=0)[None, :])
+        np.testing.assert_array_equal(np.load(directory / "prefix_score_gradients.npy"), score[None, :, None])
+        rows, sources = load_replay_rows([directory])
+        assert prefix_scalars(rows[0])["n_a"] == 2
+        assert position_grams(rows, sources, block_mb=1)[bundle.t].shape == (3, 3)
+
+
+def test_thinking_collection_rejects_old_reward_labels_before_loading_actor(tmp_path):
+    pytest.importorskip("torch")
+    script = load_script("audit_separated_thinking")
+    script.write_json(tmp_path / "worker-0-provenance.json", {"reward_protocol_version": 2})
+    with pytest.raises(ValueError, match="different reward protocol"):
+        script.collect(SimpleNamespace(run_dir=str(tmp_path)))
+
+
+def test_experiment_a_selects_saved_audit_inputs_and_preserves_them_on_resume(tmp_path, monkeypatch):
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "scripts"))
+    script = load_script("supervise_learning_completion")
+    data = tmp_path / "data.jsonl"
+    records = [{"problem_id": str(i), "prompt": f"compute {i}+1", "answer": str(i+1), "split": "audit"}
+               for i in range(8)]
+    data.write_text("".join(json.dumps(row) + "\n" for row in records))
+    config = {"seed": 17, "audit": {"n_problems": 4}}
+    directory, count = script.prepare_inputs(tmp_path, data, config)
+    assert count == 4
+    original = (directory / "shard-0.jsonl").read_text()
+    script.prepare_inputs(tmp_path, data, config)
+    assert (directory / "shard-0.jsonl").read_text() == original
+    with pytest.raises(ValueError, match="selected inputs changed"):
+        script.prepare_inputs(tmp_path, data, {"seed": 41, "audit": {"n_problems": 4}})

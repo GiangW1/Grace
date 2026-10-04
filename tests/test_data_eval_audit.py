@@ -431,6 +431,42 @@ def test_answer_already_emitted_ignores_process_boxed():
     assert answer_already_emitted("<think>work \\boxed{27}") is False
 
 
+@pytest.mark.parametrize("text", [
+    "<think>Answer: 42",
+    "<think>Answer: 42</think>",
+    "<think>work \\boxed{42}</think>",
+    "Answer: 42</think>",
+    "<think>first</think>\nAnswer: 42\n<think>more",
+])
+def test_thinking_work_is_not_a_final_answer(text):
+    from grace_gc.data.reward import answer_already_emitted, extract_answer
+
+    assert extract_answer(text) is None
+    assert answer_already_emitted(text) is False
+    assert rule_reward(text, "42") == 0.0
+
+
+def test_reward_and_parse_index_use_only_post_think_answers():
+    from grace_gc.data.reward import extract_answer
+
+    pieces = ["<think>", "Answer: 42", "</think>", "\nAnswer: 7"]
+    text = "".join(pieces)
+    assert extract_answer(text) == "7"
+    assert rule_reward(text, "42") == 0.0
+    assert rule_reward(text, "7") == 1.0
+    assert first_parseable_index(pieces) == 3
+    assert rule_reward("<think>Evelyn</think>", r"\text{Evelyn}") == 0.0
+
+
+def test_completed_answer_reward_rejects_truncation_and_preserves_base_training():
+    text = "<think>work</think>\nAnswer: 42"
+    assert rule_reward(text, "42", truncated=True) == 0.0
+    assert rule_reward(text, "42", truncated=False) == 1.0
+    assert rule_reward("Answer: 42", "42", truncated=True, require_complete=True) == 0.0
+    assert rule_reward("Answer: 42", "42", truncated=True) == 1.0
+    assert rule_reward(None, "42", truncated=True, require_complete=True) is None
+
+
 def test_extract_prefers_later_answer_line():
     from grace_gc.data.reward import extract_answer
 

@@ -222,7 +222,8 @@ def test_tiny_audit_persists_replay_artifacts_and_success_cost(tmp_path, monkeyp
     assert raw["gold"] == "2" and len(raw["baseline_samples"]) == 2
     assert raw["prefix_rng_state"] and raw["baseline_rng_state"]
     manifest = json.loads((tmp_path / "audit/audit_manifest.json").read_text())
-    assert manifest["reward_protocol_version"] == 2 and manifest["selection"] == "seeded"
+    from grace_gc.data.reward import REWARD_PROTOCOL_VERSION
+    assert manifest["reward_protocol_version"] == REWARD_PROTOCOL_VERSION and manifest["selection"] == "seeded"
     ledger = json.loads((tmp_path / "audit/compute_ledger.json").read_text())
     assert ledger["rows"][-1]["status"] == "completed"
     assert ledger["cpu_seconds"] >= 0 and ledger["gpu_reserved_seconds"] == 0

@@ -4,6 +4,16 @@ from __future__ import annotations
 
 import numpy as np
 
+from grace_gc.data.reward import rule_reward
+
+FORCED_ANSWER_PREFIX = "</think>\nAnswer:"
+
+
+def score_functional_probe(text: str, gold: str, truncated: bool = False) -> float:
+    """The generated suffix follows an Answer: already present in its prompt."""
+    return float(rule_reward("Answer:" + text, gold, truncated=truncated,
+                             require_complete=True) or 0.0)
+
 
 def classify_functional_recovery(rewards, majority: float = 0.5) -> dict:
     """Summarize fixed-budget forced-answer probes without changing the rollout."""
@@ -19,7 +29,7 @@ def classify_functional_recovery(rewards, majority: float = 0.5) -> dict:
         "qualification_n": int(values.size),
         "qualification_majority": majority,
         "functional_recoverable": bool(mean >= majority),
-        "qualification_protocol": "forced </think> + Answer:; fixed token budget; independent probe samples",
+        "qualification_protocol": "forced </think> + Answer:; score prefilled Answer: and generated suffix; completed outputs only; independent probe samples",
     }
 
 

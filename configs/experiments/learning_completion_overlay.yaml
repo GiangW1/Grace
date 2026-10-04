@@ -12,8 +12,10 @@ audit:
   n_prefixes: 4
   n_continuations: 8
   n_baseline: 16
+  max_new_tokens: 8192
   decision_grid: [256, 512, 1024, 2048, 4096]
   store_trajectory_gradients: true
+  require_complete_answers: true
 analysis:
   gradient_target: trajectory
   require_pre_emit: true

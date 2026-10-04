@@ -11,7 +11,7 @@ import sys
 
 
 FINAL = re.compile(r"(?:final\s+answer|answer)\s*(?:is\s+|[:=]\s*)(?:\n\s*)?([^\n]+)", re.I)
-REWARD_PROTOCOL_VERSION = 2
+REWARD_PROTOCOL_VERSION = 3
 
 
 def extract_boxed(text: str) -> str | None:
@@ -57,19 +57,20 @@ def _boxed_span_end(text: str) -> int | None:
     return i
 
 
+def _answer_text(text: str) -> str:
+    """Only text after the last closed reasoning section is a final response."""
+    think_start = text.rfind("<think>")
+    think_end = text.rfind("</think>")
+    if think_start > think_end:
+        return ""
+    return text[think_end + len("</think>"):] if think_end >= 0 else text
+
+
 def answer_already_emitted(text: str | None) -> bool:
     """True only when the prefix already committed a final-line answer."""
     if not text:
         return False
-    s = str(text)
-    # In reasoning mode, a boxed value or an ``Answer:`` phrase inside an
-    # unfinished <think> block is working text, not an emitted answer.
-    think_start = s.rfind("<think>")
-    think_end = s.rfind("</think>")
-    if think_start >= 0:
-        if think_end <= think_start:
-            return False
-        s = s[think_end + len("</think>"):]
+    s = _answer_text(str(text))
     finals = list(FINAL.finditer(s))
     if finals and not s[finals[-1].end() :].strip():
         return True
@@ -80,6 +81,7 @@ def answer_already_emitted(text: str | None) -> bool:
 def extract_answer(text: str) -> str | None:
     if text is None:
         return None
+    text = _answer_text(str(text))
     boxed = extract_boxed(text)
     finals = list(FINAL.finditer(text))
     last_final = finals[-1].group(1).strip() if finals else ""
@@ -199,10 +201,14 @@ def require_math_verify() -> None:
         )
 
 
-def rule_reward(text: str | None, gold: str, truncated: bool = False) -> float | None:
+def rule_reward(text: str | None, gold: str, truncated: bool = False,
+                *, require_complete: bool = False) -> float | None:
     if text is None:
         return None
-    _ = truncated
+    thinking = "<think>" in text or "</think>" in text
+    if truncated and (require_complete or thinking):
+        return 0.0
+    text = _answer_text(str(text))
     pred = extract_answer(text)
     gold_s = str(gold).replace("\u03c0", r"\pi")
     if pred is not None:

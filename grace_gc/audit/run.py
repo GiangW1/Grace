@@ -72,7 +72,8 @@ def _request_seeds(engines, n: int) -> list:
     return seeds if len(seeds) == n else [None] * n
 
 
-def _independent_pass_rate(engines, rec: MathRecord, encode_fn, n_base: int, max_new: int, rng, eos_id, samples=None) -> float:
+def _independent_pass_rate(engines, rec: MathRecord, encode_fn, n_base: int, max_new: int, rng, eos_id,
+                           samples=None, require_complete_answers: bool = False) -> float:
     """b(x) uses n_base independent full answers, never the audit suffixes."""
     if n_base <= 0:
         return 0.5
@@ -91,7 +92,8 @@ def _independent_pass_rate(engines, rec: MathRecord, encode_fn, n_base: int, max
         truncated = _length_truncated(
             full, len(prompts[i]), int(max_new), bool(finished[i]), eos_id, finish_reason=fr
         )
-        scored = rule_reward(text, rec.answer, truncated=truncated)
+        scored = rule_reward(text, rec.answer, truncated=truncated,
+                             require_complete=require_complete_answers)
         rewards.append(0.0 if scored is None else float(scored))
         if samples is not None:
             samples.append({"text": text, "gold": rec.answer, "reward": rewards[-1],
@@ -209,6 +211,7 @@ def _bundles_from_engines(
     qualification_fn=None,
     bundle_sink=None,
     bundle_resume=None,
+    require_complete_answers: bool = False,
 ) -> list[PrefixBundle]:
     from grace_gc.core.rng import IsolatedRNG
 
@@ -237,7 +240,8 @@ def _bundles_from_engines(
             b_grad, baseline_source = baseline_policy.get(rec.problem_id), "configured_fixed_baseline"
         else:
             b_grad = _independent_pass_rate(engines, rec, encode_fn, n_cont if n_baseline is None else n_baseline,
-                                            max_new, rng, eos_id, samples=baseline_samples)
+                                            max_new, rng, eos_id, samples=baseline_samples,
+                                            require_complete_answers=require_complete_answers)
             if baseline_policy is not None:
                 b_grad = baseline_policy.prescan_estimate([row["reward"] for row in baseline_samples])
             baseline_source = "independent_prescan"
@@ -404,7 +408,8 @@ def _bundles_from_engines(
                         eos_id,
                         finish_reason=cont_fr,
                     )
-                    r = rule_reward(text, rec.answer, truncated=truncated)
+                    r = rule_reward(text, rec.answer, truncated=truncated,
+                                    require_complete=require_complete_answers)
                     reward = 0.0 if r is None else float(r)
                     rewards.append(reward)
                     suffix_texts.append(text)
@@ -663,6 +668,7 @@ def generate_bundles_tiny(
         store_features=store_features,
         store_trajectory_gradients=store_trajectory_gradients,
         trajectory_dir=trajectory_dir,
+        require_complete_answers=bool(audit_cfg.get("require_complete_answers", False)),
     )
 
 
@@ -766,13 +772,13 @@ def generate_bundles_gpu(
 
     qualification_cfg = (cfg.get("audit") or {}).get("functional_qualification")
     if qualification_cfg and bool(qualification_cfg.get("enabled", False)):
-        from grace_gc.audit.qualification import classify_functional_recovery, validate_qualification_config
+        from grace_gc.audit.qualification import (FORCED_ANSWER_PREFIX, classify_functional_recovery,
+                                                  score_functional_probe, validate_qualification_config)
         probe_cfg = validate_qualification_config(qualification_cfg)
         if not hasattr(tokenizer, "encode"):
             raise ValueError("functional qualification needs a tokenizer.encode method")
-        forced = tokenizer.encode("</think>\nAnswer:", add_special_tokens=False)
+        forced = tokenizer.encode(FORCED_ANSWER_PREFIX, add_special_tokens=False)
         from grace_gc.core.rng import IsolatedRNG
-        from grace_gc.data.reward import rule_reward
 
         def qualification_fn(prefix, prompt_len, gold, problem_id, t, path_index):
             _ = prompt_len, problem_id
@@ -787,8 +793,11 @@ def generate_bundles_gpu(
                 if result is None:
                     raise ValueError("functional qualification returned no sequence")
                 text = engines.decode(result[len(probe_prefix):]) if engines.decode else ""
-                reward = rule_reward(text, gold, truncated=False)
-                rewards.append(0.0 if reward is None else float(reward))
+                truncated = _length_truncated(
+                    result, len(probe_prefix), probe_cfg["max_new_tokens"], False,
+                    getattr(engines, "eos_id", None), finish_reason=_continue_finish_reason(engines, 0)
+                )
+                rewards.append(score_functional_probe(text, gold, truncated=truncated))
             return classify_functional_recovery(rewards, probe_cfg["majority"])
 
     # A caller may initialize this frozen engine once for another audit design.
@@ -832,6 +841,8 @@ def generate_bundles_gpu(
         store_trajectory_gradients=store_trajectory_gradients,
         trajectory_dir=trajectory_dir,
         qualification_fn=qualification_fn,
+        require_complete_answers=bool(audit_cfg.get("require_complete_answers", False)
+                                      or cfg.get("enable_thinking", False)),
     )
 
 
@@ -913,6 +924,8 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
                         functional_qualification=(audit_cfg.get("functional_qualification") or
                                                    {"enabled": False}),
                         reward_protocol_version=REWARD_PROTOCOL_VERSION,
+                        require_complete_answers=bool(audit_cfg.get("require_complete_answers", False)
+                                                      or cfg.get("enable_thinking", False)),
                         baseline_configuration=baseline_from_config(cfg.get("baseline")).configuration(),
                         baseline_protocol="Independent prescan with configured prior; explicit audit.baseline or configured fixed mode overrides both gradient and feature baseline.")
         run.write_json("audit_manifest.json", manifest)

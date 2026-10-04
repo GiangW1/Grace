@@ -78,12 +78,12 @@ def cleanup(*_args):
         raise SystemExit(0)
 
 
-def worker(index, gpu, smoke=False):
+def worker(index, gpu, smoke=False, extra_args=()):
     directory = ROOT / ("smoke" if smoke else "collection")
     name = "smoke" if smoke else f"worker-{index}"
     log = ROOT / "logs" / (name + ".log")
     command = [PYTHON, "-u", REPO / "scripts/audit_separated_thinking.py", "--run-dir", directory,
-               "--checkpoint", CHECKPOINT, "--worker-index", str(index)]
+               "--checkpoint", CHECKPOINT, "--worker-index", str(index), *extra_args]
     if smoke:
         command.append("--smoke")
     while True:

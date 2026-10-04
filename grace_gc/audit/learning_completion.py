@@ -34,10 +34,11 @@ from pathlib import Path
 import numpy as np
 
 from grace_gc.audit.dynamic_score import load_diagonal_metric
-from grace_gc.versions import sha256_file
+from grace_gc.versions import sha256_array, sha256_file
 
 VECTOR_FILES = ("prefix_score_gradients.npy", "half_mean_full_grads_a.npy",
                 "half_mean_full_grads_b.npy")
+GRAM_CACHE_VERSION = 2
 GROUP_VIEWS = {
     "all": "pooled",
     "text_pre_answer": "pooled",
@@ -93,7 +94,11 @@ def load_replay_rows(replay_dirs):
                 raise ValueError(f"prefix {key} appears in more than one replay row")
             seen.add(key)
             rows.append({**row, "_source": source, "_index": index})
-        sources.append({"root": root, "prefixes_sha256": digest, "n_rows": len(local), "arrays": None})
+        provenance_hashes = {name: sha256_file(root / name)
+                             for name in ("score_gradient_provenance.json", "replay_provenance.json")
+                             if (root / name).is_file()}
+        sources.append({"root": root, "prefixes_sha256": digest, "n_rows": len(local), "arrays": None,
+                        "provenance_sha256": provenance_hashes})
     return rows, sources
 
 
@@ -171,10 +176,13 @@ def _open_vectors(source):
     return source["arrays"]
 
 
-def _gram_fingerprint(rows, sources, members, metric_sha256):
-    contributing = sorted({sources[rows[i]["_source"]]["prefixes_sha256"] for i in members})
-    payload = {"keys": [list(row_key(rows[i])) for i in members], "prefixes_sha256": contributing,
-               "metric_sha256": metric_sha256, "vectors": list(VECTOR_FILES)}
+def _gram_fingerprint(rows, sources, members, metric_sha256, vector_hashes):
+    contributing = [{"root": str(sources[index]["root"].resolve()),
+                     "prefixes_sha256": sources[index]["prefixes_sha256"],
+                     "provenance_sha256": sources[index]["provenance_sha256"]}
+                    for index in sorted({rows[i]["_source"] for i in members})]
+    payload = {"cache_version": GRAM_CACHE_VERSION, "keys": [list(row_key(rows[i])) for i in members],
+               "sources": contributing, "metric_sha256": metric_sha256, "vectors": vector_hashes}
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
 
 
@@ -183,20 +191,49 @@ def position_grams(rows, sources, metric_file=None, cache_dir=None, block_mb=102
 
     Positions never interact, so each Gram reads only that position's rows.
     With cache_dir, a Gram is reused when the rows, replay files and metric
-    match, which lets the dense arrays be deleted position by position.
+    match, including vector content hashes. Verified cached vector hashes can
+    be used after dense arrays are deleted position by position.
     """
     metric_sha = "euclidean" if metric_file is None else sha256_file(metric_file)
     grams = {}
+    available_hashes = {}
+    for source in sources:
+        source["arrays"] = None
     for t, members in position_members(rows).items():
-        fingerprint = _gram_fingerprint(rows, sources, members, metric_sha)
         cache = None if cache_dir is None else Path(cache_dir) / f"gram_t{t}.npz"
+        cached = None
         if cache is not None and cache.is_file():
             with np.load(cache, allow_pickle=False) as stored:
-                if str(stored["fingerprint"]) == fingerprint:
-                    grams[t] = np.array(stored["gram"], dtype=np.float64)
-                    if log is not None:
-                        log(f"gram t={t}: cached")
-                    continue
+                required = {"cache_version", "fingerprint", "vector_hashes", "gram", "gram_sha256"}
+                if required.issubset(stored.files) and int(stored["cache_version"]) == GRAM_CACHE_VERSION:
+                    cached = {"fingerprint": str(stored["fingerprint"]),
+                              "vector_hashes": json.loads(str(stored["vector_hashes"])),
+                              "gram": np.array(stored["gram"], dtype=np.float64),
+                              "gram_sha256": str(stored["gram_sha256"])}
+        vector_hashes = {}
+        for source_index in sorted({rows[i]["_source"] for i in members}):
+            source = sources[source_index]
+            root = str(source["root"].resolve())
+            vector_hashes[root] = {}
+            for name in VECTOR_FILES:
+                path = source["root"] / name
+                key = (root, name)
+                if key not in available_hashes:
+                    available_hashes[key] = sha256_file(path) if path.is_file() else None
+                value = available_hashes[key]
+                if value is None and cached is not None:
+                    value = cached["vector_hashes"].get(root, {}).get(name)
+                vector_hashes[root][name] = value
+        fingerprint = _gram_fingerprint(rows, sources, members, metric_sha, vector_hashes)
+        if cached is not None and cached["fingerprint"] == fingerprint:
+            gram = cached["gram"]
+            shape = (3 * len(members), 3 * len(members))
+            if (gram.shape == shape and np.all(np.isfinite(gram))
+                    and sha256_array(gram) == cached["gram_sha256"]):
+                grams[t] = gram
+                if log is not None:
+                    log(f"gram t={t}: cached")
+                continue
         vectors, dimension = [], None
         for part in range(3):
             for index in members:
@@ -213,7 +250,10 @@ def position_grams(rows, sources, metric_file=None, cache_dir=None, block_mb=102
             cache.parent.mkdir(parents=True, exist_ok=True)
             partial = cache.with_name(cache.name + ".partial")
             with partial.open("wb") as handle:
-                np.savez(handle, gram=gram, fingerprint=np.array(fingerprint))
+                np.savez(handle, gram=gram, fingerprint=np.array(fingerprint),
+                         cache_version=np.array(GRAM_CACHE_VERSION),
+                         vector_hashes=np.array(json.dumps(vector_hashes, sort_keys=True)),
+                         gram_sha256=np.array(sha256_array(gram)))
             os.replace(partial, cache)
         grams[t] = gram
         if log is not None:
@@ -358,15 +398,23 @@ def _clean(value):
 
 
 def _crossing(values, positions, reached):
-    """Index of the first position meeting the rule; len(positions) if never."""
+    """First crossing, len(grid) if censored, or -1 if missing values prevent identification."""
     hit = reached(values) & np.isfinite(values)
-    return np.where(hit.any(1), hit.argmax(1), len(positions))
+    first = np.where(hit.any(1), hit.argmax(1), len(positions))
+    missing_before = (~np.isfinite(values) & (np.arange(len(positions))[None, :] <= first[:, None])).any(1)
+    return np.where(missing_before, -1, first)
 
 
-def _order_report(learning, answer):
-    return {"P(t_L<t_A)": float(np.mean(learning < answer)),
-            "P(t_L==t_A)": float(np.mean(learning == answer)),
-            "P(t_L>t_A)": float(np.mean(learning > answer))}
+def _order_report(learning, answer, n_positions):
+    unavailable = (learning < 0) | (answer < 0)
+    both_censored = (learning == n_positions) & (answer == n_positions)
+    defined = ~(unavailable | both_censored)
+    count = int(defined.sum())
+    return {"P(t_L<t_A)": float(np.mean(learning[defined] < answer[defined])) if count else None,
+            "P(t_L==t_A)": float(np.mean(learning[defined] == answer[defined])) if count else None,
+            "P(t_L>t_A)": float(np.mean(learning[defined] > answer[defined])) if count else None,
+            "n_total": int(learning.size), "n_defined": count,
+            "n_unavailable": int(unavailable.sum()), "n_both_censored": int(both_censored.sum())}
 
 
 def _functional_status(row, probe):
@@ -478,16 +526,18 @@ def _crossings(positions, point_curves, draw_curves, epsilon, delta, bootstrap):
              "t_L_residual": ("residual_pop", lambda v: v <= epsilon),
              "t_A": ("rho_A", lambda v: v <= delta)}
     out = {"epsilon": float(epsilon), "delta": float(delta),
-           "rule": "first decision position meeting the threshold; None means not reached in the grid"}
+           "rule": "first decision position meeting the threshold; status distinguishes observed, not_reached and unavailable"}
     for name, (key, reached) in rules.items():
         index = _crossing(_stack(point_curves, key, 1), positions, reached)[0]
-        out[name] = None if index == len(positions) else positions[index]
+        out[name] = positions[index] if 0 <= index < len(positions) else None
+        out[name + "_status"] = ("unavailable" if index < 0 else
+                                  "not_reached" if index == len(positions) else "observed")
     if bootstrap:
         draws = {name: _crossing(_stack(draw_curves, key, bootstrap), positions, reached)
                  for name, (key, reached) in rules.items()}
         out["bootstrap_order"] = {
-            "unreached_counts_as_after_grid": True,
-            "t_L_projection_vs_t_A": _order_report(draws["t_L_projection"], draws["t_A"]),
-            "t_L_residual_vs_t_A": _order_report(draws["t_L_residual"], draws["t_A"]),
+            "rule": "conditional on identifiable order; unavailable draws and two censored times are excluded",
+            "t_L_projection_vs_t_A": _order_report(draws["t_L_projection"], draws["t_A"], len(positions)),
+            "t_L_residual_vs_t_A": _order_report(draws["t_L_residual"], draws["t_A"], len(positions)),
         }
     return out

@@ -2,9 +2,11 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from grace_gc.audit.learning_completion import (analyze, answer_variance_terms, estimate,
-                                                position_statistics, stacked_gram)
+                                                load_replay_rows, position_grams, position_statistics,
+                                                stacked_gram, VECTOR_FILES, _crossings)
 from scripts.analyze_learning_completion import main
 
 
@@ -197,3 +199,94 @@ def test_cli_combines_shards_and_reuses_cached_grams(tmp_path: Path):
     assert first["groups"]["functional_pre_answer"]["available"]
     assert set(first["groups"]["all"]["crossings"]) >= {"t_L_projection", "t_L_residual", "t_A"}
     assert first["groups"]["all"]["by_t"][0]["n_problems"] == 6
+
+
+@pytest.mark.parametrize("name", VECTOR_FILES)
+def test_gram_cache_recomputes_after_same_size_vector_replacement(tmp_path, name):
+    import os
+
+    rng = np.random.default_rng(12)
+    prefixes = [(f"p{x}", 0.5, 0.5, rng.standard_normal(4), rng.standard_normal(4))
+                for x in range(3) for _ in range(2)]
+    rows, g, a, b = _simulate(rng, prefixes)
+    root, cache = tmp_path / "replay", tmp_path / "cache"
+    _write_shard(root, rows, g, a, b)
+    loaded, sources = load_replay_rows([root])
+    first = position_grams(loaded, sources, cache_dir=cache, block_mb=1)[64]
+    path = root / name
+    before = path.stat()
+    np.save(path, np.load(path) + 5)
+    os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))
+    assert path.stat().st_size == before.st_size
+    loaded, sources = load_replay_rows([root])
+    actual = position_grams(loaded, sources, cache_dir=cache, block_mb=1)[64]
+    expected = position_grams(loaded, sources, block_mb=1)[64]
+    np.testing.assert_allclose(actual, expected)
+    assert not np.allclose(actual, first)
+
+
+def test_gram_cache_cannot_reuse_deleted_arrays_under_changed_actor_provenance(tmp_path):
+    rng = np.random.default_rng(13)
+    prefixes = [(f"p{x}", 0.5, 0.5, rng.standard_normal(4), rng.standard_normal(4))
+                for x in range(2) for _ in range(2)]
+    rows, g, a, b = _simulate(rng, prefixes)
+    root = tmp_path / "replay"
+    _write_shard(root, rows, g, a, b)
+    provenance = root / "score_gradient_provenance.json"
+    provenance.write_text(json.dumps({"actor_sha256": "actor-a"}))
+    loaded, sources = load_replay_rows([root])
+    position_grams(loaded, sources, cache_dir=tmp_path / "cache", block_mb=1)
+    for name in VECTOR_FILES:
+        (root / name).unlink()
+    provenance.write_text(json.dumps({"actor_sha256": "actor-b"}))
+    loaded, sources = load_replay_rows([root])
+    with pytest.raises(ValueError, match="lacks"):
+        position_grams(loaded, sources, cache_dir=tmp_path / "cache", block_mb=1)
+
+
+def test_gram_cache_recomputes_corrupted_gram(tmp_path):
+    rng = np.random.default_rng(14)
+    prefixes = [(f"p{x}", 0.5, 0.5, rng.standard_normal(4), rng.standard_normal(4))
+                for x in range(2) for _ in range(2)]
+    rows, g, a, b = _simulate(rng, prefixes)
+    root, cache = tmp_path / "replay", tmp_path / "cache"
+    _write_shard(root, rows, g, a, b)
+    loaded, sources = load_replay_rows([root])
+    expected = position_grams(loaded, sources, cache_dir=cache, block_mb=1)[64]
+    path = cache / "gram_t64.npz"
+    with np.load(path) as stored:
+        payload = dict(stored)
+    payload["gram"] = payload["gram"] + 5
+    np.savez(path, **payload)
+    actual = position_grams(loaded, sources, cache_dir=cache, block_mb=1)[64]
+    np.testing.assert_allclose(actual, expected)
+
+
+def test_crossings_do_not_turn_unavailable_estimates_into_equal_times():
+    report = _crossings([32, 64], [None, None], [None, None], .1, .5, 10)
+    assert report["t_L_residual"] is None
+    assert report["t_L_residual_status"] == "unavailable"
+    assert report["t_A_status"] == "unavailable"
+    order = report["bootstrap_order"]["t_L_residual_vs_t_A"]
+    assert order["n_defined"] == 0 and order["n_unavailable"] == 10
+    assert order["P(t_L==t_A)"] is None
+
+
+def test_crossings_distinguish_censoring_and_missing_earlier_positions():
+    def curve(f, residual, rho):
+        return {"F_pop": np.array([f]), "residual_pop": np.array([residual]),
+                "rho_A": np.array([rho])}
+
+    first, last = curve(.5, .5, .8), curve(.6, .4, .7)
+    report = _crossings([32, 64], [first, last], [first, last], .1, .5, 1)
+    assert report["t_L_residual_status"] == report["t_A_status"] == "not_reached"
+    order = report["bootstrap_order"]["t_L_residual_vs_t_A"]
+    assert order["n_both_censored"] == 1 and order["P(t_L==t_A)"] is None
+    hit = curve(.99, .01, .3)
+    missing_first = _crossings([32, 64], [None, hit], [], .1, .5, 0)
+    assert missing_first["t_L_residual_status"] == "unavailable"
+    known_first = _crossings([32, 64], [hit, None], [], .1, .5, 0)
+    assert known_first["t_L_residual"] == known_first["t_A"] == 32
+    known_order = _crossings([32], [curve(.99, .01, .8)], [curve(.99, .01, .8)], .1, .5, 1)
+    order = known_order["bootstrap_order"]["t_L_residual_vs_t_A"]
+    assert order["n_defined"] == 1 and order["P(t_L<t_A)"] == 1.0

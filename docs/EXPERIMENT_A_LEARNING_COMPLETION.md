@@ -1,6 +1,6 @@
 # 实验 A：总体期望更新先于答案完成
 
-本实验只新增文件：`grace_gc/audit/learning_completion.py`、`scripts/analyze_learning_completion.py`、`configs/experiments/learning_completion_overlay.yaml` 和 `tests/test_learning_completion.py`。audit、replay、训练、奖励和已有分析脚本都不改；已有 run 和结果不受影响。
+实验入口为 `scripts/analyze_learning_completion.py`；三卡 thinking 采集入口为 `scripts/supervise_learning_completion.py`。2026-10-04 修复统一了 thinking 判分、probe 预填判分、Gram 缓存和缺失观测点的穿越时间统计。历史 run 的原始结果保留，新采集记录 reward protocol v3。
 
 ## 要检验的主张
 
@@ -33,7 +33,7 @@ mu(h) = E[G | h] = P(h) + c(h),     P(h) = (q(h) - b) g_h
 
 `Var(R|h)` 用二值奖励计数的无偏式 `s(n-s)/(n(n-1))`；`Var(R|x)` 用同题不同前缀的交叉乘积估计 `(E q)²`。为了让两条曲线在同一批前缀上计算，每组只保留该组在该位置至少有 2 个前缀的题目；被排除的题数和行数写在 `excluded_single_row_problems` 和 `excluded_rows`。
 
-Bootstrap 以题目为单位，所有位置和分组共用同一组重抽样，所以可以比较跨 t 的穿越时间。题目被重复抽到时不与自身配对，因此 U 统计量不会混入单题能量。小样本下 U 统计量可以为负，此时比值记为 `null`，`bootstrap_defined` 给出有定义的次数。
+Bootstrap 以题目为单位，所有位置和分组共用同一组重抽样，所以可以比较跨 t 的穿越时间。题目被重复抽到时不与自身配对，因此 U 统计量不会混入单题能量。小样本下 U 统计量可以为负，此时比值记为 `null`，`bootstrap_defined` 给出有定义的次数。穿越时间另报 `observed`、`not_reached` 或 `unavailable`；首次满足阈值之前存在缺失点时为 `unavailable`。Bootstrap 时间比较排除无法判断的重抽样和两条曲线都未越过阈值的情况，同时记录各类次数；无可判断样本时概率为 `null`。
 
 ## 分组
 
@@ -46,7 +46,7 @@ Bootstrap 以题目为单位，所有位置和分组共用同一组重抽样，�
 
 ## 前提
 
-1. 奖励必须是二值，而且对 thinking 输出要正确判分。PR13 记录的两个问题仍在现有代码里：原始奖励不看截断，可能抽到 `<think>` 内的答案；功能 probe 判分漏掉了预填的 `Answer:`。本 PR 不修改 `reward.py` 和 probe，以免影响其他实验。所以 thinking 模式的实验 A 需要先单独修好这两处；非 thinking 的 Base 模型可以直接跑。
+1. 本实验的 rollout 和独立 baseline 使用完整回答奖励：截断计 0 分，thinking 输出只判 `</think>` 后的回答。功能 probe 把预填 `Answer:` 与生成后缀一起判分，也根据实际结束原因排除截断。Overlay 设置 `audit.require_complete_answers: true`；普通 Base 训练仍保留原有的截断可解析答案口径。旧奖励产生的梯度不能直接当作修复后的标签，需按新奖励重新 replay；采集续跑拒绝混用旧协议。
 2. 生成续写的策略要和求 score 梯度的策略一致（完整 softmax、同一 checkpoint）。否则 `E[g_s|h] ≠ 0`，`c(h)` 会混入采样偏差。
 3. baseline 在每个前缀内保持不变（audit 默认使用独立 prescan；也可以传 `--baseline-file`）。
 4. `--epsilon` 和 `--delta` 要在看结果之前固定。下面的 0.1 和 0.5 只是示例。
@@ -59,12 +59,24 @@ Bootstrap 以题目为单位，所有位置和分组共用同一组重抽样，�
 
 ```bash
 python scripts/audit.py --generate --data-path DATA.jsonl --model-path "$MODEL" \
-  --checkpoint "$CKPT" --config configs/default.yaml \
+  --checkpoint "$CKPT" --backend gpu_verl --method full_pg --config configs/default.yaml \
   --config configs/experiments/learning_completion_overlay.yaml \
   --run-dir runs/expA-audit
 ```
 
-overlay 默认设置是 96 题 × 4 个前缀 × 8 条续写，决策位置为 `[256, 512, 1024, 2048, 4096]`；超过 `max_new_tokens` 的位置会被 audit 丢弃并记录。总体统计量的精度主要取决于题目数，单个前缀的续写条数次要，所以预算优先用来增加题目数。
+overlay 默认设置是 96 题 × 4 个前缀 × 8 条续写，8192 token 响应上限，决策位置为 `[256, 512, 1024, 2048, 4096]`；超过 `max_new_tokens` 的位置会被 audit 丢弃并记录。总体统计量的精度主要取决于题目数，单个前缀的续写条数次要，所以预算优先用来增加题目数。
+
+三卡 thinking 运行命令如下；前两卡计算梯度，第三卡运行 vLLM，预检完成后并行采集，最后自动进行 CPU 分析。采集直接写一行一个前缀的 replay 分片，不再复制稠密数组；完成的前缀可续跑，OOM 会等待显存恢复后重试。需要预先运行 `scripts/download_thinking_model.py` 下载固定 revision。
+
+```bash
+python scripts/supervise_learning_completion.py \
+  --run-dir runs/expA-thinking --data-path DATA.parquet --gpus 1 2 3 \
+  --config configs/default.yaml \
+  --config configs/experiments/reasoning_mechanism_audit.yaml \
+  --config configs/experiments/learning_completion_overlay.yaml
+```
+
+未指定 difficulty manifest 时，使用 audit split 内 seed=17 的 96 题抽样，并保存选题清单。穿越阈值为可选分析参数，三卡入口默认只输出曲线和区间，不指定阈值。
 
 ### 2. 每个位置做一次稠密 replay
 
@@ -97,7 +109,7 @@ python scripts/analyze_learning_completion.py \
 
 D = 5,898,240 时，FP64 每个向量约 47 MB。实验 A 每个前缀读 3 个向量（`prefix_score_gradients.npy`、`half_mean_full_grads_a/b.npy`），约 142 MB。replay 还会写出实验 A 不用的 `mean_grads.npy` 和 `half_mean_grads_a/b.npy`，可以在 replay 结束后删除。
 
-各位置之间互不配对，所以可以逐个位置处理：replay 一个位置，用 `--gram-cache` 跑一次分析得到该位置的 Gram（3n×3n，很小），然后删除该位置的大数组，再处理下一个位置。最后一次分析只需要各目录的 `prefixes.jsonl` 和 Gram 缓存。缓存的指纹包括前缀键、`prefixes.jsonl` 的 hash 和度量 hash；输入变化时会自动重算。同一位置的全部行必须同时在盘上，因为跨分片的题目对也要计算。
+各位置之间互不配对，所以可以逐个位置处理：replay 一个位置，用 `--gram-cache` 跑一次分析得到该位置的 Gram（3n×3n，很小），然后删除该位置的大数组，再处理下一个位置。最后一次分析需要各目录的 `prefixes.jsonl`、原 provenance 和 Gram 缓存。缓存 v2 绑定前缀键、来源目录、metadata/provenance、三份梯度数组内容及度量的 SHA-256，同时校验 Gram 的形状和内容哈希。数组存在时重新核对其哈希；数组已删除时使用缓存中保留的输入哈希。旧版缓存不直接复用。同一位置的全部行必须同时在盘上，因为跨分片的题目对也要计算。
 
 如果 PR12 的稠密 trajectory replay 仍在服务器上，可以直接用它做一次单位置分析，看 `aggregation_survival` 和 `U_MM` 的置信区间，用来估计正式实验需要多少题。
 

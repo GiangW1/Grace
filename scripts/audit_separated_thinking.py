@@ -24,11 +24,14 @@ sys.path.insert(0, str(REPO))
 
 from grace_gc.audit.prefix_audit import bundle_from_dict, bundle_to_dict
 from grace_gc.audit.run import _bundles_from_engines
+from grace_gc.audit.qualification import FORCED_ANSWER_PREFIX, score_functional_probe
 from grace_gc.core.rng import IsolatedRNG
 from grace_gc.data.format_prompt import apply_solve_instruction
 from grace_gc.data.math_data import load_math_records
+from grace_gc.data.reward import REWARD_PROTOCOL_VERSION
 from grace_gc.data.tokenize import encode_records_hf, load_hf_tokenizer
 from grace_gc.trainer.checkpoint import load_checkpoint, save_checkpoint
+from grace_gc.trainer.algorithm import _length_truncated
 from grace_gc.trainer.state_io import load_numpy_module_state, numpy_module_state
 from grace_gc.versions import sha256_array, sha256_file, sha256_named
 
@@ -115,7 +118,7 @@ class RemoteLLM:
             return list(pool.map(one, zip(prompts, params)))
 
 
-def reduce_bundle(bundle, rng, directory, seed):
+def reduce_bundle(bundle, rng, directory, seed, learning_completion=False, provenance=None):
     target = prefix_directory(directory, bundle.path_id, bundle.t)
     target.mkdir(parents=True, exist_ok=True)
     gradients = np.asarray(bundle.trajectory_grads)
@@ -130,9 +133,16 @@ def reduce_bundle(bundle, rng, directory, seed):
         mean = np.zeros(gradients.shape[1], dtype=np.float64)
         for index in indices:
             mean += gradients[index] / len(indices)
-        save_array(target / f"mean_{half}.npy", mean)
-    save_array(target / "prefix_score.npy", bundle.prefix_score_grad)
-    raw.update(enable_thinking=True, half_counts=list(map(len, halves)),
+        if learning_completion:
+            save_array(target / f"half_mean_full_grads_{half}.npy", mean[None, :])
+        else:
+            save_array(target / f"mean_{half}.npy", mean)
+    if learning_completion:
+        save_array(target / "prefix_score_gradients.npy", np.asarray(bundle.prefix_score_grad)[None, :, None])
+    else:
+        save_array(target / "prefix_score.npy", bundle.prefix_score_grad)
+    raw.update(enable_thinking=True, reward_protocol_version=REWARD_PROTOCOL_VERSION,
+               require_complete_answers=True, half_counts=list(map(len, halves)),
                half_indices=[part.tolist() for part in halves],
                half_mean_reward=[float(np.mean(bundle.rewards[part])) for part in halves],
                half_mean_advantage=[float(np.mean(bundle.rewards[part]) - bundle.baseline) for part in halves],
@@ -141,6 +151,18 @@ def reduce_bundle(bundle, rng, directory, seed):
                                        for part in halves],
                n_continuations=len(gradients), rng_after=rng.state_dict(),
                sufficient_statistics="Full-space FP64 A/B means, second moments and prefix score; JL only for display")
+    if learning_completion:
+        row = {key: raw.get(key) for key in (
+            "problem_id", "path_id", "t", "half_counts", "half_mean_reward", "baseline",
+            "answer_emitted", "finished", "functional_recoverable", "reward_protocol_version",
+            "require_complete_answers")}
+        prefixes = target / "prefixes.jsonl"
+        temporary = prefixes.with_suffix(".jsonl.tmp")
+        temporary.write_text(json.dumps(row, allow_nan=False) + "\n")
+        temporary.replace(prefixes)
+        write_json(target / "score_gradient_provenance.json", {
+            **(provenance or {}), "replay_prefixes_sha256": sha256_file(prefixes),
+            "gradient_label": "full_trajectory", "storage": "one prefix; independent A/B full-space means"})
     # Publishing metadata last makes each completed prefix the resume unit.
     write_json(target / "bundle.json", raw)
     bundle.trajectory_grads = None
@@ -154,17 +176,21 @@ def collect(args):
     from grace_gc.backends.verl_trainer import load_lora_actor
     from grace_gc.core.layout import collect_lora_layout, layout_hash
     from grace_gc.audit.qualification import classify_functional_recovery
-    from grace_gc.data.reward import rule_reward
     from grace_gc.trainer.methods import method_spec
 
     root = Path(args.run_dir)
     root.mkdir(parents=True, exist_ok=True)
+    for path in (*root.glob("worker-*-provenance.json"), *root.glob("problems/*/summary.json")):
+        previous = json.loads(path.read_text())
+        if (previous.get("reward_protocol_version") != REWARD_PROTOCOL_VERSION
+                or not previous.get("require_complete_answers")):
+            raise ValueError("run uses a different reward protocol; use a new run directory")
     records = []
     for path in sorted(Path(args.data_dir).glob("shard-*.jsonl")):
         records.extend(load_math_records(path))
     records = apply_solve_instruction(records)
-    if len(records) != 32 or len({rec.problem_id for rec in records}) != 32:
-        raise ValueError("this test must use the original 32 distinct problems")
+    if len(records) != args.n_problems or len({rec.problem_id for rec in records}) != args.n_problems:
+        raise ValueError(f"input must contain {args.n_problems} distinct selected problems")
     if args.smoke:
         records = records[:1]
     else:
@@ -199,6 +225,8 @@ def collect(args):
                   "layout_dim": layout.dim, "layout_names": layout.names(), "layout_sha256": layout_hash(layout),
                   "actor_numerics": actor_numerics(actor), "enable_thinking": True,
                   "temperature": 1.0, "metric": "euclidean",
+                  "reward_protocol_version": REWARD_PROTOCOL_VERSION,
+                  "require_complete_answers": True,
                   "adam_metric": "unavailable: new snapshot has no optimizer moments"}
     write_json(root / f"worker-{args.worker_index}-provenance.json", provenance)
     tokenizer = load_hf_tokenizer(args.model_path)
@@ -229,7 +257,7 @@ def collect(args):
                 "template_behavior": "Thinking tokens are generated by Qwen3, not prefilled"})
         return result
 
-    forced = tokenizer.encode("</think>\nAnswer:", add_special_tokens=False)
+    forced = tokenizer.encode(FORCED_ANSWER_PREFIX, add_special_tokens=False)
     probe_records = {}
 
     def qualify(prefix, prompt_len, gold, pid, t, path_index):
@@ -237,11 +265,16 @@ def collect(args):
         rng = IsolatedRNG.create(args.seed + path_index * 100003 + int(t) * 1009 + len(prefix))
         fulls, reasons, seeds = repeated(probe, 4, 32, rng)
         texts = [engines.decode(full[len(probe):]) for full in fulls]
-        rewards = [float(rule_reward(text, gold, truncated=False) or 0.0) for text in texts]
+        truncated = [_length_truncated(full, len(probe), 32, False, engines.eos_id,
+                                        finish_reason=reason)
+                     for full, reason in zip(fulls, reasons)]
+        rewards = [score_functional_probe(text, gold, truncated=hit)
+                   for text, hit in zip(texts, truncated)]
         probe_records[(pid, f"{pid}:{path_index}", t)] = [
             {"text": text, "reward": reward, "seed": seed, "finish_reason": reason,
-             "token_ids": full[len(probe):]} for text, reward, seed, reason, full
-            in zip(texts, rewards, seeds, reasons, fulls)]
+             "truncated": hit, "scored_text": "Answer:" + text,
+             "token_ids": full[len(probe):]} for text, reward, seed, reason, hit, full
+            in zip(texts, rewards, seeds, reasons, truncated, fulls)]
         return classify_functional_recovery(rewards, 0.5)
 
     started = time.monotonic()
@@ -259,7 +292,8 @@ def collect(args):
                 target = prefix_directory(directory, bundle.path_id, bundle.t)
                 if key in probe_records:
                     write_json(target / "functional_probes.json", probe_records[key])
-                reduce_bundle(bundle, rng, directory, args.seed)
+                reduce_bundle(bundle, rng, directory, args.seed,
+                              learning_completion=args.learning_completion, provenance=provenance)
                 write_json(root / f"worker-{args.worker_index}-status.json", {
                     "status": "collecting", "updated_utc": utc(), "problem_id": rec.problem_id,
                     "problem_index": problem_index, "n_assigned_problems": len(records),
@@ -272,21 +306,26 @@ def collect(args):
                 if not path.exists():
                     return None
                 raw = json.loads(path.read_text())
+                if (raw.get("reward_protocol_version") != REWARD_PROTOCOL_VERSION
+                        or not raw.get("require_complete_answers")):
+                    raise ValueError("prefix uses a different reward protocol; use a new run directory")
                 rng.load_state_dict(raw["rng_after"])
                 print(f"phase=resume_prefix pid={pid} path={path_id} t={t}", flush=True)
                 return bundle_from_dict(raw)
 
             bundles = _bundles_from_engines(
-                [rec], engines, layout, 1 if args.smoke else 2, 2 if args.smoke else 64,
-                [64, 128] if args.smoke else [1024, 2048], 8192, seed, encode,
+                [rec], engines, layout, 1 if args.smoke else args.n_prefixes,
+                2 if args.smoke else args.n_continuations,
+                [64, 128] if args.smoke else args.decision_tokens, args.max_new_tokens, seed, encode,
                 spec=method_spec("full_pg"), jl_dim=256, jl_seed=args.seed,
-                n_baseline=2 if args.smoke else 16, store_features=True,
+                n_baseline=2 if args.smoke else args.n_baseline, store_features=not args.learning_completion,
                 store_trajectory_gradients=True, qualification_fn=qualify,
-                bundle_sink=sink, bundle_resume=resume)
+                bundle_sink=sink, bundle_resume=resume, require_complete_answers=True)
             write_json(directory / "raw_problem.json", _bundles_from_engines.last[0])
             write_json(directory / "summary.json", {"status": "completed", "problem_id": rec.problem_id,
                        "n_bundles": len(bundles), "seed": seed, "finished_utc": utc(),
-                       "enable_thinking": True})
+                       "enable_thinking": True, "reward_protocol_version": REWARD_PROTOCOL_VERSION,
+                       "require_complete_answers": True})
             print(f"phase=problem_completed worker={args.worker_index} problem={problem_index+1}/{len(records)}", flush=True)
     write_json(root / f"worker-{args.worker_index}-status.json", {
         "status": "completed", "finished_utc": utc(), "n_problems": len(records),
@@ -377,9 +416,23 @@ def main():
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--worker-index", type=int, default=0)
     parser.add_argument("--workers", type=int, default=2)
+    parser.add_argument("--n-problems", type=int, default=32)
+    parser.add_argument("--n-prefixes", type=int, default=2)
+    parser.add_argument("--n-continuations", type=int, default=64)
+    parser.add_argument("--n-baseline", type=int, default=16)
+    parser.add_argument("--decision-tokens", type=int, nargs="+", default=[1024, 2048])
+    parser.add_argument("--max-new-tokens", type=int, default=8192)
+    parser.add_argument("--learning-completion", action="store_true",
+                        help="write one-row trajectory replay shards for Experiment A")
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--analyze-only", action="store_true")
     args = parser.parse_args()
+    if (args.n_problems < 1 or args.n_prefixes < 1 or args.n_continuations < 2
+            or args.n_baseline < 1 or args.workers < 1 or not 0 <= args.worker_index < args.workers
+            or any(t < 1 or t >= args.max_new_tokens for t in args.decision_tokens)):
+        parser.error("invalid collection dimensions or decision positions")
+    if args.analyze_only and args.learning_completion:
+        parser.error("use analyze_learning_completion.py for Experiment A shards")
     if args.analyze_only:
         merge(args)
     else:
