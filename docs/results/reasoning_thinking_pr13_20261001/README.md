@@ -60,10 +60,13 @@ Dense full-space gradient arrays and duplicate HTTP rollout caches are omitted.
 The archive manifest records original sizes and SHA-256 hashes for included
 and excluded files. Each included source file is at most 20 MiB.
 
-After archive integrity and GitHub upload are verified, this run's omitted
-gradient arrays, duplicate caches, downloaded model weights and incomplete
-download fragments are deleted. The exact deletion list and bytes are recorded
-separately. Model configuration and tokenizer files are retained. Recomputing
+Archive integrity and the GitHub asset's size and SHA-256 were verified before
+cleanup completed on 2026-10-04 at 11:38 HKT. Cleanup removed 9695 files totaling
+46380200199 bytes (43.19 GiB): 394 dense gradient arrays, 9295 duplicate cache
+files, three newly downloaded model weight shards, two incomplete download
+fragments, and the model-download completion marker. The exact deletion list
+and bytes are recorded in `cleanup_receipt.json`. Model configuration and
+tokenizer files are retained. Recomputing
 full-space gradients requires downloading the pinned model and replaying the
 saved tokens with the retained frozen LoRA checkpoint; the filtered archive
 does not contain the dense arrays themselves.
@@ -75,4 +78,4 @@ https://github.com/GiangW1/Grace/releases/download/pr13-thinking-results-2026100
 SHA-256: `114df9c59cd705aa81790bc097f97df4edfa1b406e09e88025a9b69ad524d26a`.
 `archive_manifest.json` and `archive_verification.json` accompany the result
 reports in this PR. `cleanup_plan.json` lists the exact files authorized for
-removal; the subsequent cleanup receipt records actual deletion.
+removal; `cleanup_receipt.json` records actual deletion.
