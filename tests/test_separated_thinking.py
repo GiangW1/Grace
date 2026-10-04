@@ -230,3 +230,52 @@ def test_experiment_a_selects_saved_audit_inputs_and_preserves_them_on_resume(tm
     assert (directory / "shard-0.jsonl").read_text() == original
     with pytest.raises(ValueError, match="selected inputs changed"):
         script.prepare_inputs(tmp_path, data, {"seed": 41, "audit": {"n_problems": 4}})
+
+
+@pytest.mark.parametrize("gpus", [[1, 3], [1, 2, 3]])
+def test_experiment_a_assigns_all_inputs_to_configured_gradient_workers(tmp_path, monkeypatch, gpus):
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "scripts"))
+    script = load_script("supervise_learning_completion")
+    model = tmp_path / "model"
+    model.mkdir()
+    (model / "thinking_download_verified.txt").write_text(script.REVISION)
+    config = {"seed": 17, "audit": {"n_problems": 36, "n_prefixes": 4,
+              "n_continuations": 8, "n_baseline": 16, "max_new_tokens": 8192,
+              "decision_grid": [256, 512, 1024, 2048, 4096], "require_complete_answers": True},
+              "max_new_tokens": 8192}
+    monkeypatch.setattr(script, "build_run_config", lambda *args: config)
+    monkeypatch.setattr(script, "prepare_inputs", lambda *args: (tmp_path / "input", 36))
+    monkeypatch.setattr(script, "verify_smoke", lambda *args: None)
+    monkeypatch.setattr(script, "analyze_collection", lambda *args: None)
+    monkeypatch.setattr(script.signal, "signal", lambda *args: None)
+    for name in ("ROOT", "MODEL", "CHECKPOINT", "URL"):
+        monkeypatch.setattr(script.runtime, name, getattr(script.runtime, name))
+    monkeypatch.setattr(script.runtime, "cleanup", lambda *args: None)
+    monkeypatch.setattr(script.runtime, "wait_for_card", lambda *args: None)
+    monkeypatch.setattr(script.runtime, "ready", lambda: True)
+    phases, servers, workers = [], [], []
+    monkeypatch.setattr(script.runtime, "status", lambda phase, **extra: phases.append((phase, extra)))
+
+    def launch(command, log, gpu):
+        servers.append(gpu)
+        return SimpleNamespace(poll=lambda: None)
+
+    def worker(index, gpu, smoke=False, extra_args=()):
+        workers.append((index, gpu, smoke, extra_args))
+
+    monkeypatch.setattr(script.runtime, "launch", launch)
+    monkeypatch.setattr(script.runtime, "worker", worker)
+    script.main(["--run-dir", str(tmp_path), "--data-path", "unused", "--config", "unused",
+                 "--model-path", str(model), "--gpus", *map(str, gpus)])
+    assert servers == [gpus[-1]]
+    assert sorted((index, gpu) for index, gpu, smoke, _extra in workers if not smoke) == list(enumerate(gpus[:-1]))
+    assert sum(smoke for _index, _gpu, smoke, _extra in workers) == 1
+    for _index, _gpu, _smoke, extra in workers:
+        assert extra[extra.index("--workers") + 1] == str(len(gpus) - 1)
+        assert extra[extra.index("--n-problems") + 1] == "36"
+    scope = json.loads((tmp_path / "scope.json").read_text())
+    assert scope["n_problems"] == 36
+    assert len(scope["gpu_roles"]) == len(gpus)
+    collecting = next(extra for phase, extra in phases if phase == "collecting")
+    assert collecting["gradient_gpus"] == gpus[:-1]
+    assert collecting["rollout_gpu"] == gpus[-1]

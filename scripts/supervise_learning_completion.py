@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run Experiment A with two frozen gradient workers and one vLLM GPU."""
+"""Run Experiment A with one or two frozen gradient workers and one vLLM GPU."""
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor
@@ -86,11 +86,13 @@ def main(argv=None):
     parser.add_argument("--data-path", required=True)
     parser.add_argument("--model-path", default=str(runtime.MODEL))
     parser.add_argument("--config", action="append", required=True)
-    parser.add_argument("--gpus", type=int, nargs=3, default=[1, 2, 3])
+    parser.add_argument("--gpus", type=int, nargs="+", default=[1, 2, 3],
+                        help="one or two gradient GPUs followed by the rollout GPU")
     parser.add_argument("--port", type=int, default=18014)
     args = parser.parse_args(argv)
-    if len(set(args.gpus)) != 3:
-        parser.error("three distinct GPUs are required")
+    if len(args.gpus) not in (2, 3) or len(set(args.gpus)) != len(args.gpus):
+        parser.error("two or three distinct GPUs are required; the last GPU generates rollouts")
+    gradient_gpus, rollout_gpu = args.gpus[:-1], args.gpus[-1]
     config = build_run_config(args.config, {"backend": "gpu_verl", "method": "full_pg", "enable_thinking": True})
     audit = config["audit"]
     if not audit.get("require_complete_answers"):
@@ -110,7 +112,8 @@ def main(argv=None):
                  "--n-prefixes", str(audit["n_prefixes"]), "--n-continuations", str(audit["n_continuations"]),
                  "--n-baseline", str(audit["n_baseline"]), "--max-new-tokens", str(max_new),
                  "--model-path", str(runtime.MODEL), "--server-url", runtime.URL,
-                 "--server-model", "grace-thinking-exp-a", "--workers", "2", "--learning-completion",
+                 "--server-model", "grace-thinking-exp-a", "--workers", str(len(gradient_gpus)),
+                 "--learning-completion",
                  "--decision-tokens", *map(str, audit["decision_grid"])]
         write_json(root / "scope.json", {
             "experiment": "PR14 Experiment A: population learning completion vs answer resolution",
@@ -119,22 +122,23 @@ def main(argv=None):
             "n_problems": count, "n_prefixes": audit["n_prefixes"], "n_continuations": audit["n_continuations"],
             "n_baseline": audit["n_baseline"], "decision_grid": audit["decision_grid"],
             "max_new_tokens": max_new, "primary_metric": "euclidean", "crossing_thresholds": None,
-            "gpu_roles": {str(args.gpus[0]): "gradient worker 0", str(args.gpus[1]): "gradient worker 1",
-                          str(args.gpus[2]): "vLLM rollout server"}})
+            "gpu_roles": {**{str(gpu): f"gradient worker {index}"
+                            for index, gpu in enumerate(gradient_gpus)},
+                          str(rollout_gpu): "vLLM rollout server"}})
         runtime.status("waiting_model_download")
         marker = runtime.MODEL / "thinking_download_verified.txt"
         while not marker.exists():
             time.sleep(10)
         if marker.read_text().strip() != REVISION:
             raise ValueError("downloaded thinking model revision differs")
-        runtime.wait_for_card(args.gpus[2])
-        runtime.status("starting_vllm", gpu=args.gpus[2])
+        runtime.wait_for_card(rollout_gpu)
+        runtime.status("starting_vllm", gpu=rollout_gpu)
         command = [runtime.VLLM, "serve", runtime.MODEL, "--host", "127.0.0.1", "--port", str(args.port),
                    "--served-model-name", "grace-thinking-exp-a", "--dtype", "bfloat16",
                    "--generation-config", "vllm", "--max-model-len", str(max_new + 1088),
                    "--gpu-memory-utilization", "0.40", "--max-num-seqs", "16", "--enforce-eager",
                    "--return-tokens-as-token-ids"]
-        server = runtime.launch(command, root / "logs/vllm.log", args.gpus[2])
+        server = runtime.launch(command, root / "logs/vllm.log", rollout_gpu)
         while not runtime.ready():
             if server.poll() is not None:
                 raise RuntimeError("vLLM exited during startup; see logs/vllm.log")
@@ -142,9 +146,9 @@ def main(argv=None):
         runtime.status("smoke_running", gpu=args.gpus[0])
         runtime.worker(0, args.gpus[0], smoke=True, extra_args=extra)
         verify_smoke(root)
-        runtime.status("collecting", n_problems=count, gradient_gpus=args.gpus[:2], rollout_gpu=args.gpus[2])
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            futures = [pool.submit(runtime.worker, i, gpu, extra_args=extra) for i, gpu in enumerate(args.gpus[:2])]
+        runtime.status("collecting", n_problems=count, gradient_gpus=gradient_gpus, rollout_gpu=rollout_gpu)
+        with ThreadPoolExecutor(max_workers=len(gradient_gpus)) as pool:
+            futures = [pool.submit(runtime.worker, i, gpu, extra_args=extra) for i, gpu in enumerate(gradient_gpus)]
             for future in futures:
                 future.result()
         runtime.cleanup()
