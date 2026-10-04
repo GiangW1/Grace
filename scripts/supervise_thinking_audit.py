@@ -153,6 +153,11 @@ def main(argv=None):
     parser.add_argument("--n-problems", type=int, default=32)
     parser.add_argument("--n-continuations", type=int, default=64)
     parser.add_argument("--request-concurrency", type=int, default=8)
+    parser.add_argument("--vllm-memory-utilization", type=float, default=.40)
+    parser.add_argument("--max-num-seqs", type=int, default=16)
+    parser.add_argument("--batch-continuations", action="store_true")
+    parser.add_argument("--gradient-checkpointing", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--feature-batch-size", type=int, default=1)
     parser.add_argument("--gpus", type=int, nargs="+", default=[0, 2, 3],
                         help="one or two gradient GPUs followed by the rollout GPU")
     parser.add_argument("--port", type=int, default=18013)
@@ -165,6 +170,8 @@ def main(argv=None):
         parser.error("request concurrency must be positive")
     if args.n_continuations < 2:
         parser.error("A/B continuation statistics require at least two samples")
+    if not 0 < args.vllm_memory_utilization < 1 or args.max_num_seqs < 1 or args.feature_batch_size < 1:
+        parser.error("invalid execution memory budget or batch size")
     ROOT, MODEL = Path(args.run_dir).resolve(), Path(args.model_path).resolve()
     CHECKPOINT = Path(args.checkpoint).resolve() if args.checkpoint else ROOT / "frozen-thinking-lora.npz"
     URL = f"http://127.0.0.1:{args.port}"
@@ -173,7 +180,11 @@ def main(argv=None):
              "--n-problems", str(args.n_problems), "--model-path", str(MODEL),
              "--server-url", URL, "--server-model", "grace-thinking",
              "--request-concurrency", str(args.request_concurrency),
-             "--n-continuations", str(args.n_continuations)]
+             "--n-continuations", str(args.n_continuations),
+             "--feature-batch-size", str(args.feature_batch_size),
+             "--gradient-checkpointing" if args.gradient_checkpointing else "--no-gradient-checkpointing"]
+    if args.batch_continuations:
+        extra.append("--batch-continuations")
     ROOT.mkdir(parents=True, exist_ok=True)
     (ROOT / "logs").mkdir(exist_ok=True)
     if (ROOT / "scope.json").is_file():
@@ -184,6 +195,11 @@ def main(argv=None):
                "model": "Qwen/Qwen3-4B", "model_revision": REVISION, "enable_thinking": True,
                "n_prefixes": 2, "n_continuations": args.n_continuations, "n_baseline": 16,
                "request_concurrency": args.request_concurrency,
+               "execution": {"vllm_memory_utilization": args.vllm_memory_utilization,
+                             "max_num_seqs": args.max_num_seqs,
+                             "batch_continuations": args.batch_continuations,
+                             "gradient_checkpointing": args.gradient_checkpointing,
+                             "feature_batch_size": args.feature_batch_size},
                "max_new_tokens": 8192, "decision_grid": [1024, 2048],
                "functional_probes": {"n": 4, "max_new_tokens": 32, "threshold": .5},
                "gpu_roles": {**{str(gpu): f"gradient worker {index}" for index, gpu in enumerate(gradient_gpus)},
@@ -209,8 +225,8 @@ def main(argv=None):
         status("starting_vllm", gpu=rollout_gpu)
         command = [VLLM, "serve", MODEL, "--host", "127.0.0.1", "--port", str(args.port),
                    "--served-model-name", "grace-thinking", "--dtype", "bfloat16", "--generation-config", "vllm",
-                   "--max-model-len", "9280", "--gpu-memory-utilization", "0.40",
-                   "--max-num-seqs", "16", "--enforce-eager", "--return-tokens-as-token-ids"]
+                   "--max-model-len", "9280", "--gpu-memory-utilization", str(args.vllm_memory_utilization),
+                   "--max-num-seqs", str(args.max_num_seqs), "--enforce-eager", "--return-tokens-as-token-ids"]
         server = launch(command, ROOT / "logs/vllm.log", rollout_gpu)
         while not ready():
             if server.poll() is not None:

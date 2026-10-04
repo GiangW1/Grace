@@ -332,6 +332,9 @@ def collect(args):
         "problem_ids": [rec.problem_id for rec in records]})
     torch.manual_seed(args.seed)
     actor = load_lora_actor(args.model_path, LORA)
+    if not args.gradient_checkpointing:
+        actor.gradient_checkpointing_disable()
+        actor._grace_gradient_checkpointing = False
     named = named_lora_params(actor)
     layout = collect_lora_layout(named)
     metric_file = None if args.metric_file is None else Path(args.metric_file)
@@ -371,6 +374,8 @@ def collect(args):
                   "actor_numerics": actor_numerics(actor), "enable_thinking": True,
                   "temperature": 1.0, "metric": metric_name,
                   "request_concurrency": args.request_concurrency,
+                  "batch_continuations": args.batch_continuations,
+                  "feature_batch_size": args.feature_batch_size,
                   **collection_scope,
                   "metric_file": (None if metric_file is None else str(metric_file.resolve())),
                   "metric_weights_sha256": sha256_array(metric),
@@ -383,7 +388,8 @@ def collect(args):
                   "reward_protocol_version": REWARD_PROTOCOL_VERSION}
     write_json(root / f"worker-{args.worker_index}-provenance.json", provenance)
     tokenizer = load_hf_tokenizer(args.model_path)
-    cfg = {"temperature": 1.0, "predictor": {"feature_batch_size": 1, "feature_mode": "legacy"}}
+    cfg = {"temperature": 1.0, "predictor": {
+        "feature_batch_size": args.feature_batch_size, "feature_mode": "legacy"}}
     remote = RemoteLLM(args.server_url, args.server_model, root / "rollout-cache",
                        request_concurrency=args.request_concurrency)
     engines, _ = make_gpu_engines(actor, remote, tokenizer, cfg, root / "unused-adapter")
@@ -464,7 +470,8 @@ def collect(args):
                 spec=method_spec("full_pg"), jl_dim=256, jl_seed=args.seed,
                 n_baseline=2 if args.smoke else 16, store_features=True,
                 store_trajectory_gradients=True, qualification_fn=qualify,
-                bundle_sink=sink, bundle_resume=resume)
+                bundle_sink=sink, bundle_resume=resume,
+                batch_continuations=args.batch_continuations)
             write_json(directory / "raw_problem.json", _bundles_from_engines.last[0])
             write_json(directory / "summary.json", {"status": "completed", "problem_id": rec.problem_id,
                        "n_bundles": len(bundles), "seed": seed, "finished_utc": utc(),
@@ -658,6 +665,9 @@ def main():
     parser.add_argument("--server-url", default="http://127.0.0.1:18013")
     parser.add_argument("--server-model", default="grace-thinking")
     parser.add_argument("--request-concurrency", type=int, default=8)
+    parser.add_argument("--batch-continuations", action="store_true")
+    parser.add_argument("--gradient-checkpointing", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--feature-batch-size", type=int, default=1)
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--worker-index", type=int, default=0)
     parser.add_argument("--workers", type=int, default=2)
@@ -675,6 +685,8 @@ def main():
         parser.error("request concurrency must be positive")
     if args.n_continuations < 2:
         parser.error("A/B continuation statistics require at least two samples")
+    if args.feature_batch_size < 1:
+        parser.error("feature batch size must be positive")
     if args.analyze_only:
         merge(args)
     else:

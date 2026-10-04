@@ -177,3 +177,10 @@ python scripts/train.py --config configs/experiments/minimal.yaml --run-dir runs
 ```
 
 当前工作树的 GPU 比较：`bash scripts/run_minimal_gpu.sh`。论文规模仍按 README：先 smoke Full-PG，再 Pilot。不把 tiny / 2026-09-16 两次 smoke / 那次 16 题链写成现役实测。
+
+## 2026-10-04 Thinking audit execution optimization
+
+- PR13 targeted validation: 109 passed. Grouped continuation tests compare request seeds, individual gradient statistics, per-prefix RNG states, and partial resume against sequential execution.
+- Execution knobs now expose HTTP concurrency, vLLM sequence capacity/memory budget, grouped prefix continuations, feature batch size, and activation checkpointing. Sample counts and scoring are independent of these knobs.
+- On the frozen Qwen3-4B actor, one real 8192-response-token score gradient averaged 2.249 s with checkpointing (23.30 GiB allocated peak), versus 2.304 s without it (58.58 GiB). Relative gradient L2 difference was 0.775%. Checkpointing remains enabled; two repeats do not establish a speed benefit from disabling it.
+- Runtime benchmark: `scripts/benchmark_audit_execution.py`. Generation throughput must be read from the resumed run logs; unit tests are not performance measurements.
