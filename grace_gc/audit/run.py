@@ -135,6 +135,30 @@ def _score_grad_vec(engines, layout, token_ids, prompt_len: int) -> np.ndarray:
     return pack_grads(packed, layout)
 
 
+def _prefetch_continuations(engines, prefixes, prompt_lens, finished, path_ids,
+                            problem_id, t, n_cont, max_new, rng, resume):
+    from grace_gc.backends.vllm_two_phase import draw_request_seeds
+
+    cached, states, jobs = {}, {}, []
+    for loc, prefix in enumerate(prefixes):
+        saved = None if resume is None else resume(problem_id, path_ids[loc], t, rng)
+        if saved is not None:
+            if saved.prefix_token_ids != list(prefix):
+                raise ValueError("resumed audit prefix differs from regenerated path")
+            cached[loc] = saved
+        else:
+            remaining = max(0, int(max_new) - (len(prefix) - prompt_lens[loc]))
+            if not finished[loc] and remaining > 0:
+                jobs.append({"index": loc, "prefix": prefix, "max_new": remaining,
+                             "seeds": draw_request_seeds(rng, "continuation", n_cont)})
+        # Save the state after each prefix, even though requests execute together.
+        states[loc] = rng.state_dict()
+    generated = engines.continue_grouped(jobs, rng) if jobs else {}
+    if set(generated) != {job["index"] for job in jobs}:
+        raise ValueError("grouped continuation results differ from requested prefixes")
+    return cached, states, generated
+
+
 def _audit_method_spec(cfg: dict[str, Any] | None, payload=None):
     from grace_gc.trainer.methods import method_spec
 
@@ -212,6 +236,7 @@ def _bundles_from_engines(
     bundle_sink=None,
     bundle_resume=None,
     require_complete_answers: bool = False,
+    batch_continuations: bool = False,
 ) -> list[PrefixBundle]:
     from grace_gc.core.rng import IsolatedRNG
 
@@ -346,11 +371,20 @@ def _bundles_from_engines(
                         c_list = [float(pred.c_hat[i]) for i in range(len(prefixes))]
                     f_list = [np.asarray(pred.f[i], dtype=np.float64) for i in range(len(prefixes))]
                     effective_f_list = [np.asarray(effective_f[i], dtype=np.float64) for i in range(len(prefixes))]
+            grouped = batch_continuations and callable(getattr(engines, "continue_grouped", None))
+            if grouped:
+                resumed, rng_after, prefetched = _prefetch_continuations(
+                    engines, prefixes, prompt_lens_t, finished,
+                    [f"{rec.problem_id}:{idx}" for idx in path_idx], rec.problem_id, t,
+                    n_cont, max_new, rng, bundle_resume)
             for loc, prefix in enumerate(prefixes):
                 prompt_len = prompt_lens_t[loc]
                 idx = path_idx[loc]
-                if bundle_resume is not None:
-                    cached = bundle_resume(rec.problem_id, f"{rec.problem_id}:{idx}", t, rng)
+                if grouped:
+                    rng.load_state_dict(rng_after[loc])
+                if grouped or bundle_resume is not None:
+                    cached = (resumed.get(loc) if grouped else
+                              bundle_resume(rec.problem_id, f"{rec.problem_id}:{idx}", t, rng))
                     if cached is not None:
                         if cached.prefix_token_ids != list(prefix):
                             raise ValueError("resumed audit prefix differs from regenerated path")
@@ -363,6 +397,10 @@ def _bundles_from_engines(
                     fulls = [prefix]
                     finish_reasons = [None]
                     suffix_seeds = [None]
+                elif grouped:
+                    fulls, finish_reasons, suffix_seeds = prefetched[loc]
+                    if any(len(values) != n_cont for values in (fulls, finish_reasons, suffix_seeds)):
+                        raise ValueError("grouped continuation count differs from n_cont")
                 elif callable(getattr(engines, "continue_repeated", None)):
                     fulls, finish_reasons, suffix_seeds = engines.continue_repeated(prefix, n_cont, rem, rng)
                     if any(len(values) != n_cont for values in (fulls, finish_reasons, suffix_seeds)):

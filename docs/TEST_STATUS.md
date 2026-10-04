@@ -173,3 +173,10 @@ python scripts/train.py --config configs/experiments/minimal.yaml --run-dir runs
 ```
 
 当前工作树的 GPU 比较：`bash scripts/run_minimal_gpu.sh`。论文规模仍按 README：先 smoke Full-PG，再 Pilot。不把 tiny / 2026-09-16 两次 smoke / 那次 16 题链写成现役实测。
+
+## 2026-10-04 Learning completion execution optimization
+
+- PR14 targeted validation: 107 passed, including learning completion analysis and grouped-generation partial resume. Request seeds and saved per-prefix RNG states match sequential execution.
+- Grouping four prefixes with eight continuations each submits up to 32 requests while retaining the original 36 problems, five observation positions, and completed-answer scoring.
+- The frozen checkpoint is identical to PR13's. The shared 8192-response-token gradient benchmark averaged 2.249 s / 23.30 GiB with checkpointing, versus 2.304 s / 58.58 GiB without it. The latter had 0.775% relative gradient L2 difference, so checkpointing remains enabled.
+- Runtime settings expose generation concurrency and vLLM memory/sequence capacity. Actual throughput is reported separately from CPU correctness tests.

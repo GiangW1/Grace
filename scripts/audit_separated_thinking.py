@@ -69,11 +69,14 @@ def prefix_directory(directory, path_id, t):
 
 
 class RemoteLLM:
-    def __init__(self, url, model, cache):
+    def __init__(self, url, model, cache, request_concurrency=8):
         self.url = url.rstrip("/") + "/v1/completions"
         self.model = model
         self.cache = Path(cache)
         self.cache.mkdir(parents=True, exist_ok=True)
+        self.request_concurrency = int(request_concurrency)
+        if self.request_concurrency < 1:
+            raise ValueError("request concurrency must be positive")
 
     def generate(self, prompts, sampling_params, **_kwargs):
         params = (list(sampling_params) if isinstance(sampling_params, (list, tuple))
@@ -114,7 +117,7 @@ class RemoteLLM:
                                    finish_reason=choice.get("finish_reason"),
                                    stop_reason=choice.get("stop_reason"), logprobs=None)])
 
-        with ThreadPoolExecutor(max_workers=min(8, max(len(prompts), 1))) as pool:
+        with ThreadPoolExecutor(max_workers=min(self.request_concurrency, max(len(prompts), 1))) as pool:
             return list(pool.map(one, zip(prompts, params)))
 
 
@@ -200,6 +203,9 @@ def collect(args):
         "problem_ids": [rec.problem_id for rec in records]})
     torch.manual_seed(args.seed)
     actor = load_lora_actor(args.model_path, LORA)
+    if not args.gradient_checkpointing:
+        actor.gradient_checkpointing_disable()
+        actor._grace_gradient_checkpointing = False
     named = named_lora_params(actor)
     layout = collect_lora_layout(named)
     checkpoint = Path(args.checkpoint)
@@ -225,13 +231,18 @@ def collect(args):
                   "layout_dim": layout.dim, "layout_names": layout.names(), "layout_sha256": layout_hash(layout),
                   "actor_numerics": actor_numerics(actor), "enable_thinking": True,
                   "temperature": 1.0, "metric": "euclidean",
+                  "request_concurrency": args.request_concurrency,
+                  "batch_continuations": args.batch_continuations,
+                  "feature_batch_size": args.feature_batch_size,
                   "reward_protocol_version": REWARD_PROTOCOL_VERSION,
                   "require_complete_answers": True,
                   "adam_metric": "unavailable: new snapshot has no optimizer moments"}
     write_json(root / f"worker-{args.worker_index}-provenance.json", provenance)
     tokenizer = load_hf_tokenizer(args.model_path)
-    cfg = {"temperature": 1.0, "predictor": {"feature_batch_size": 1, "feature_mode": "legacy"}}
-    remote = RemoteLLM(args.server_url, args.server_model, root / "rollout-cache")
+    cfg = {"temperature": 1.0, "predictor": {
+        "feature_batch_size": args.feature_batch_size, "feature_mode": "legacy"}}
+    remote = RemoteLLM(args.server_url, args.server_model, root / "rollout-cache",
+                       request_concurrency=args.request_concurrency)
     engines, _ = make_gpu_engines(actor, remote, tokenizer, cfg, root / "unused-adapter")
 
     def repeated(prefix, count, max_new, rng):
@@ -320,7 +331,8 @@ def collect(args):
                 spec=method_spec("full_pg"), jl_dim=256, jl_seed=args.seed,
                 n_baseline=2 if args.smoke else args.n_baseline, store_features=not args.learning_completion,
                 store_trajectory_gradients=True, qualification_fn=qualify,
-                bundle_sink=sink, bundle_resume=resume, require_complete_answers=True)
+                bundle_sink=sink, bundle_resume=resume, require_complete_answers=True,
+                batch_continuations=args.batch_continuations)
             write_json(directory / "raw_problem.json", _bundles_from_engines.last[0])
             write_json(directory / "summary.json", {"status": "completed", "problem_id": rec.problem_id,
                        "n_bundles": len(bundles), "seed": seed, "finished_utc": utc(),
@@ -413,6 +425,10 @@ def main():
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--server-url", default="http://127.0.0.1:18013")
     parser.add_argument("--server-model", default="grace-thinking")
+    parser.add_argument("--request-concurrency", type=int, default=8)
+    parser.add_argument("--batch-continuations", action="store_true")
+    parser.add_argument("--gradient-checkpointing", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--feature-batch-size", type=int, default=1)
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--worker-index", type=int, default=0)
     parser.add_argument("--workers", type=int, default=2)
@@ -427,7 +443,8 @@ def main():
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--analyze-only", action="store_true")
     args = parser.parse_args()
-    if (args.n_problems < 1 or args.n_prefixes < 1 or args.n_continuations < 2
+    if (args.request_concurrency < 1 or args.feature_batch_size < 1
+            or args.n_problems < 1 or args.n_prefixes < 1 or args.n_continuations < 2
             or args.n_baseline < 1 or args.workers < 1 or not 0 <= args.worker_index < args.workers
             or any(t < 1 or t >= args.max_new_tokens for t in args.decision_tokens)):
         parser.error("invalid collection dimensions or decision positions")

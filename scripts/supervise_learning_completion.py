@@ -89,9 +89,18 @@ def main(argv=None):
     parser.add_argument("--gpus", type=int, nargs="+", default=[1, 2, 3],
                         help="one or two gradient GPUs followed by the rollout GPU")
     parser.add_argument("--port", type=int, default=18014)
+    parser.add_argument("--request-concurrency", type=int, default=8)
+    parser.add_argument("--vllm-memory-utilization", type=float, default=.40)
+    parser.add_argument("--max-num-seqs", type=int, default=16)
+    parser.add_argument("--batch-continuations", action="store_true")
+    parser.add_argument("--gradient-checkpointing", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--feature-batch-size", type=int, default=1)
     args = parser.parse_args(argv)
     if len(args.gpus) not in (2, 3) or len(set(args.gpus)) != len(args.gpus):
         parser.error("two or three distinct GPUs are required; the last GPU generates rollouts")
+    if (args.request_concurrency < 1 or not 0 < args.vllm_memory_utilization < 1
+            or args.max_num_seqs < 1 or args.feature_batch_size < 1):
+        parser.error("invalid execution memory budget or batch size")
     gradient_gpus, rollout_gpu = args.gpus[:-1], args.gpus[-1]
     config = build_run_config(args.config, {"backend": "gpu_verl", "method": "full_pg", "enable_thinking": True})
     audit = config["audit"]
@@ -113,8 +122,13 @@ def main(argv=None):
                  "--n-baseline", str(audit["n_baseline"]), "--max-new-tokens", str(max_new),
                  "--model-path", str(runtime.MODEL), "--server-url", runtime.URL,
                  "--server-model", "grace-thinking-exp-a", "--workers", str(len(gradient_gpus)),
+                 "--request-concurrency", str(args.request_concurrency),
+                 "--feature-batch-size", str(args.feature_batch_size),
+                 "--gradient-checkpointing" if args.gradient_checkpointing else "--no-gradient-checkpointing",
                  "--learning-completion",
                  "--decision-tokens", *map(str, audit["decision_grid"])]
+        if args.batch_continuations:
+            extra.append("--batch-continuations")
         write_json(root / "scope.json", {
             "experiment": "PR14 Experiment A: population learning completion vs answer resolution",
             "model": "Qwen/Qwen3-4B", "model_revision": REVISION, "enable_thinking": True,
@@ -122,6 +136,12 @@ def main(argv=None):
             "n_problems": count, "n_prefixes": audit["n_prefixes"], "n_continuations": audit["n_continuations"],
             "n_baseline": audit["n_baseline"], "decision_grid": audit["decision_grid"],
             "max_new_tokens": max_new, "primary_metric": "euclidean", "crossing_thresholds": None,
+            "request_concurrency": args.request_concurrency,
+            "execution": {"vllm_memory_utilization": args.vllm_memory_utilization,
+                          "max_num_seqs": args.max_num_seqs,
+                          "batch_continuations": args.batch_continuations,
+                          "gradient_checkpointing": args.gradient_checkpointing,
+                          "feature_batch_size": args.feature_batch_size},
             "gpu_roles": {**{str(gpu): f"gradient worker {index}"
                             for index, gpu in enumerate(gradient_gpus)},
                           str(rollout_gpu): "vLLM rollout server"}})
@@ -136,7 +156,8 @@ def main(argv=None):
         command = [runtime.VLLM, "serve", runtime.MODEL, "--host", "127.0.0.1", "--port", str(args.port),
                    "--served-model-name", "grace-thinking-exp-a", "--dtype", "bfloat16",
                    "--generation-config", "vllm", "--max-model-len", str(max_new + 1088),
-                   "--gpu-memory-utilization", "0.40", "--max-num-seqs", "16", "--enforce-eager",
+                   "--gpu-memory-utilization", str(args.vllm_memory_utilization),
+                   "--max-num-seqs", str(args.max_num_seqs), "--enforce-eager",
                    "--return-tokens-as-token-ids"]
         server = runtime.launch(command, root / "logs/vllm.log", rollout_gpu)
         while not runtime.ready():
