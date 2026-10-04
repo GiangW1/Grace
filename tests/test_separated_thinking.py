@@ -126,7 +126,7 @@ def test_cpu_analysis_accepts_collected_statistics(monkeypatch, tmp_path):
             bundle.qualification_n, bundle.qualification_mean_reward = 4, .25
             bundle.functional_recoverable, bundle.answer_emitted = False, False
             script.reduce_bundle(bundle, IsolatedRNG.create(17), directory, 17)
-    script.merge(SimpleNamespace(run_dir=str(tmp_path), seed=17))
+    script.merge(SimpleNamespace(run_dir=str(tmp_path), seed=17, allow_legacy=True))
     output = json.loads((tmp_path / "benefit/predictor_benefit_summary.json").read_text())
     assert output["status"] == "completed"
     assert output["n_observed_problems"] == 3
@@ -134,3 +134,16 @@ def test_cpu_analysis_accepts_collected_statistics(monkeypatch, tmp_path):
     for row in output["lopo"]:
         full = next(item for item in row["variance_cost"] if item["p"] == 1.)
         assert full["variance_cost_ratio"] == pytest.approx(1.)
+
+
+def test_merge_rejects_stale_problem_ids(tmp_path):
+    script = load_script("audit_separated_thinking")
+    script.write_json(tmp_path / "selection.json", {
+        "n_problems": 1,
+        "problems": [{"problem_id": "selected"}],
+        "reward_protocol_version": 3,
+    })
+    directory = script.problem_directory(tmp_path, "stale")
+    script.write_json(directory / "summary.json", {"status": "completed", "problem_id": "stale"})
+    with pytest.raises(ValueError, match="completed problem IDs"):
+        script.merge(SimpleNamespace(run_dir=str(tmp_path), seed=17, allow_legacy=False))

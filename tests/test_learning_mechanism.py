@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from grace_gc.audit.learning_stats import (
     _q_label,
@@ -94,6 +95,17 @@ def test_difficulty_selection_respects_preregistered_mix(tmp_path: Path):
               "h0": "hard", "h1": "hard"}
     assert {label: sum(labels[r.problem_id] == label for r in selected)
             for label in ("easy", "medium", "hard")} == {"easy": 1, "medium": 3, "hard": 2}
+
+
+def test_difficulty_selection_rejects_unavailable_preregistered_stratum(tmp_path: Path):
+    manifest = tmp_path / "difficulty.json"
+    manifest.write_text(json.dumps({"difficulty": {
+        "e0": "easy", "m0": "medium", "h0": "hard",
+    }}), encoding="utf-8")
+    records = [MathRecord(pid, pid, "1") for pid in ("e0", "m0", "h0")]
+    with pytest.raises(ValueError, match="cannot satisfy"):
+        select_records_difficulty(records, 3, manifest,
+                                   {"easy": 2, "medium": 1, "hard": 0}, seed=4)
 
 
 def test_colocated_vllm_cap_preserves_lower_explicit_limit():

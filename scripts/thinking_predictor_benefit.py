@@ -6,9 +6,11 @@ from pathlib import Path
 
 import numpy as np
 
-from grace_gc.audit.dynamic_score import feature_matrix, fit_prefix_coefficients
+from grace_gc.audit.dynamic_score import (difficulty_strata, feature_matrix,
+                                           fit_prefix_coefficients, load_diagonal_metric)
 from grace_gc.audit.expected_gain import fit_predict
 from grace_gc.audit.learning_stats import _strict_pre_answer
+from grace_gc.versions import sha256_array
 
 
 def moment_product(norms, gram, residuals, prefix, suffix, probability, weights=None):
@@ -46,7 +48,8 @@ def bootstrap_product(norms, gram, residuals, prefix, suffix, probability, probl
             "n_problem_clusters": len(ids), "unit": "problem_id with all its paths and positions"}
 
 
-def report_benefit(replay, destination, seed=17):
+def report_benefit(replay, destination, seed=17, metric_file=None,
+                   metric_name=None, difficulty_manifest=None):
     replay, destination = Path(replay), Path(destination)
     destination.mkdir(parents=True, exist_ok=True)
     rows = [json.loads(line) for line in (replay / "prefixes.jsonl").read_text().splitlines()]
@@ -54,15 +57,30 @@ def report_benefit(replay, destination, seed=17):
     a = np.load(replay / "half_mean_full_grads_a.npy", mmap_mode="r")
     b = np.load(replay / "half_mean_full_grads_b.npy", mmap_mode="r")
     basis = np.load(replay / "prefix_score_gradients.npy", mmap_mode="r")
-    norms = np.load(replay / "half_mean_full_norm_sq_b.npy")
-    coefficients = fit_prefix_coefficients(basis, a)[:, 0]
+    metric_path = metric_file or (replay / "metric_weights.npy")
+    weights = (load_diagonal_metric(metric_path, a.shape[1])
+               if Path(metric_path).is_file() else np.ones(a.shape[1], dtype=np.float64))
+    provenance_path = replay / "replay_provenance.json"
+    provenance = (json.loads(provenance_path.read_text(encoding="utf-8"))
+                  if provenance_path.is_file() else {})
+    metric_hash = sha256_array(weights)
+    recorded_metric_hash = provenance.get("metric_weights_sha256")
+    if recorded_metric_hash is not None and recorded_metric_hash != metric_hash:
+        raise ValueError("benefit metric differs from replay provenance")
+    resolved_metric_name = str(metric_name or provenance.get("metric_name") or
+                               ("euclidean" if np.all(weights == 1.0) else "diagonal_file"))
+    metric_norm_path = replay / "half_full_metric_norm_sq_b.npy"
+    norms = np.load(metric_norm_path if metric_norm_path.is_file() and not np.all(weights == 1.0)
+                    else replay / "half_mean_full_norm_sq_b.npy")
+    coefficients = fit_prefix_coefficients(basis, a, weights)[:, 0]
     hh, gb, gram = np.zeros(len(rows)), np.zeros(len(rows)), np.zeros((len(rows), len(rows)))
     for start in range(0, a.shape[1], 65536):
         score = np.asarray(basis[:, start:start+65536, 0])
         target = np.asarray(b[:, start:start+65536])
-        hh += np.sum(score * score, axis=1)
-        gb += np.sum(score * target, axis=1)
-        gram += target @ target.T
+        block_weights = weights[start:start+65536]
+        hh += np.sum(score * score * block_weights[None, :], axis=1)
+        gb += np.sum(score * target * block_weights[None, :], axis=1)
+        gram += (target * block_weights[None, :]) @ target.T
     prefix = np.asarray([row["prefix_tokens"] for row in rows], dtype=float)
     suffix = np.asarray([row["half_mean_suffix_cost"][1] for row in rows])
     predictions = {"independent_half_oracle": coefficients}
@@ -85,6 +103,11 @@ def report_benefit(replay, destination, seed=17):
     selections = {"all": np.arange(len(rows))}
     for t in sorted({row["t"] for row in rows}):
         selections[f"t={t}"] = np.flatnonzero(np.asarray([row["t"] for row in rows]) == t)
+    difficulty, difficulty_available = difficulty_strata(rows, difficulty_manifest)
+    if difficulty_available:
+        for name, indices in difficulty.items():
+            if name != "all":
+                selections[f"difficulty/{name}"] = indices
     strict = [i for i, row in enumerate(rows) if _strict_pre_answer(row)]
     if strict:
         selections["strict_pre_answer_undecided"] = np.asarray(strict)
@@ -93,7 +116,7 @@ def report_benefit(replay, destination, seed=17):
         residuals = norms - 2 * predicted * gb + predicted * predicted * hh
         for selection, indices in selections.items():
             energy = float(np.mean(norms[indices]))
-            item = {"model": name, "metric": "euclidean", "selection": selection,
+            item = {"model": name, "metric": resolved_metric_name, "selection": selection,
                     "evaluation": "leave_one_problem_out" if name != "independent_half_oracle" else "fit_on_A_evaluate_on_B",
                     "n_prefixes": len(indices), "n_problems": len(set(pids[indices])),
                     "residual_ratio_to_zero": None if energy == 0 else float(np.mean(residuals[indices])) / energy,
@@ -105,11 +128,19 @@ def report_benefit(replay, destination, seed=17):
                     **bootstrap_product(*inputs, pids[indices].tolist(), seed)})
             reports.append(item)
     output = {"status": "completed", "finished_utc": datetime.now(timezone.utc).isoformat(),
-              "model": "Qwen/Qwen3-4B", "enable_thinking": True, "n_original_problems": 32,
+              "model": "Qwen/Qwen3-4B", "enable_thinking": True,
+              "n_original_problems": len(set(pids)),
               "n_observed_problems": len(set(pids)), "n_prefixes": len(rows), "lopo": reports,
               "functional_qualification_available": True,
               "strict_pre_answer_undecided_prefixes": len(strict),
-              "adam_metric": "unavailable: fresh frozen LoRA has no optimizer history",
+              "metric_name": resolved_metric_name,
+              "metric_weights_sha256": metric_hash,
+              "difficulty_stratification": {
+                  "available": bool(difficulty_available),
+                  "manifest": (None if difficulty_manifest is None else
+                                str(Path(difficulty_manifest).resolve())),
+                  "definition": "predeclared problem difficulty; no outcome labels used",
+              },
               "scope": {"cost": "prefix plus probability-weighted suffix tokens; excludes GPU and feature overhead",
                         "variance": "empirical pooled B gradients, conditional on surviving decision-point prefixes",
                         "oracle": "noisy A-fit/B-score reference; not a theoretical bound",

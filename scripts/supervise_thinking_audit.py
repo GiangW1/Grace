@@ -20,6 +20,10 @@ PYTHON = Path("/SSD/00/wja/GRACE/runs/conda/envs/grace/bin/python")
 VLLM = PYTHON.with_name("vllm")
 CHECKPOINT = ROOT / "frozen-thinking-lora.npz"
 URL = "http://127.0.0.1:18013"
+METRIC_FILE = os.environ.get("GRACE_METRIC_FILE")
+METRIC_NAME = os.environ.get("GRACE_METRIC_NAME")
+DIFFICULTY_MANIFEST = os.environ.get("GRACE_DIFFICULTY_MANIFEST")
+DIFFICULTY_COUNTS = os.environ.get("GRACE_DIFFICULTY_COUNTS")
 ENVIRONMENT = {**os.environ, "OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1",
                "TOKENIZERS_PARALLELISM": "false", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"}
 children = []
@@ -63,6 +67,19 @@ def launch(command, log, gpu=None):
     return process
 
 
+def audit_flags():
+    flags = []
+    if METRIC_FILE:
+        flags += ["--metric-file", METRIC_FILE]
+    if METRIC_NAME:
+        flags += ["--metric-name", METRIC_NAME]
+    if DIFFICULTY_MANIFEST:
+        flags += ["--difficulty-manifest", DIFFICULTY_MANIFEST]
+    if DIFFICULTY_COUNTS:
+        flags += ["--difficulty-counts", DIFFICULTY_COUNTS]
+    return flags
+
+
 def cleanup(*_args):
     for process in children:
         if process.poll() is None:
@@ -84,6 +101,7 @@ def worker(index, gpu, smoke=False):
     log = ROOT / "logs" / (name + ".log")
     command = [PYTHON, "-u", REPO / "scripts/audit_separated_thinking.py", "--run-dir", directory,
                "--checkpoint", CHECKPOINT, "--worker-index", str(index)]
+    command.extend(audit_flags())
     if smoke:
         command.append("--smoke")
     while True:
@@ -130,10 +148,13 @@ def main():
                "model": "Qwen/Qwen3-4B", "model_revision": REVISION, "enable_thinking": True,
                "n_prefixes": 2, "n_continuations": 64, "n_baseline": 16,
                "max_new_tokens": 8192, "decision_grid": [1024, 2048],
-               "functional_probes": {"n": 4, "max_new_tokens": 32, "majority": .5},
+               "functional_probes": {"n": 4, "max_new_tokens": 32, "threshold": .5},
                "gpu_roles": {"0": "actor gradients", "2": "actor gradients", "3": "vLLM generation"},
-               "primary_metric": "euclidean", "adam_metric": "unavailable: no optimizer history",
-               "difficulty_manifest": "unavailable; original 32 problems retained"})
+               "primary_metric": METRIC_NAME or "euclidean",
+               "metric_file": METRIC_FILE,
+               "adam_metric": ("not_requested" if not METRIC_FILE else "fixed_diagonal_metric"),
+               "difficulty_manifest": DIFFICULTY_MANIFEST,
+               "difficulty_counts": DIFFICULTY_COUNTS})
     signal.signal(signal.SIGTERM, cleanup)
     signal.signal(signal.SIGINT, cleanup)
     try:
@@ -167,6 +188,7 @@ def main():
         status("offline_predictor_analysis")
         command = [PYTHON, "-u", REPO / "scripts/audit_separated_thinking.py", "--run-dir", ROOT / "collection",
                    "--checkpoint", CHECKPOINT, "--analyze-only"]
+        command.extend(audit_flags())
         if launch(command, ROOT / "logs/offline-analysis.log").wait():
             raise RuntimeError("offline analysis failed; see logs/offline-analysis.log")
         status("completed", summary=str(ROOT / "collection/benefit/predictor_benefit_summary.json"))

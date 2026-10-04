@@ -76,6 +76,10 @@ def summarize(root):
                                 "rescored_correct": sum(sum(row["rescored_rewards"]) for row in probes),
                                 "recoverable_prefixes": sum(row["functional_recoverable"] for row in probes),
                                 "strict_pre_answer_undecided_prefixes": sum(row["strict_pre_answer_undecided"] for row in probes)},
+              "gradient_statistics": {
+                  "valid_for_reward_protocol": False,
+                  "reason": "saved gradients were collected before reward protocol v3 and were not replayed",
+              },
               "original_reward_comparisons_p05": comparisons,
               "limitations": ["Published PR13 predictor and gradient statistics were collected before reward protocol v3 and must be recomputed.",
                               "Published PR13 functional probe files were collected before the prefilled Answer: scoring fix and are retained only as legacy evidence.",

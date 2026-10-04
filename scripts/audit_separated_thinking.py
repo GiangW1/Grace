@@ -26,6 +26,7 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
+from grace_gc.audit.dynamic_score import load_diagonal_metric
 from grace_gc.audit.prefix_audit import bundle_from_dict, bundle_to_dict
 from grace_gc.audit.run import _bundles_from_engines
 from grace_gc.core.rng import IsolatedRNG
@@ -36,6 +37,7 @@ from grace_gc.data.math_data import (
     selection_manifest,
 )
 from grace_gc.data.tokenize import encode_records_hf, load_hf_tokenizer
+from grace_gc.data.reward import REWARD_PROTOCOL_VERSION
 from grace_gc.trainer.checkpoint import load_checkpoint, save_checkpoint
 from grace_gc.trainer.state_io import load_numpy_module_state, numpy_module_state
 from grace_gc.versions import sha256_array, sha256_file, sha256_named
@@ -148,10 +150,16 @@ class RemoteLLM:
             return list(pool.map(one, zip(prompts, params)))
 
 
-def reduce_bundle(bundle, rng, directory, seed):
+def reduce_bundle(bundle, rng, directory, seed, metric=None, metric_name="euclidean"):
     target = prefix_directory(directory, bundle.path_id, bundle.t)
     target.mkdir(parents=True, exist_ok=True)
     gradients = np.asarray(bundle.trajectory_grads)
+    weights = (np.ones(gradients.shape[1], dtype=np.float64) if metric is None else
+               np.asarray(metric, dtype=np.float64).reshape(-1))
+    if (weights.shape != (gradients.shape[1],) or
+            not np.all(np.isfinite(weights)) or np.any(weights < 0.0) or
+            not np.any(weights > 0.0)):
+        raise ValueError("metric weights must be finite, nonnegative, and match trajectory dimension")
     order_seed = int.from_bytes(hashlib.sha256(
         f"{seed}:{bundle.problem_id}:{bundle.path_id}:{bundle.t}".encode()).digest()[:4], "little")
     order = np.random.default_rng(order_seed).permutation(len(gradients))
@@ -164,6 +172,10 @@ def reduce_bundle(bundle, rng, directory, seed):
         for index in indices:
             mean += gradients[index] / len(indices)
         save_array(target / f"mean_{half}.npy", mean)
+    half_metric_norm_sq = [
+        float(np.mean(np.sum(gradients[indices] * gradients[indices] * weights[None, :], axis=1)))
+        for indices in halves
+    ]
     save_array(target / "prefix_score.npy", bundle.prefix_score_grad)
     raw.update(enable_thinking=True,
                normal_q_mean_reward=float(np.mean(bundle.rewards[halves[0]])),
@@ -174,6 +186,10 @@ def reduce_bundle(bundle, rng, directory, seed):
                half_mean_suffix_cost=[float(np.mean(bundle.suffix_cost[part])) for part in halves],
                half_mean_full_norm_sq=[float(np.mean(np.asarray(bundle.true_grad_norm_sq)[part]))
                                        for part in halves],
+               half_full_metric_norm_sq=half_metric_norm_sq,
+               metric_name=str(metric_name),
+               metric_weights_sha256=sha256_array(weights),
+               reward_protocol_version=REWARD_PROTOCOL_VERSION,
                n_continuations=len(gradients), rng_after=rng.state_dict(),
                sufficient_statistics="Full-space FP64 A/B means, second moments and prefix score; JL only for display")
     # Publishing metadata last makes each completed prefix the resume unit.
@@ -198,14 +214,33 @@ def collect(args):
     for path in sorted(Path(args.data_dir).glob("shard-*.jsonl")):
         records.extend(load_math_records(path))
     records = apply_solve_instruction(records)
+    difficulty_manifest_path = None
+    difficulty_manifest_hash = None
+    requested_difficulty_counts = None
+    actual_difficulty_counts = None
+    difficulty_mapping = None
     if args.difficulty_manifest:
         counts = (None if args.difficulty_counts is None
                   else json.loads(args.difficulty_counts))
         if counts is not None and not isinstance(counts, dict):
             raise ValueError("--difficulty-counts must be a JSON object")
+        difficulty_manifest_path = str(Path(args.difficulty_manifest).resolve())
+        difficulty_manifest_hash = sha256_file(args.difficulty_manifest)
+        requested_difficulty_counts = None if counts is None else {
+            label: int(counts[label]) for label in ("easy", "medium", "hard")
+        }
         records = select_records_difficulty(
             records, args.n_problems, args.difficulty_manifest, counts, seed=args.seed
         )
+        payload = json.loads(Path(args.difficulty_manifest).read_text(encoding="utf-8"))
+        difficulty_mapping = payload.get("difficulty", payload) if isinstance(payload, dict) else None
+        if not isinstance(difficulty_mapping, dict):
+            raise ValueError("difficulty manifest must map problem IDs to easy/medium/hard")
+        actual_difficulty_counts = {
+            label: sum(1 for record in records
+                       if str(difficulty_mapping.get(str(record.problem_id), "")).lower() == label)
+            for label in ("easy", "medium", "hard")
+        }
         selection = "difficulty"
     else:
         if len(records) != args.n_problems or len({rec.problem_id for rec in records}) != args.n_problems:
@@ -220,8 +255,20 @@ def collect(args):
     # only intentional exception and should advertise its one-problem scope.
     if args.smoke or args.worker_index == 0:
         manifest_records = records if args.smoke else selected_records
-        write_json(root / "selection.json", selection_manifest(
-            manifest_records, selection, args.seed))
+        manifest_difficulty_counts = (None if difficulty_mapping is None else {
+            label: sum(1 for record in manifest_records
+                       if str(difficulty_mapping.get(str(record.problem_id), "")).lower() == label)
+            for label in ("easy", "medium", "hard")
+        })
+        selection_payload = selection_manifest(manifest_records, selection, args.seed)
+        selection_payload.update(
+            difficulty_manifest=difficulty_manifest_path,
+            difficulty_manifest_sha256=difficulty_manifest_hash,
+            difficulty_counts=requested_difficulty_counts,
+            actual_difficulty_counts=manifest_difficulty_counts,
+            reward_protocol_version=REWARD_PROTOCOL_VERSION,
+        )
+        write_json(root / "selection.json", selection_payload)
     write_json(root / f"worker-{args.worker_index}-status.json", {
         "status": "loading_actor", "started_utc": utc(), "gpu": os.environ.get("CUDA_VISIBLE_DEVICES"),
         "problem_ids": [rec.problem_id for rec in records]})
@@ -229,6 +276,18 @@ def collect(args):
     actor = load_lora_actor(args.model_path, LORA)
     named = named_lora_params(actor)
     layout = collect_lora_layout(named)
+    metric_file = None if args.metric_file is None else Path(args.metric_file)
+    if metric_file is None:
+        metric = np.ones(layout.dim, dtype=np.float64)
+        metric_name = str(args.metric_name or "euclidean")
+    else:
+        metric = load_diagonal_metric(metric_file, layout.dim)
+        sidecar = metric_file.with_suffix(".json")
+        sidecar_name = None
+        if sidecar.is_file():
+            sidecar_payload = json.loads(sidecar.read_text(encoding="utf-8"))
+            sidecar_name = sidecar_payload.get("metric_name")
+        metric_name = str(args.metric_name or sidecar_name or "diagonal_file")
     checkpoint = Path(args.checkpoint)
     if checkpoint.exists():
         payload = load_checkpoint(checkpoint)
@@ -244,6 +303,9 @@ def collect(args):
                                     "model_revision": REVISION, "spec": "full_pg", "step": 0,
                                     "layout_dim": layout.dim, "layout_names": layout.names(),
                                     "origin": "Fresh zero-B LoRA on post-trained Qwen3-4B; no optimizer history"})
+    metric_path = root / "metric_weights.npy"
+    if not metric_path.is_file() or args.worker_index == 0 or args.smoke:
+        save_array(metric_path, metric)
     provenance = {"model": "Qwen/Qwen3-4B", "model_revision": REVISION,
                   "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO, text=True).strip(),
                   "audit_source_sha256": sha256_file(REPO / "grace_gc/audit/run.py"),
@@ -251,8 +313,16 @@ def collect(args):
                   "checkpoint_sha256": sha256_file(checkpoint), "checkpoint": str(checkpoint),
                   "layout_dim": layout.dim, "layout_names": layout.names(), "layout_sha256": layout_hash(layout),
                   "actor_numerics": actor_numerics(actor), "enable_thinking": True,
-                  "temperature": 1.0, "metric": "euclidean",
-                  "adam_metric": "unavailable: new snapshot has no optimizer moments"}
+                  "temperature": 1.0, "metric": metric_name,
+                  "metric_file": (None if metric_file is None else str(metric_file.resolve())),
+                  "metric_weights_sha256": sha256_array(metric),
+                  "adam_metric": ("not_requested" if metric_name == "euclidean"
+                                  else "fixed_diagonal_metric"),
+                  "difficulty_manifest": difficulty_manifest_path,
+                  "difficulty_manifest_sha256": difficulty_manifest_hash,
+                  "difficulty_counts": requested_difficulty_counts,
+                  "actual_difficulty_counts": actual_difficulty_counts,
+                  "reward_protocol_version": REWARD_PROTOCOL_VERSION}
     write_json(root / f"worker-{args.worker_index}-provenance.json", provenance)
     tokenizer = load_hf_tokenizer(args.model_path)
     cfg = {"temperature": 1.0, "predictor": {"feature_batch_size": 1, "feature_mode": "legacy"}}
@@ -312,7 +382,7 @@ def collect(args):
                 target = prefix_directory(directory, bundle.path_id, bundle.t)
                 if key in probe_records:
                     write_json(target / "functional_probes.json", probe_records[key])
-                reduce_bundle(bundle, rng, directory, args.seed)
+                reduce_bundle(bundle, rng, directory, args.seed, metric=metric, metric_name=metric_name)
                 write_json(root / f"worker-{args.worker_index}-status.json", {
                     "status": "collecting", "updated_utc": utc(), "problem_id": rec.problem_id,
                     "problem_index": problem_index, "n_assigned_problems": len(records),
@@ -353,19 +423,61 @@ def merge(args):
     directories = sorted((root / "problems").glob("*/path-*/bundle.json"))
     summaries = list((root / "problems").glob("*/summary.json"))
     selection_path = root / "selection.json"
+    allow_legacy = bool(getattr(args, "allow_legacy", False))
     if selection_path.is_file():
         selection = json.loads(selection_path.read_text(encoding="utf-8"))
         expected_problems = int(selection["n_problems"])
+        if (selection.get("reward_protocol_version") != REWARD_PROTOCOL_VERSION
+                and not allow_legacy):
+            raise ValueError(
+                "selection manifest is not reward protocol v3; rerun collection "
+                "or pass --allow-legacy for explicitly unverified diagnostics"
+            )
+        expected_problem_ids = {str(row["problem_id"])
+                                for row in selection.get("problems", [])}
+        if len(expected_problem_ids) != expected_problems:
+            raise ValueError("selection manifest has duplicate or missing problem IDs")
     else:
         # PR13 runs predate the frozen selection manifest; preserve their
-        # analysis path while making the missing provenance explicit.
+        # analysis path only when the caller explicitly opts into legacy data.
+        if not allow_legacy:
+            raise ValueError(
+                "run lacks a frozen selection/reward manifest; rerun collection "
+                "before analysis or pass --allow-legacy for diagnostics"
+            )
         expected_problems = len(summaries)
         selection = {"selection": "legacy_unrecorded", "n_problems": expected_problems}
+        expected_problem_ids = None
     if len(summaries) != expected_problems:
         raise ValueError(f"only {len(summaries)} of {expected_problems} selected problems are complete")
+    summary_payloads = [json.loads(path.read_text(encoding="utf-8")) for path in summaries]
+    if expected_problem_ids is not None:
+        summary_problem_ids = {str(row.get("problem_id")) for row in summary_payloads}
+        if summary_problem_ids != expected_problem_ids:
+            raise ValueError(
+                "completed problem IDs differ from selection manifest: "
+                f"missing={sorted(expected_problem_ids - summary_problem_ids)} "
+                f"extra={sorted(summary_problem_ids - expected_problem_ids)}"
+            )
     replay = root / "replay"
     replay.mkdir(exist_ok=True)
     rows = [json.loads(path.read_text()) for path in directories]
+    if expected_problem_ids is not None:
+        row_problem_ids = {str(row.get("problem_id")) for row in rows}
+        if row_problem_ids != expected_problem_ids:
+            raise ValueError(
+                "bundle problem IDs differ from selection manifest: "
+                f"missing={sorted(expected_problem_ids - row_problem_ids)} "
+                f"extra={sorted(row_problem_ids - expected_problem_ids)}"
+            )
+        expected_protocol = selection.get("reward_protocol_version")
+        if expected_protocol is not None:
+            observed = {row.get("reward_protocol_version") for row in rows}
+            if observed != {expected_protocol}:
+                raise ValueError(
+                    f"bundles use reward protocols {sorted(observed, key=str)}, "
+                    f"expected {expected_protocol}; rerun collection before analysis"
+                )
     provenance = json.loads((root / "worker-0-provenance.json").read_text())
     dimension = provenance["layout_dim"]
     if not rows:
@@ -384,24 +496,41 @@ def merge(args):
                 matrix[index] = np.load(source, mmap_mode="r")
         matrix.flush()
         del matrix
+    metric_path = root / "metric_weights.npy"
+    metric = (load_diagonal_metric(metric_path, dimension)
+              if metric_path.is_file() else np.ones(dimension, dtype=np.float64))
+    metric_name = str(provenance.get("metric") or "euclidean")
+    save_array(replay / "metric_weights.npy", metric)
     for index, half in enumerate(("a", "b")):
-        save_array(replay / f"half_mean_full_norm_sq_{half}.npy",
-                   np.asarray([row["half_mean_full_norm_sq"][index] for row in rows]))
+        full_norm = np.asarray([row["half_mean_full_norm_sq"][index] for row in rows])
+        metric_norm = np.asarray([
+            (row.get("half_full_metric_norm_sq") or row["half_mean_full_norm_sq"])[index]
+            for row in rows
+        ])
+        save_array(replay / f"half_mean_full_norm_sq_{half}.npy", full_norm)
+        save_array(replay / f"half_full_metric_norm_sq_{half}.npy", metric_norm)
     compact = [{key: value for key, value in row.items() if key not in
                 {"rng_after", "grads", "suffix_texts", "continuation_records", "baseline_samples", "prefix_text"}}
                for row in rows]
     (replay / "prefixes.jsonl").write_text("".join(json.dumps(row, separators=(",", ":")) + "\n" for row in compact))
-    save_array(replay / "euclidean_weights.npy", np.ones(dimension))
-    write_json(replay / "replay_provenance.json", provenance)
+    replay_provenance = {**provenance, "metric_name": metric_name,
+                         "metric_weights_sha256": sha256_array(metric),
+                         "reward_protocol_version": provenance.get(
+                             "reward_protocol_version", selection.get("reward_protocol_version"))}
+    write_json(replay / "replay_provenance.json", replay_provenance)
     basis = np.load(replay / "prefix_score_gradients.npy", mmap_mode="r")
     write_json(replay / "score_gradient_provenance.json", {
-        **provenance, "shape": list(basis.shape), "score_gradients_sha256": sha256_array(basis),
+        **replay_provenance, "shape": list(basis.shape), "score_gradients_sha256": sha256_array(basis),
         "replay_prefixes_sha256": sha256_file(replay / "prefixes.jsonl"),
         "prefix_keys_sha256": prefix_keys_sha256(compact)})
     write_json(replay / "preparation_summary.json", {
         "status": "completed", "n_original_problems": expected_problems, "n_prefixes": len(rows),
         "n_continuations": sum(row["n_continuations"] for row in rows),
         "enable_thinking": True, "functional_qualification_available": True,
+        "metric_name": metric_name, "metric_weights_sha256": sha256_array(metric),
+        "difficulty_manifest": selection.get("difficulty_manifest"),
+        "difficulty_manifest_sha256": selection.get("difficulty_manifest_sha256"),
+        "reward_protocol_version": replay_provenance.get("reward_protocol_version"),
         "verification": "Collected features, prefix score and gradient moments from the same frozen actor"})
     analysis = root / "analysis"
     analysis.mkdir(exist_ok=True)
@@ -412,19 +541,27 @@ def merge(args):
                  "--models", "zero,constant,ridge,mlp64,mlp256"])]
     for name, script, extra in reports:
         command = [sys.executable, str(REPO / "scripts" / script), "--replay-dir", str(replay),
-                   "--gradient-target", "trajectory", "--metric-file", str(replay / "euclidean_weights.npy"),
+                   "--gradient-target", "trajectory", "--metric-file", str(replay / "metric_weights.npy"),
                    "--run-dir", str(analysis / name), *extra]
+        if selection.get("difficulty_manifest"):
+            command.extend(["--difficulty-manifest", str(selection["difficulty_manifest"])])
         with (analysis / f"{name}.log").open("w") as log:
             subprocess.run(command, cwd=REPO, stdout=log, stderr=subprocess.STDOUT, check=True)
     with (analysis / "mechanism.log").open("w") as log:
-        subprocess.run([sys.executable, str(REPO / "scripts/analyze_learning_mechanism.py"),
-                        "--replay-dir", str(replay), "--metric-name", "euclidean", "--bootstrap", "1000",
-                        "--run-dir", str(analysis / "mechanism")], cwd=REPO,
-                       stdout=log, stderr=subprocess.STDOUT, check=True)
+        command = [sys.executable, str(REPO / "scripts/analyze_learning_mechanism.py"),
+                   "--replay-dir", str(replay), "--metric-file", str(replay / "metric_weights.npy"),
+                   "--metric-name", metric_name, "--bootstrap", "1000",
+                   "--run-dir", str(analysis / "mechanism")]
+        if selection.get("difficulty_manifest"):
+            command.extend(["--difficulty-manifest", str(selection["difficulty_manifest"])])
+        subprocess.run(command, cwd=REPO, stdout=log, stderr=subprocess.STDOUT, check=True)
     from thinking_predictor_benefit import report_benefit
-    report_benefit(replay, root / "benefit", args.seed)
+    report_benefit(replay, root / "benefit", args.seed,
+                   metric_file=replay / "metric_weights.npy", metric_name=metric_name,
+                   difficulty_manifest=selection.get("difficulty_manifest"))
     write_json(root / "analysis_status.json", {"status": "completed", "finished_utc": utc(),
                "n_original_problems": expected_problems, "n_prefixes": len(rows), "enable_thinking": True,
+               "metric_name": metric_name, "difficulty_manifest": selection.get("difficulty_manifest"),
                "summary": str(root / "benefit/predictor_benefit_summary.json")})
 
 
@@ -434,6 +571,10 @@ def main():
     parser.add_argument("--model-path", default="/SSD/00/wja/GRACE/data/Qwen3-4B")
     parser.add_argument("--data-dir", default="/SSD/00/wja/grace-pr13-20260929/input-shards-32")
     parser.add_argument("--checkpoint", required=True)
+    parser.add_argument("--metric-file", default=None,
+                        help="fixed diagonal metric weights; saved into replay before analysis")
+    parser.add_argument("--metric-name", default=None,
+                        help="name recorded for --metric-file (otherwise read its JSON sidecar)")
     parser.add_argument("--server-url", default="http://127.0.0.1:18013")
     parser.add_argument("--server-model", default="grace-thinking")
     parser.add_argument("--seed", type=int, default=17)
@@ -445,6 +586,8 @@ def main():
                         help="JSON object such as {\"easy\":8,\"medium\":16,\"hard\":8}")
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--analyze-only", action="store_true")
+    parser.add_argument("--allow-legacy", action="store_true",
+                        help="analyze pre-v3 runs only as explicitly unverified diagnostics")
     args = parser.parse_args()
     if args.analyze_only:
         merge(args)

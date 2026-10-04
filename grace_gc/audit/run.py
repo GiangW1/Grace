@@ -476,8 +476,13 @@ def _bundles_from_engines(
                         finished=bool(finished[loc]),
                         prefix_tokens=max(len(prefix) - prompt_len, 0),
                         answer_emitted=answer_already_emitted(prefix_text),
+                        # Keep q-strata cross-fitted: replay materializes the
+                        # first continuation half as A and reserves B for
+                        # evaluation. Using all rewards here would let the
+                        # evaluation half define the strict subset.
                         normal_q_mean_reward=(
-                            float(np.mean(rewards)) if rewards else None
+                            float(np.mean(rewards[:max(1, len(rewards) // 2)]))
+                            if rewards else None
                         ),
                         qualification_mean_reward=qualification.get("qualification_mean_reward"),
                         qualification_n=qualification.get("qualification_n"),
