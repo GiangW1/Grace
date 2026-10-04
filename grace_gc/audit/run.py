@@ -207,6 +207,8 @@ def _bundles_from_engines(
     store_trajectory_gradients: bool = False,
     trajectory_dir: str | Path | None = None,
     qualification_fn=None,
+    bundle_sink=None,
+    bundle_resume=None,
 ) -> list[PrefixBundle]:
     from grace_gc.core.rng import IsolatedRNG
 
@@ -343,6 +345,13 @@ def _bundles_from_engines(
             for loc, prefix in enumerate(prefixes):
                 prompt_len = prompt_lens_t[loc]
                 idx = path_idx[loc]
+                if bundle_resume is not None:
+                    cached = bundle_resume(rec.problem_id, f"{rec.problem_id}:{idx}", t, rng)
+                    if cached is not None:
+                        if cached.prefix_token_ids != list(prefix):
+                            raise ValueError("resumed audit prefix differs from regenerated path")
+                        bundles.append(cached)
+                        continue
                 rem = max(0, int(max_new) - (len(prefix) - prompt_len))
                 if finished[loc] or rem <= 0:
                     # One observation: cloning n_cont identical rows would overweight this prefix.
@@ -350,6 +359,10 @@ def _bundles_from_engines(
                     fulls = [prefix]
                     finish_reasons = [None]
                     suffix_seeds = [None]
+                elif callable(getattr(engines, "continue_repeated", None)):
+                    fulls, finish_reasons, suffix_seeds = engines.continue_repeated(prefix, n_cont, rem, rng)
+                    if any(len(values) != n_cont for values in (fulls, finish_reasons, suffix_seeds)):
+                        raise ValueError("batched audit continuation count differs from n_cont")
                 else:
                     fulls = []
                     finish_reasons = []
@@ -487,6 +500,8 @@ def _bundles_from_engines(
                 )
                 if trajectory_dir is not None and trajectory_arr is not None:
                     _spill_trajectory_arrays(bundles[-1], Path(trajectory_dir), len(bundles) - 1)
+                if bundle_sink is not None:
+                    bundle_sink(bundles[-1], rng)
                 print(
                     f"phase=audit_prefix_done problem={record_index}/{len(records)} "
                     f"t={t} path={idx} n_bundles={len(bundles)}",

@@ -1,0 +1,9 @@
+{
+  "status": "completed",
+  "n_original_problems": 32,
+  "n_prefixes": 128,
+  "n_continuations": 8192,
+  "enable_thinking": true,
+  "functional_qualification_available": true,
+  "verification": "Collected features, prefix score and gradient moments from the same frozen actor"
+}

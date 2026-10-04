@@ -1,0 +1,10 @@
+{
+  "kind": "learning_mechanism",
+  "started": "2026-10-01T13:20:56.052486+00:00",
+  "run_dir": "/SSD/01/wja/grace-pr13-thinking-20261001/collection/analysis/mechanism",
+  "requested_run_dir": "/SSD/01/wja/grace-pr13-thinking-20261001/collection/analysis/mechanism",
+  "redirected": false,
+  "finished": "2026-10-01T13:21:01.161858+00:00",
+  "status": "completed",
+  "exit_code": 0
+}

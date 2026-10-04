@@ -1,0 +1,5 @@
+{
+  "commit": "a1fa99360a3823d0b3242def9255055f7f3f378c",
+  "status": " M grace_gc/audit/run.py\n?? scripts/audit_separated_thinking.py\n?? scripts/download_thinking_model.py\n?? scripts/supervise_thinking_audit.py\n?? scripts/thinking_predictor_benefit.py\n?? tests/test_separated_thinking.py\n",
+  "diff_sha256": "a5ceb7fa457b07b31a11ae7a55d9266dd45ea63c358deb986e986e8fcfdd31a7"
+}

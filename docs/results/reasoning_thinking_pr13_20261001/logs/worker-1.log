@@ -1,0 +1,97 @@
+Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 3/3 [00:00<00:00, 83.30it/s]
+phase=audit_problem_begin problem=1/1 problem_id=186c94eb-3f6a-43b1-b2a4-f7dec58b7318 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=4
+phase=problem_completed worker=1 problem=1/16
+phase=audit_problem_begin problem=1/1 problem_id=e4eede97-5bed-4a2a-9b64-5de4e8cde3e8 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=4
+phase=problem_completed worker=1 problem=2/16
+phase=audit_problem_begin problem=1/1 problem_id=3e477408-f0be-488b-b64b-455c98f01220 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=4
+phase=problem_completed worker=1 problem=3/16
+phase=audit_problem_begin problem=1/1 problem_id=0ae83368-3a58-4faa-9ab6-91e989ac15e9 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=4
+phase=problem_completed worker=1 problem=4/16
+phase=audit_problem_begin problem=1/1 problem_id=6fe5bcfc-af5a-42d7-80c9-bcae028c835f n_bundles=0
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=4
+phase=problem_completed worker=1 problem=5/16
+phase=audit_problem_begin problem=1/1 problem_id=b426d104-244d-4831-a2c4-cd756b61700a n_bundles=0
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=4
+phase=problem_completed worker=1 problem=6/16
+phase=audit_problem_begin problem=1/1 problem_id=29f6a98f-0730-48f6-b637-2e902c24d9bd n_bundles=0
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=4
+phase=problem_completed worker=1 problem=7/16
+phase=audit_problem_begin problem=1/1 problem_id=06f17afd-4946-4188-8c5f-0d372bc3b07a n_bundles=0
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=4
+phase=problem_completed worker=1 problem=8/16
+phase=audit_problem_begin problem=1/1 problem_id=b7119f82-4161-4e79-8194-93596b4f2fa3 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=4
+phase=problem_completed worker=1 problem=9/16
+phase=audit_problem_begin problem=1/1 problem_id=983e41c8-805d-4669-9be6-11c1d5938192 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=4
+phase=problem_completed worker=1 problem=10/16
+phase=audit_problem_begin problem=1/1 problem_id=bf2cddfc-c4c0-4067-b320-3bb506875cf5 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=4
+phase=problem_completed worker=1 problem=11/16
+phase=audit_problem_begin problem=1/1 problem_id=96bd487f-c324-41b4-8015-f8234fe31bb4 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=4
+phase=problem_completed worker=1 problem=12/16
+phase=audit_problem_begin problem=1/1 problem_id=1d394a55-3ba5-40cd-90df-0eedf9a91e3b n_bundles=0
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=4
+phase=problem_completed worker=1 problem=13/16
+phase=audit_problem_begin problem=1/1 problem_id=ad6027e0-ad02-4d3f-8d6e-a69d711c44dc n_bundles=0
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=4
+phase=problem_completed worker=1 problem=14/16
+phase=audit_problem_begin problem=1/1 problem_id=c37bdb6f-39ba-48c8-896f-e4e1760bd040 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=4
+phase=problem_completed worker=1 problem=15/16
+phase=audit_problem_begin problem=1/1 problem_id=879b93ad-c7f5-4795-bc0a-3e9fe3c57566 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=4
+phase=problem_completed worker=1 problem=16/16
