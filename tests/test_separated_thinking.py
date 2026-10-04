@@ -368,6 +368,7 @@ def test_supervisor_assigns_all_problems_to_requested_gradient_workers(tmp_path,
     monkeypatch.setattr(script, "worker", worker)
     script.main(["--run-dir", str(tmp_path), "--data-dir", str(tmp_path / "inputs"),
                  "--model-path", str(model), "--port", "18099", "--request-concurrency", "16",
+                 "--n-continuations", "32",
                  "--gpus", *map(str, gpus)])
     assert servers == [gpus[-1]]
     assert sorted((index, gpu) for index, gpu, smoke, _extra in workers if not smoke) == list(enumerate(gpus[:-1]))
@@ -376,9 +377,30 @@ def test_supervisor_assigns_all_problems_to_requested_gradient_workers(tmp_path,
         assert extra[extra.index("--n-problems") + 1] == "32"
         assert extra[extra.index("--server-url") + 1] == "http://127.0.0.1:18099"
         assert extra[extra.index("--request-concurrency") + 1] == "16"
+        assert extra[extra.index("--n-continuations") + 1] == "32"
     scope = json.loads((tmp_path / "scope.json").read_text())
     assert set(scope["gpu_roles"]) == set(map(str, gpus))
     assert scope["n_problems"] == 32
     assert scope["request_concurrency"] == 16
+    assert scope["n_continuations"] == 32
     assert len(analyses) == 1 and "--analyze-only" in analyses[0]
     assert phases[-1][0] == "completed"
+
+
+def test_collection_scope_preserves_sample_count_on_resume(tmp_path):
+    script = load_script("audit_separated_thinking")
+    expected = script.prepare_collection_scope(tmp_path, 32)
+    assert expected["n_continuations"] == 32
+    assert script.prepare_collection_scope(tmp_path, 32) == expected
+    with pytest.raises(ValueError, match="parameters differ"):
+        script.prepare_collection_scope(tmp_path, 64)
+    assert json.loads((tmp_path / "collection_scope.json").read_text()) == expected
+
+
+def test_collection_scope_does_not_relabel_legacy_64_sample_results(tmp_path):
+    script = load_script("audit_separated_thinking")
+    script.write_json(tmp_path / "worker-0-provenance.json", {"enable_thinking": True})
+    with pytest.raises(ValueError, match="continuation count differs"):
+        script.prepare_collection_scope(tmp_path, 32)
+    assert not (tmp_path / "collection_scope.json").exists()
+    assert script.prepare_collection_scope(tmp_path, 64)["n_continuations"] == 64

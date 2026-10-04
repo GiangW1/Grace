@@ -233,6 +233,28 @@ def prepare_metric(root, metric):
             save_array(metric_path, metric)
 
 
+def prepare_collection_scope(root, n_continuations, *, smoke=False):
+    scope = {"n_prefixes": 1 if smoke else 2, "n_continuations": int(n_continuations),
+             "n_baseline": 2 if smoke else 16, "max_new_tokens": 8192,
+             "decision_grid": [64, 128] if smoke else [1024, 2048]}
+    path = root / "collection_scope.json"
+    with problem_lock(root / ".collection-scope.lock"):
+        if path.is_file():
+            if json.loads(path.read_text()) != scope:
+                raise ValueError("saved collection parameters differ; use a new run directory")
+        else:
+            for saved in root.glob("worker-*-provenance.json"):
+                prior = json.loads(saved.read_text())
+                count = prior.get("n_continuations", 2 if smoke else 64)
+                if count != n_continuations:
+                    raise ValueError("saved continuation count differs; use a new run directory")
+            for saved in root.glob("problems/*/path-*/bundle.json"):
+                if json.loads(saved.read_text()).get("n_continuations") != n_continuations:
+                    raise ValueError("saved continuation count differs; use a new run directory")
+            write_json(path, scope)
+    return scope
+
+
 def collect(args):
     import torch
     from grace_gc.backends.gpu_engine import make_gpu_engines
@@ -244,6 +266,8 @@ def collect(args):
 
     root = Path(args.run_dir)
     root.mkdir(parents=True, exist_ok=True)
+    collection_scope = prepare_collection_scope(
+        root, 2 if args.smoke else args.n_continuations, smoke=args.smoke)
     records = []
     for path in sorted(Path(args.data_dir).glob("shard-*.jsonl")):
         records.extend(load_math_records(path))
@@ -347,6 +371,7 @@ def collect(args):
                   "actor_numerics": actor_numerics(actor), "enable_thinking": True,
                   "temperature": 1.0, "metric": metric_name,
                   "request_concurrency": args.request_concurrency,
+                  **collection_scope,
                   "metric_file": (None if metric_file is None else str(metric_file.resolve())),
                   "metric_weights_sha256": sha256_array(metric),
                   "adam_metric": ("not_requested" if metric_name == "euclidean"
@@ -433,7 +458,8 @@ def collect(args):
                 return bundle_from_dict(raw)
 
             bundles = _bundles_from_engines(
-                [rec], engines, layout, 1 if args.smoke else 2, 2 if args.smoke else 64,
+                [rec], engines, layout, 1 if args.smoke else 2,
+                collection_scope["n_continuations"],
                 [64, 128] if args.smoke else [1024, 2048], 8192, seed, encode,
                 spec=method_spec("full_pg"), jl_dim=256, jl_seed=args.seed,
                 n_baseline=2 if args.smoke else 16, store_features=True,
@@ -636,6 +662,7 @@ def main():
     parser.add_argument("--worker-index", type=int, default=0)
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--n-problems", type=int, default=32)
+    parser.add_argument("--n-continuations", type=int, default=64)
     parser.add_argument("--difficulty-manifest", default=None)
     parser.add_argument("--difficulty-counts", default=None,
                         help="JSON object such as {\"easy\":8,\"medium\":16,\"hard\":8}")
@@ -646,6 +673,8 @@ def main():
     args = parser.parse_args()
     if args.request_concurrency < 1:
         parser.error("request concurrency must be positive")
+    if args.n_continuations < 2:
+        parser.error("A/B continuation statistics require at least two samples")
     if args.analyze_only:
         merge(args)
     else:

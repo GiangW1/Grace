@@ -151,6 +151,7 @@ def main(argv=None):
     parser.add_argument("--data-dir", default="/SSD/00/wja/grace-pr13-20260929/input-shards-32")
     parser.add_argument("--checkpoint")
     parser.add_argument("--n-problems", type=int, default=32)
+    parser.add_argument("--n-continuations", type=int, default=64)
     parser.add_argument("--request-concurrency", type=int, default=8)
     parser.add_argument("--gpus", type=int, nargs="+", default=[0, 2, 3],
                         help="one or two gradient GPUs followed by the rollout GPU")
@@ -162,6 +163,8 @@ def main(argv=None):
         parser.error("n_problems must be positive")
     if args.request_concurrency < 1:
         parser.error("request concurrency must be positive")
+    if args.n_continuations < 2:
+        parser.error("A/B continuation statistics require at least two samples")
     ROOT, MODEL = Path(args.run_dir).resolve(), Path(args.model_path).resolve()
     CHECKPOINT = Path(args.checkpoint).resolve() if args.checkpoint else ROOT / "frozen-thinking-lora.npz"
     URL = f"http://127.0.0.1:{args.port}"
@@ -169,12 +172,17 @@ def main(argv=None):
     extra = ["--workers", str(len(gradient_gpus)), "--data-dir", str(Path(args.data_dir).resolve()),
              "--n-problems", str(args.n_problems), "--model-path", str(MODEL),
              "--server-url", URL, "--server-model", "grace-thinking",
-             "--request-concurrency", str(args.request_concurrency)]
+             "--request-concurrency", str(args.request_concurrency),
+             "--n-continuations", str(args.n_continuations)]
     ROOT.mkdir(parents=True, exist_ok=True)
     (ROOT / "logs").mkdir(exist_ok=True)
+    if (ROOT / "scope.json").is_file():
+        saved_scope = json.loads((ROOT / "scope.json").read_text())
+        if saved_scope.get("n_continuations", 64) != args.n_continuations:
+            raise ValueError("saved continuation count differs; use a new run directory")
     write_json(ROOT / "scope.json", {"n_problems": args.n_problems, "append_32": False,
                "model": "Qwen/Qwen3-4B", "model_revision": REVISION, "enable_thinking": True,
-               "n_prefixes": 2, "n_continuations": 64, "n_baseline": 16,
+               "n_prefixes": 2, "n_continuations": args.n_continuations, "n_baseline": 16,
                "request_concurrency": args.request_concurrency,
                "max_new_tokens": 8192, "decision_grid": [1024, 2048],
                "functional_probes": {"n": 4, "max_new_tokens": 32, "threshold": .5},
