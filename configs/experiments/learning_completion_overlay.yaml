@@ -1,0 +1,19 @@
+# Experiment A overlay (population learning completion vs answer resolution).
+# Stack it after the audit config of the model being studied, e.g.
+#   --config configs/default.yaml --config <base or thinking audit>.yaml \
+#   --config configs/experiments/learning_completion_overlay.yaml
+# It only changes the audit sample shape; reward, sampling and the actor stay
+# as in the stacked configs. Grid points above max_new_tokens are dropped and
+# recorded by the audit.
+audit:
+  n_problems: 96
+  # Used only with --difficulty-manifest; must sum to n_problems.
+  difficulty_counts: {easy: 24, medium: 48, hard: 24}
+  n_prefixes: 4
+  n_continuations: 8
+  n_baseline: 16
+  decision_grid: [256, 512, 1024, 2048, 4096]
+  store_trajectory_gradients: true
+analysis:
+  gradient_target: trajectory
+  require_pre_emit: true
