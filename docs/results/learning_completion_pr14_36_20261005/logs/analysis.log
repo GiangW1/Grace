@@ -1,0 +1,34 @@
+gram t=256: computed from 144 prefixes
+gram t=512: computed from 144 prefixes
+gram t=1024: computed from 144 prefixes
+gram t=2048: computed from 144 prefixes
+gram t=4096: computed from 124 prefixes
+run_dir=/SSD/00/wja/grace-pr14-learning-completion-36-20261004-run/analysis
+[all] view=pooled
+      t  probs   F_pop  resid_L   rho_A     gap  F_prefix
+    256     36     -     -   1.028     -   0.851
+    512     36  -0.583   3.366   0.939  -2.428   0.593
+   1024     36  -0.784   0.611   0.889   0.278   1.428
+   2048     36     -     -   0.781     -   0.980
+   4096     32   0.830   0.148   0.456   0.308   0.997
+[text_pre_answer] view=pooled
+      t  probs   F_pop  resid_L   rho_A     gap  F_prefix
+    256     36     -     -   1.028     -   0.851
+    512     36  -0.583   3.366   0.939  -2.428   0.593
+   1024     36  -0.784   0.611   0.889   0.278   1.428
+   2048     36     -     -   0.781     -   0.980
+   4096     32   0.830   0.148   0.456   0.308   0.997
+[functional_pre_answer] view=pooled
+      t  probs   F_pop  resid_L   rho_A     gap  F_prefix
+    256     33     -     -   1.016     -   0.880
+    512     33  -0.557   2.297   0.935  -1.361   0.835
+   1024     31     -     -   0.910     -   0.968
+   2048     21     -     -   0.662     -   1.001
+   4096     15     -     -   0.278     -   1.002
+[undecided_half_a] view=half_b
+      t  probs   F_pop  resid_L   rho_A     gap  F_prefix
+    256     12     -     -   1.000     -     -
+    512     11     -     -   1.058     -     -
+   1024     13     -     -   0.889     -     -
+   2048     10   0.064   0.546   0.867   0.321     -
+   4096      4   0.468   0.133   0.642   0.508     -

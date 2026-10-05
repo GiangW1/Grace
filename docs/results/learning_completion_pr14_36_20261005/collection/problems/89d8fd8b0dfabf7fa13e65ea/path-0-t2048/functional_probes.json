@@ -1,0 +1,89 @@
+[
+  {
+    "text": " 100",
+    "reward": 0.0,
+    "seed": 2008038347,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 100",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 100",
+    "reward": 0.0,
+    "seed": 1764871885,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 100",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 100",
+    "reward": 0.0,
+    "seed": 1785167472,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 100",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 100*a1 if k is odd, but we have to find a1 such that a_{20} = a_{23}.\n\n",
+    "reward": 0.0,
+    "seed": 1658807112,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 100*a1 if k is odd, but we have to find a1 such that a_{20} = a_{23}.\n\n",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      33742,
+      16,
+      421,
+      595,
+      374,
+      10322,
+      11,
+      714,
+      582,
+      614,
+      311,
+      1477,
+      264,
+      16,
+      1741,
+      429,
+      264,
+      15159,
+      17,
+      15,
+      92,
+      284,
+      264,
+      15159,
+      17,
+      18,
+      92,
+      382
+    ]
+  }
+]

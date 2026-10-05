@@ -1,0 +1,105 @@
+method: full_pg
+seed: 17
+split_seed: 17
+n_start: 8
+n_prompts: 4
+num_steps: 1
+prompt_max_tokens: 1024
+decision_tokens: 1024
+max_new_tokens: 8192
+temperature: 1.0
+enable_thinking: true
+eval_temperature: 0.6
+eval_top_p: 0.95
+allocation:
+  p_min: 0.2
+  beta: 0.5
+  bisection_iters: 20
+predictor:
+  k: 8
+  hidden_coord: 256
+  hidden_risk: 64
+  lr: 0.001
+  epochs: 2
+  warmup_steps: 20
+  audit_s: 0.125
+  reservoir_size: 512
+  refresh_every: 32
+  constant_cost: true
+  coord_kind: mlp
+  ridge_l2: 1.0
+  use_affine: true
+  shrink_m: true
+  align_basis: true
+lora:
+  rank: 16
+  alpha: 32.0
+  dropout: 0.0
+  gradient_checkpointing: true
+  targets:
+  - q_proj
+  - v_proj
+optim:
+  lr: 0.0001
+  betas:
+  - 0.9
+  - 0.99
+  weight_decay: 0.0
+  grad_clip: 1.0
+colocated_vllm_memory_utilization: 0.25
+colocated_vllm_max_num_seqs: 1
+format_warmup:
+  steps: 256
+  batch_size: 8
+baseline:
+  ema_alpha: 0.7
+  prescan: 4
+hardware:
+  name: a100
+  n_gpu: 1
+  gpu_memory_gb: 80
+analysis:
+  answer_undecided: 0.15
+  nonzero_signal_kappa: 0.05
+  delta_answer: 0.05
+  epsilon_learn: 0.2
+  wilson_lo: 0.05
+  wilson_hi: 0.95
+  require_pre_emit: true
+  gradient_target: trajectory
+backend: gpu_verl
+eval:
+  k: 4
+  n: 4
+  max_new_tokens: 4096
+  temperature: 0.6
+  top_p: 0.95
+experiment_variant: reasoning_mechanism_audit
+audit:
+  n_problems: 96
+  n_prefixes: 4
+  n_continuations: 8
+  n_baseline: 16
+  decision_grid:
+  - 256
+  - 512
+  - 1024
+  - 2048
+  - 4096
+  max_new_tokens: 8192
+  difficulty_counts:
+    easy: 24
+    medium: 48
+    hard: 24
+  store_features: true
+  store_trajectory_gradients: true
+  functional_qualification:
+    enabled: true
+    n: 4
+    max_new_tokens: 32
+    majority: 0.5
+  require_complete_answers: true
+vllm:
+  tensor_parallel: 1
+  dtype: bfloat16
+  gpu_memory_utilization: 0.5

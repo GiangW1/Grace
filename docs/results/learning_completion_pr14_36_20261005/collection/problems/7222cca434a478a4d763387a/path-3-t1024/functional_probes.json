@@ -1,0 +1,91 @@
+[
+  {
+    "text": " 1089",
+    "reward": 0.0,
+    "seed": 344291010,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1089",
+    "token_ids": [
+      220,
+      16,
+      15,
+      23,
+      24,
+      151645
+    ]
+  },
+  {
+    "text": " 37*3^3 = 37*27=999? Wait, no. Wait, if f(3) and f",
+    "reward": 0.0,
+    "seed": 927810540,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 37*3^3 = 37*27=999? Wait, no. Wait, if f(3) and f",
+    "token_ids": [
+      220,
+      18,
+      22,
+      9,
+      18,
+      61,
+      18,
+      284,
+      220,
+      18,
+      22,
+      9,
+      17,
+      22,
+      28,
+      24,
+      24,
+      24,
+      30,
+      13824,
+      11,
+      902,
+      13,
+      13824,
+      11,
+      421,
+      282,
+      7,
+      18,
+      8,
+      323,
+      282
+    ]
+  },
+  {
+    "text": " 144",
+    "reward": 0.0,
+    "seed": 702213901,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 144",
+    "token_ids": [
+      220,
+      16,
+      19,
+      19,
+      151645
+    ]
+  },
+  {
+    "text": " 3721",
+    "reward": 0.0,
+    "seed": 1826119052,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 3721",
+    "token_ids": [
+      220,
+      18,
+      22,
+      17,
+      16,
+      151645
+    ]
+  }
+]

@@ -1,0 +1,37 @@
+{
+  "started_utc": "2026-10-04T13:42:30.982233+00:00",
+  "actor_sha256": "64afe6011142d020e2ff2b5fe6e0077676e05c0325f0c8567e8aeabb2fcfe078",
+  "bundle": "/SSD/00/wja/grace-pr13-thinking-v3-8cac23f-c32-20261004-run/collection/problems/e8608446b2a531ebdfd78b76/path-0-t1024/bundle.json",
+  "sequence_tokens": 8388,
+  "prompt_len": 196,
+  "dimension": 5898240,
+  "modes": [
+    {
+      "gradient_checkpointing": true,
+      "status": "completed",
+      "seconds": [
+        2.2499469271861017,
+        2.247067767661065
+      ],
+      "mean_seconds": 2.2485073474235833,
+      "peak_allocated_gib": 23.295544624328613,
+      "all_finite": true,
+      "relative_l2_difference": 0.0,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "gradient_checkpointing": false,
+      "status": "completed",
+      "seconds": [
+        2.0283748107030988,
+        2.5790000651031733
+      ],
+      "mean_seconds": 2.303687437903136,
+      "peak_allocated_gib": 58.58125019073486,
+      "all_finite": true,
+      "relative_l2_difference": 0.007747657703015437,
+      "max_absolute_difference": 0.5
+    }
+  ],
+  "finished_utc": "2026-10-04T13:42:41.363267+00:00"
+}

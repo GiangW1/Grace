@@ -1,0 +1,93 @@
+[
+  {
+    "text": " 3\u00b3\u00d737 = 27\u00d737 = 999, but wait, that's the original value. But the problem says",
+    "reward": 0.0,
+    "seed": 508648378,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 3\u00b3\u00d737 = 27\u00d737 = 999, but wait, that's the original value. But the problem says",
+    "token_ids": [
+      220,
+      18,
+      43201,
+      17568,
+      18,
+      22,
+      284,
+      220,
+      17,
+      22,
+      17568,
+      18,
+      22,
+      284,
+      220,
+      24,
+      24,
+      24,
+      11,
+      714,
+      3783,
+      11,
+      429,
+      594,
+      279,
+      4024,
+      897,
+      13,
+      1988,
+      279,
+      3491,
+      2727
+    ]
+  },
+  {
+    "text": " 1458",
+    "reward": 0.0,
+    "seed": 730873555,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1458",
+    "token_ids": [
+      220,
+      16,
+      19,
+      20,
+      23,
+      151645
+    ]
+  },
+  {
+    "text": " 37248",
+    "reward": 0.0,
+    "seed": 1785203092,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 37248",
+    "token_ids": [
+      220,
+      18,
+      22,
+      17,
+      19,
+      23,
+      151645
+    ]
+  },
+  {
+    "text": " 1296",
+    "reward": 0.0,
+    "seed": 1677170170,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1296",
+    "token_ids": [
+      220,
+      16,
+      17,
+      24,
+      21,
+      151645
+    ]
+  }
+]

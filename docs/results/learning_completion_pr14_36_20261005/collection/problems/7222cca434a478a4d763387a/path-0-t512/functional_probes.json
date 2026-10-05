@@ -1,0 +1,92 @@
+[
+  {
+    "text": " 1008",
+    "reward": 0.0,
+    "seed": 252286222,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1008",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      23,
+      151645
+    ]
+  },
+  {
+    "text": " 1944",
+    "reward": 0.0,
+    "seed": 1443101804,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1944",
+    "token_ids": [
+      220,
+      16,
+      24,
+      19,
+      19,
+      151645
+    ]
+  },
+  {
+    "text": " 1000\n\nWait, hold on, I think I made a mistake here. Let me go back. Maybe I need to figure out the correct",
+    "reward": 0.0,
+    "seed": 1928585458,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 1000\n\nWait, hold on, I think I made a mistake here. Let me go back. Maybe I need to figure out the correct",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      15,
+      271,
+      14190,
+      11,
+      3331,
+      389,
+      11,
+      358,
+      1744,
+      358,
+      1865,
+      264,
+      16523,
+      1588,
+      13,
+      6771,
+      752,
+      728,
+      1182,
+      13,
+      10696,
+      358,
+      1184,
+      311,
+      7071,
+      700,
+      279,
+      4396
+    ]
+  },
+  {
+    "text": " 1260",
+    "reward": 0.0,
+    "seed": 2138415300,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1260",
+    "token_ids": [
+      220,
+      16,
+      17,
+      21,
+      15,
+      151645
+    ]
+  }
+]

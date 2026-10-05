@@ -1,0 +1,62 @@
+[
+  {
+    "text": " 403",
+    "reward": 0.0,
+    "seed": 660440283,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 403",
+    "token_ids": [
+      220,
+      19,
+      15,
+      18,
+      151645
+    ]
+  },
+  {
+    "text": " 403",
+    "reward": 0.0,
+    "seed": 481253604,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 403",
+    "token_ids": [
+      220,
+      19,
+      15,
+      18,
+      151645
+    ]
+  },
+  {
+    "text": " 403",
+    "reward": 0.0,
+    "seed": 146195757,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 403",
+    "token_ids": [
+      220,
+      19,
+      15,
+      18,
+      151645
+    ]
+  },
+  {
+    "text": " 406",
+    "reward": 0.0,
+    "seed": 33713973,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 406",
+    "token_ids": [
+      220,
+      19,
+      15,
+      21,
+      151645
+    ]
+  }
+]

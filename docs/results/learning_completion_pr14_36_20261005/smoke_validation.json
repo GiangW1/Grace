@@ -1,0 +1,10 @@
+{
+  "status": "passed",
+  "prefixes": 2,
+  "reward_protocol_version": 3,
+  "checked": [
+    "completed rollout scoring",
+    "prefilled probe scoring",
+    "trajectory shard shapes"
+  ]
+}

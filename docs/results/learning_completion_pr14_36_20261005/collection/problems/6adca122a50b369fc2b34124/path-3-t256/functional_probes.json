@@ -1,0 +1,83 @@
+[
+  {
+    "text": " 1",
+    "reward": 0.0,
+    "seed": 412322180,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1",
+    "token_ids": [
+      220,
+      16,
+      151645
+    ]
+  },
+  {
+    "text": " 0\n\nWait, that can't be right. Let me check my steps again. Maybe I made a mistake in simplifying the equations.\n\nStarting again with",
+    "reward": 0.0,
+    "seed": 471364240,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 0\n\nWait, that can't be right. Let me check my steps again. Maybe I made a mistake in simplifying the equations.\n\nStarting again with",
+    "token_ids": [
+      220,
+      15,
+      271,
+      14190,
+      11,
+      429,
+      646,
+      944,
+      387,
+      1290,
+      13,
+      6771,
+      752,
+      1779,
+      847,
+      7354,
+      1549,
+      13,
+      10696,
+      358,
+      1865,
+      264,
+      16523,
+      304,
+      15491,
+      7766,
+      279,
+      37906,
+      382,
+      24617,
+      1549,
+      448
+    ]
+  },
+  {
+    "text": " 1",
+    "reward": 0.0,
+    "seed": 1876427761,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1",
+    "token_ids": [
+      220,
+      16,
+      151645
+    ]
+  },
+  {
+    "text": " 2",
+    "reward": 0.0,
+    "seed": 1386300125,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 2",
+    "token_ids": [
+      220,
+      17,
+      151645
+    ]
+  }
+]

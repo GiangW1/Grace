@@ -1,0 +1,10 @@
+{
+  "kind": "learning_completion",
+  "started": "2026-10-04T22:44:39.569824+00:00",
+  "run_dir": "/SSD/00/wja/grace-pr14-learning-completion-36-20261004-run/analysis",
+  "requested_run_dir": "/SSD/00/wja/grace-pr14-learning-completion-36-20261004-run/analysis",
+  "redirected": false,
+  "finished": "2026-10-04T22:46:45.257786+00:00",
+  "status": "completed",
+  "exit_code": 0
+}

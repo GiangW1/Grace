@@ -1,0 +1,90 @@
+[
+  {
+    "text": " 1275\n\nWait, no, that seems too hasty. Let me think again. Maybe I need to find a better approach. Let me",
+    "reward": 0.0,
+    "seed": 259532739,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 1275\n\nWait, no, that seems too hasty. Let me think again. Maybe I need to find a better approach. Let me",
+    "token_ids": [
+      220,
+      16,
+      17,
+      22,
+      20,
+      271,
+      14190,
+      11,
+      902,
+      11,
+      429,
+      4977,
+      2238,
+      305,
+      14980,
+      13,
+      6771,
+      752,
+      1744,
+      1549,
+      13,
+      10696,
+      358,
+      1184,
+      311,
+      1477,
+      264,
+      2664,
+      5486,
+      13,
+      6771,
+      752
+    ]
+  },
+  {
+    "text": " 50",
+    "reward": 0.0,
+    "seed": 1947769103,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 50",
+    "token_ids": [
+      220,
+      20,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 1250",
+    "reward": 0.0,
+    "seed": 273232044,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1250",
+    "token_ids": [
+      220,
+      16,
+      17,
+      20,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 2500",
+    "reward": 0.0,
+    "seed": 1410426596,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 2500",
+    "token_ids": [
+      220,
+      17,
+      20,
+      15,
+      15,
+      151645
+    ]
+  }
+]

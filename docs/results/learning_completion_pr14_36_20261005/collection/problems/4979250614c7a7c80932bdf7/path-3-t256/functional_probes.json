@@ -1,0 +1,89 @@
+[
+  {
+    "text": " 120",
+    "reward": 0.0,
+    "seed": 576005679,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 120",
+    "token_ids": [
+      220,
+      16,
+      17,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 200",
+    "reward": 0.0,
+    "seed": 1981706911,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 200",
+    "token_ids": [
+      220,
+      17,
+      15,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " To maximize the sum, we should arrange the points so that as many arcs as possible have the highest possible values. The highest value is 3 (blue-green",
+    "reward": 0.0,
+    "seed": 503128191,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: To maximize the sum, we should arrange the points so that as many arcs as possible have the highest possible values. The highest value is 3 (blue-green",
+    "token_ids": [
+      2014,
+      34508,
+      279,
+      2629,
+      11,
+      582,
+      1265,
+      30893,
+      279,
+      3501,
+      773,
+      429,
+      438,
+      1657,
+      66750,
+      438,
+      3204,
+      614,
+      279,
+      8426,
+      3204,
+      2750,
+      13,
+      576,
+      8426,
+      897,
+      374,
+      220,
+      18,
+      320,
+      12203,
+      38268
+    ]
+  },
+  {
+    "text": " 180",
+    "reward": 0.0,
+    "seed": 1374276336,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 180",
+    "token_ids": [
+      220,
+      16,
+      23,
+      15,
+      151645
+    ]
+  }
+]

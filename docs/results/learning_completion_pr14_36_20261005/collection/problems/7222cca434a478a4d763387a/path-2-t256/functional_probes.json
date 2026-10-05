@@ -1,0 +1,92 @@
+[
+  {
+    "text": " 1000",
+    "reward": 0.0,
+    "seed": 37020718,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1000",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 999 is 999 = 9 \u00d7 111 = 9 \u00d7 3 \u00d7 37 = 3\u00b3 \u00d7",
+    "reward": 0.0,
+    "seed": 618328029,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 999 is 999 = 9 \u00d7 111 = 9 \u00d7 3 \u00d7 37 = 3\u00b3 \u00d7",
+    "token_ids": [
+      220,
+      24,
+      24,
+      24,
+      374,
+      220,
+      24,
+      24,
+      24,
+      284,
+      220,
+      24,
+      24768,
+      220,
+      16,
+      16,
+      16,
+      284,
+      220,
+      24,
+      24768,
+      220,
+      18,
+      24768,
+      220,
+      18,
+      22,
+      284,
+      220,
+      18,
+      43201,
+      24768
+    ]
+  },
+  {
+    "text": " 1000",
+    "reward": 0.0,
+    "seed": 981880699,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1000",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 1944",
+    "reward": 0.0,
+    "seed": 1841771833,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1944",
+    "token_ids": [
+      220,
+      16,
+      24,
+      19,
+      19,
+      151645
+    ]
+  }
+]

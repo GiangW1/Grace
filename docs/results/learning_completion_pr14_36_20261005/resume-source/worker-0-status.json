@@ -1,0 +1,10 @@
+{
+  "status": "collecting",
+  "updated_utc": "2026-10-04T09:44:06.410308+00:00",
+  "problem_id": "44e5d8cb-90e7-4e22-942d-8c60b9672e70",
+  "problem_index": 2,
+  "n_assigned_problems": 48,
+  "last_completed_path": "44e5d8cb-90e7-4e22-942d-8c60b9672e70:3",
+  "last_completed_t": 2048,
+  "elapsed_seconds": 5145.366420044098
+}
