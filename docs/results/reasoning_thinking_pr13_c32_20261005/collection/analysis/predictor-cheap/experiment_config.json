@@ -1,0 +1,14 @@
+{
+  "replay_dir": "/SSD/00/wja/grace-pr13-thinking-v3-8cac23f-c32-20261004-run/collection/replay",
+  "score_gradients": null,
+  "gradient_target": "trajectory",
+  "metric_file": "/SSD/00/wja/grace-pr13-thinking-v3-8cac23f-c32-20261004-run/collection/replay/metric_weights.npy",
+  "run_dir": "/SSD/00/wja/grace-pr13-thinking-v3-8cac23f-c32-20261004-run/collection/analysis/predictor-cheap",
+  "split_manifest": null,
+  "features": "cheap",
+  "models": "zero,constant,ridge,mlp64,mlp256",
+  "mlp_epochs": 50,
+  "device": "cpu",
+  "seed": 17,
+  "difficulty_manifest": null
+}

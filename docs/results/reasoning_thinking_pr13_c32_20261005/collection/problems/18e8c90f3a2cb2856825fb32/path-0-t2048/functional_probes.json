@@ -1,0 +1,85 @@
+[
+  {
+    "text": " 0",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      15,
+      151645
+    ],
+    "seed": 31286773
+  },
+  {
+    "text": " 2020",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      15,
+      17,
+      15,
+      151645
+    ],
+    "seed": 1479018552
+  },
+  {
+    "text": " 2021",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      15,
+      17,
+      16,
+      151645
+    ],
+    "seed": 1349157296
+  },
+  {
+    "text": " 2020 is the expected value, so maybe the list is 1 through n. But my calculation leads to a non-integer n, which",
+    "reward": 0.0,
+    "finish_reason": "length",
+    "truncated": true,
+    "token_ids": [
+      220,
+      17,
+      15,
+      17,
+      15,
+      374,
+      279,
+      3601,
+      897,
+      11,
+      773,
+      7196,
+      279,
+      1140,
+      374,
+      220,
+      16,
+      1526,
+      308,
+      13,
+      1988,
+      847,
+      21937,
+      11508,
+      311,
+      264,
+      2477,
+      12,
+      11662,
+      308,
+      11,
+      892
+    ],
+    "seed": 1107725610
+  }
+]

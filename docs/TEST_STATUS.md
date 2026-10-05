@@ -2,6 +2,15 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
+## Corrected PR13 completed run (2026-10-05)
+
+- Full CPU suite: `865 passed, 1 skipped in 114.34s` using
+  `OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -o addopts=''`.
+- Completed 32-problem / 32-continuation GPU collection and all offline analyses
+  are recorded in `docs/results/reasoning_thinking_pr13_c32_20261005/`.
+- The timing test's synthetic bundle now exposes the trajectory summary fields
+  consumed by the audit. The CPU suite is separate from real GPU measurements.
+
 ## PR13 thinking audit 修复（2026-10-04，8cac23f 后）
 
 相关 CPU/替身回归：`232 passed, 1 skipped in 29.67s`。

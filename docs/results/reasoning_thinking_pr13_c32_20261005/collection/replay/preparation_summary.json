@@ -1,0 +1,16 @@
+{
+  "status": "completed",
+  "n_original_problems": 32,
+  "n_prefixes": 128,
+  "n_observed_problems": 32,
+  "no_surviving_prefix_problem_ids": [],
+  "n_continuations": 4096,
+  "enable_thinking": true,
+  "functional_qualification_available": true,
+  "metric_name": "euclidean",
+  "metric_weights_sha256": "596ebc77c27e88ebf6449d6923d4dbbe7d12d50e77d29abd1ba9385fe294e7c6",
+  "difficulty_manifest": null,
+  "difficulty_manifest_sha256": null,
+  "reward_protocol_version": 3,
+  "verification": "Collected features, prefix score and gradient moments from the same frozen actor"
+}

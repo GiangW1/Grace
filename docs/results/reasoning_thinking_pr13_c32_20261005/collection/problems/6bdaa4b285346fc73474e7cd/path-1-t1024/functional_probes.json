@@ -1,0 +1,97 @@
+[
+  {
+    "text": " 2^{n - 1}",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      47822,
+      77,
+      481,
+      220,
+      16,
+      92,
+      151645
+    ],
+    "seed": 5313133
+  },
+  {
+    "text": " 2^{n - 1}",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      47822,
+      77,
+      481,
+      220,
+      16,
+      92,
+      151645
+    ],
+    "seed": 397399437
+  },
+  {
+    "text": " 2^{n - 1}",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      47822,
+      77,
+      481,
+      220,
+      16,
+      92,
+      151645
+    ],
+    "seed": 1944471599
+  },
+  {
+    "text": " 2^{n - 1} if n is even, and 2^{n - 1} if n is odd? Wait, that doesn't",
+    "reward": 0.0,
+    "finish_reason": "length",
+    "truncated": true,
+    "token_ids": [
+      220,
+      17,
+      47822,
+      77,
+      481,
+      220,
+      16,
+      92,
+      421,
+      308,
+      374,
+      1496,
+      11,
+      323,
+      220,
+      17,
+      47822,
+      77,
+      481,
+      220,
+      16,
+      92,
+      421,
+      308,
+      374,
+      10322,
+      30,
+      13824,
+      11,
+      429,
+      3171,
+      944
+    ],
+    "seed": 305687050
+  }
+]
