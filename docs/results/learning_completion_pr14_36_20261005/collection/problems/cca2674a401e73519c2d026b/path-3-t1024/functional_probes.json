@@ -1,0 +1,85 @@
+[
+  {
+    "text": " 10\n\nWait, that doesn't make sense. Wait, no. For the power of point B with respect to the circle, since the secant",
+    "reward": 0.0,
+    "seed": 241044274,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 10\n\nWait, that doesn't make sense. Wait, no. For the power of point B with respect to the circle, since the secant",
+    "token_ids": [
+      220,
+      16,
+      15,
+      271,
+      14190,
+      11,
+      429,
+      3171,
+      944,
+      1281,
+      5530,
+      13,
+      13824,
+      11,
+      902,
+      13,
+      1752,
+      279,
+      2355,
+      315,
+      1459,
+      425,
+      448,
+      5091,
+      311,
+      279,
+      12671,
+      11,
+      2474,
+      279,
+      5701,
+      517
+    ]
+  },
+  {
+    "text": " 5",
+    "reward": 1.0,
+    "seed": 2052336272,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 5",
+    "token_ids": [
+      220,
+      20,
+      151645
+    ]
+  },
+  {
+    "text": " 10",
+    "reward": 0.0,
+    "seed": 2127365040,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 10",
+    "token_ids": [
+      220,
+      16,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 12",
+    "reward": 0.0,
+    "seed": 233307018,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 12",
+    "token_ids": [
+      220,
+      16,
+      17,
+      151645
+    ]
+  }
+]

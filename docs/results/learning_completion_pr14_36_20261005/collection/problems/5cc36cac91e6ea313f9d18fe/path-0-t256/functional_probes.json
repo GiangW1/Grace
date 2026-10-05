@@ -1,0 +1,87 @@
+[
+  {
+    "text": " 17",
+    "reward": 0.0,
+    "seed": 475131316,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 17",
+    "token_ids": [
+      220,
+      16,
+      22,
+      151645
+    ]
+  },
+  {
+    "text": " 123456789 (Note: This is a placeholder. The actual answer would be computed based on the correct solution steps. Please",
+    "reward": 0.0,
+    "seed": 565572709,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 123456789 (Note: This is a placeholder. The actual answer would be computed based on the correct solution steps. Please",
+    "token_ids": [
+      220,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      320,
+      9112,
+      25,
+      1096,
+      374,
+      264,
+      5878,
+      13,
+      576,
+      5042,
+      4226,
+      1035,
+      387,
+      24182,
+      3118,
+      389,
+      279,
+      4396,
+      6291,
+      7354,
+      13,
+      5209
+    ]
+  },
+  {
+    "text": " 23",
+    "reward": 0.0,
+    "seed": 967000933,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 23",
+    "token_ids": [
+      220,
+      17,
+      18,
+      151645
+    ]
+  },
+  {
+    "text": " 101",
+    "reward": 0.0,
+    "seed": 757105587,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 101",
+    "token_ids": [
+      220,
+      16,
+      15,
+      16,
+      151645
+    ]
+  }
+]

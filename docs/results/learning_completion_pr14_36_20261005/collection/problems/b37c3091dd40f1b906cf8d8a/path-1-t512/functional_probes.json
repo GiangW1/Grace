@@ -1,0 +1,89 @@
+[
+  {
+    "text": " Let's compute each part step by step.\n\n1. **Numbers divisible by 5**:\n   - The count is floor(2015/5",
+    "reward": 0.0,
+    "seed": 736683282,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: Let's compute each part step by step.\n\n1. **Numbers divisible by 5**:\n   - The count is floor(2015/5",
+    "token_ids": [
+      6771,
+      594,
+      12564,
+      1817,
+      949,
+      3019,
+      553,
+      3019,
+      382,
+      16,
+      13,
+      3070,
+      27237,
+      74916,
+      553,
+      220,
+      20,
+      334,
+      510,
+      256,
+      481,
+      576,
+      1760,
+      374,
+      6422,
+      7,
+      17,
+      15,
+      16,
+      20,
+      14,
+      20
+    ]
+  },
+  {
+    "text": " 604",
+    "reward": 0.0,
+    "seed": 2106715229,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 604",
+    "token_ids": [
+      220,
+      21,
+      15,
+      19,
+      151645
+    ]
+  },
+  {
+    "text": " 403",
+    "reward": 0.0,
+    "seed": 1974691304,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 403",
+    "token_ids": [
+      220,
+      19,
+      15,
+      18,
+      151645
+    ]
+  },
+  {
+    "text": " 503",
+    "reward": 0.0,
+    "seed": 501311193,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 503",
+    "token_ids": [
+      220,
+      20,
+      15,
+      18,
+      151645
+    ]
+  }
+]

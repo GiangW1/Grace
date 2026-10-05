@@ -1,0 +1,103 @@
+[
+  {
+    "text": " 42",
+    "reward": 0.0,
+    "seed": 1976695862,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 42",
+    "token_ids": [
+      220,
+      19,
+      17,
+      151645
+    ]
+  },
+  {
+    "text": " 2^{n+1} - 2n - 1\nAnswer: 16",
+    "reward": 0.0,
+    "seed": 60303276,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 2^{n+1} - 2n - 1\nAnswer: 16",
+    "token_ids": [
+      220,
+      17,
+      47822,
+      77,
+      10,
+      16,
+      92,
+      481,
+      220,
+      17,
+      77,
+      481,
+      220,
+      16,
+      198,
+      16141,
+      25,
+      220,
+      16,
+      21,
+      151645
+    ]
+  },
+  {
+    "text": " 34",
+    "reward": 0.0,
+    "seed": 201433040,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 34",
+    "token_ids": [
+      220,
+      18,
+      19,
+      151645
+    ]
+  },
+  {
+    "text": " 2^n + 2^{n-1} + 2^{n-2} + ... + 2^0 = 2^{n+",
+    "reward": 0.0,
+    "seed": 920196318,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 2^n + 2^{n-1} + 2^{n-2} + ... + 2^0 = 2^{n+",
+    "token_ids": [
+      220,
+      17,
+      86167,
+      488,
+      220,
+      17,
+      47822,
+      77,
+      12,
+      16,
+      92,
+      488,
+      220,
+      17,
+      47822,
+      77,
+      12,
+      17,
+      92,
+      488,
+      2503,
+      488,
+      220,
+      17,
+      61,
+      15,
+      284,
+      220,
+      17,
+      47822,
+      77,
+      10
+    ]
+  }
+]

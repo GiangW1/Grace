@@ -1,0 +1,84 @@
+[
+  {
+    "text": " 4 + 18 + 8 = 30",
+    "reward": 0.0,
+    "seed": 1574624799,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 4 + 18 + 8 = 30",
+    "token_ids": [
+      220,
+      19,
+      488,
+      220,
+      16,
+      23,
+      488,
+      220,
+      23,
+      284,
+      220,
+      18,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 8\u221a2 + 32",
+    "reward": 0.0,
+    "seed": 190432040,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 8\u221a2 + 32",
+    "token_ids": [
+      220,
+      23,
+      144336,
+      17,
+      488,
+      220,
+      18,
+      17,
+      151645
+    ]
+  },
+  {
+    "text": " 16\u221a2 + 32",
+    "reward": 0.0,
+    "seed": 441273362,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 16\u221a2 + 32",
+    "token_ids": [
+      220,
+      16,
+      21,
+      144336,
+      17,
+      488,
+      220,
+      18,
+      17,
+      151645
+    ]
+  },
+  {
+    "text": " 8\u221a2 + 32",
+    "reward": 0.0,
+    "seed": 1866620484,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 8\u221a2 + 32",
+    "token_ids": [
+      220,
+      23,
+      144336,
+      17,
+      488,
+      220,
+      18,
+      17,
+      151645
+    ]
+  }
+]

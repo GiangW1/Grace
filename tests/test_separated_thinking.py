@@ -154,6 +154,151 @@ def test_cpu_analysis_preserves_certain_q_despite_uncertain_probes(monkeypatch, 
         assert full["variance_cost_ratio"] == pytest.approx(1.)
 
 
+@pytest.mark.parametrize("finish_reason,expected", [("stop", 1.0), ("length", 0.0)])
+def test_gpu_audit_probe_scores_prefilled_answer_and_real_finish(monkeypatch, finish_reason, expected):
+    from grace_gc.data import tokenize
+
+    monkeypatch.setattr(tokenize, "load_hf_tokenizer", lambda path:
+                        SimpleNamespace(encode=lambda text, **kw: [9]))
+
+    class ProbeEngine(Engine):
+        decode = staticmethod(lambda tokens: " 1")
+
+        def continue_selected(self, prefixes, selected, length, rng):
+            self.last_rollout = {"continue_finish_reasons": {0: finish_reason}}
+            return [prefixes[0] + [3]]
+
+    def capture(*args, **kwargs):
+        assert kwargs["require_complete_answers"] is True
+        result = kwargs["qualification_fn"]([1, 2], 2, "1", "p", 64, 0)
+        assert result["qualification_mean_reward"] == expected
+        return []
+
+    monkeypatch.setattr(run, "_bundles_from_engines", capture)
+    config = {"model_path": "mock", "method": "full_pg", "enable_thinking": True,
+              "audit": {"functional_qualification": {"enabled": True, "n": 1, "max_new_tokens": 32}}}
+    run.generate_bundles_gpu([MathRecord("p", "q", "1")], 1, 2, 64, 128, 17, config,
+                             engines=ProbeEngine(), layout=SimpleNamespace(dim=3))
+
+
+def test_complete_audit_rewards_and_baseline_share_the_same_policy(monkeypatch):
+    class LengthEngine(Engine):
+        def continue_selected(self, *args):
+            result = super().continue_selected(*args)
+            self.last_rollout["continue_finish_reasons"] = dict.fromkeys(range(len(result)), "length")
+            return result
+
+        def continue_repeated(self, *args):
+            fulls, _reasons, seeds = super().continue_repeated(*args)
+            return fulls, ["length"] * len(fulls), seeds
+
+    monkeypatch.setattr(run, "_policy_grad_vec", lambda *a: np.array([1., 2., 3.]))
+    bundles = run._bundles_from_engines(
+        [MathRecord("p", "q", "1")], LengthEngine(), SimpleNamespace(dim=3),
+        2, 4, [1, 2], 8, 17, lambda rec, n: ([[1]] * n, [rec.problem_id] * n, [rec.answer] * n),
+        require_complete_answers=True)
+    for bundle in bundles:
+        assert bundle.baseline == 0.0
+        assert all(row["reward"] == 0.0 for row in bundle.baseline_samples)
+        assert np.all(bundle.rewards == 0.0)
+
+
+def test_learning_completion_sink_writes_directly_readable_replay_shards(monkeypatch, tmp_path):
+    from grace_gc.core.rng import IsolatedRNG
+    from grace_gc.audit.learning_completion import load_replay_rows, position_grams, prefix_scalars
+
+    script = load_script("audit_separated_thinking")
+    reference = collect(monkeypatch)
+    for bundle in reference:
+        gradients = bundle.trajectory_grads.copy()
+        score = bundle.prefix_score_grad.copy()
+        script.reduce_bundle(bundle, IsolatedRNG.create(17), tmp_path, 17, learning_completion=True,
+                             provenance={"actor_sha256": "synthetic", "layout_dim": 3})
+        directory = script.prefix_directory(tmp_path, bundle.path_id, bundle.t)
+        raw = json.loads((directory / "bundle.json").read_text())
+        for half, indices in zip(("a", "b"), raw["half_indices"]):
+            np.testing.assert_allclose(np.load(directory / f"half_mean_full_grads_{half}.npy"),
+                                       gradients[indices].mean(axis=0)[None, :])
+        np.testing.assert_array_equal(np.load(directory / "prefix_score_gradients.npy"), score[None, :, None])
+        rows, sources = load_replay_rows([directory])
+        assert prefix_scalars(rows[0])["n_a"] == 2
+        assert position_grams(rows, sources, block_mb=1)[bundle.t].shape == (3, 3)
+
+
+def test_thinking_collection_rejects_old_reward_labels_before_loading_actor(tmp_path):
+    pytest.importorskip("torch")
+    script = load_script("audit_separated_thinking")
+    script.write_json(tmp_path / "worker-0-provenance.json", {"reward_protocol_version": 2})
+    with pytest.raises(ValueError, match="different reward protocol"):
+        script.collect(SimpleNamespace(run_dir=str(tmp_path)))
+
+
+def test_experiment_a_selects_saved_audit_inputs_and_preserves_them_on_resume(tmp_path, monkeypatch):
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "scripts"))
+    script = load_script("supervise_learning_completion")
+    data = tmp_path / "data.jsonl"
+    records = [{"problem_id": str(i), "prompt": f"compute {i}+1", "answer": str(i+1), "split": "audit"}
+               for i in range(8)]
+    data.write_text("".join(json.dumps(row) + "\n" for row in records))
+    config = {"seed": 17, "audit": {"n_problems": 4}}
+    directory, count = script.prepare_inputs(tmp_path, data, config)
+    assert count == 4
+    original = (directory / "shard-0.jsonl").read_text()
+    script.prepare_inputs(tmp_path, data, config)
+    assert (directory / "shard-0.jsonl").read_text() == original
+    with pytest.raises(ValueError, match="selected inputs changed"):
+        script.prepare_inputs(tmp_path, data, {"seed": 41, "audit": {"n_problems": 4}})
+
+
+@pytest.mark.parametrize("gpus", [[1, 3], [1, 2, 3]])
+def test_experiment_a_assigns_all_inputs_to_configured_gradient_workers(tmp_path, monkeypatch, gpus):
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "scripts"))
+    script = load_script("supervise_learning_completion")
+    model = tmp_path / "model"
+    model.mkdir()
+    (model / "thinking_download_verified.txt").write_text(script.REVISION)
+    config = {"seed": 17, "audit": {"n_problems": 36, "n_prefixes": 4,
+              "n_continuations": 8, "n_baseline": 16, "max_new_tokens": 8192,
+              "decision_grid": [256, 512, 1024, 2048, 4096], "require_complete_answers": True},
+              "max_new_tokens": 8192}
+    monkeypatch.setattr(script, "build_run_config", lambda *args: config)
+    monkeypatch.setattr(script, "prepare_inputs", lambda *args: (tmp_path / "input", 36))
+    monkeypatch.setattr(script, "verify_smoke", lambda *args: None)
+    monkeypatch.setattr(script, "analyze_collection", lambda *args: None)
+    monkeypatch.setattr(script.signal, "signal", lambda *args: None)
+    for name in ("ROOT", "MODEL", "CHECKPOINT", "URL"):
+        monkeypatch.setattr(script.runtime, name, getattr(script.runtime, name))
+    monkeypatch.setattr(script.runtime, "cleanup", lambda *args: None)
+    monkeypatch.setattr(script.runtime, "wait_for_card", lambda *args: None)
+    monkeypatch.setattr(script.runtime, "ready", lambda: True)
+    phases, servers, workers = [], [], []
+    monkeypatch.setattr(script.runtime, "status", lambda phase, **extra: phases.append((phase, extra)))
+
+    def launch(command, log, gpu):
+        servers.append(gpu)
+        return SimpleNamespace(poll=lambda: None)
+
+    def worker(index, gpu, smoke=False, extra_args=()):
+        workers.append((index, gpu, smoke, extra_args))
+
+    monkeypatch.setattr(script.runtime, "launch", launch)
+    monkeypatch.setattr(script.runtime, "worker", worker)
+    script.main(["--run-dir", str(tmp_path), "--data-path", "unused", "--config", "unused",
+                 "--model-path", str(model), "--gpus", *map(str, gpus)])
+    assert servers == [gpus[-1]]
+    assert sorted((index, gpu) for index, gpu, smoke, _extra in workers if not smoke) == list(enumerate(gpus[:-1]))
+    assert sum(smoke for _index, _gpu, smoke, _extra in workers) == 1
+    for _index, _gpu, _smoke, extra in workers:
+        assert extra[extra.index("--workers") + 1] == str(len(gpus) - 1)
+        assert extra[extra.index("--n-problems") + 1] == "36"
+    scope = json.loads((tmp_path / "scope.json").read_text())
+    assert scope["n_problems"] == 36
+    assert len(scope["gpu_roles"]) == len(gpus)
+    collecting = next(extra for phase, extra in phases if phase == "collecting")
+    assert collecting["gradient_gpus"] == gpus[:-1]
+    assert collecting["rollout_gpu"] == gpus[-1]
+
+
 def test_merge_rejects_stale_problem_ids(tmp_path):
     script = load_script("audit_separated_thinking")
     script.write_json(tmp_path / "selection.json", {
@@ -165,6 +310,7 @@ def test_merge_rejects_stale_problem_ids(tmp_path):
     script.write_json(directory / "summary.json", {"status": "completed", "problem_id": "stale"})
     with pytest.raises(ValueError, match="completed problem IDs"):
         script.merge(SimpleNamespace(run_dir=str(tmp_path), seed=17, allow_legacy=False))
+
 
 
 @pytest.mark.parametrize("n_bundles", [0, 1])
@@ -189,6 +335,7 @@ def test_merge_distinguishes_no_surviving_prefix_from_lost_bundles(tmp_path, n_b
         assert output["predictor_benefit"] is None
 
 
+
 def test_merge_rejects_bundles_outside_selection(tmp_path):
     script = load_script("audit_separated_thinking")
     script.write_json(tmp_path / "selection.json", {
@@ -199,6 +346,7 @@ def test_merge_rejects_bundles_outside_selection(tmp_path):
         "problem_id": "stale", "reward_protocol_version": 3})
     with pytest.raises(ValueError, match="bundle problem IDs"):
         script.merge(SimpleNamespace(run_dir=str(tmp_path), seed=17, allow_legacy=False))
+
 
 
 @pytest.mark.parametrize("reason,count,eos,expected", [
@@ -214,31 +362,6 @@ def test_probe_uses_real_termination_and_preserves_scoring_evidence(reason, coun
     assert sample["token_ids"] == [3] * count
     assert sample["finish_reason"] == reason
 
-
-@pytest.mark.parametrize("finish_reason,expected", [("stop", 1.0), ("length", 0.0)])
-def test_gpu_audit_probe_passes_actual_finish_reason(monkeypatch, finish_reason, expected):
-    from grace_gc.data import tokenize
-
-    monkeypatch.setattr(tokenize, "load_hf_tokenizer", lambda path:
-                        SimpleNamespace(encode=lambda text, **kw: [9]))
-
-    class ProbeEngine(Engine):
-        decode = staticmethod(lambda tokens: " 1")
-
-        def continue_selected(self, prefixes, selected, length, rng):
-            self.last_rollout = {"continue_finish_reasons": {0: finish_reason}}
-            return [prefixes[0] + [3]]
-
-    def capture(*args, **kwargs):
-        result = kwargs["qualification_fn"]([1, 2], 2, "1", "p", 64, 0)
-        assert result["qualification_mean_reward"] == expected
-        return []
-
-    monkeypatch.setattr(run, "_bundles_from_engines", capture)
-    config = {"model_path": "mock", "method": "full_pg", "enable_thinking": True,
-              "audit": {"functional_qualification": {"enabled": True, "n": 1, "max_new_tokens": 32}}}
-    run.generate_bundles_gpu([MathRecord("p", "q", "1")], 1, 2, 64, 128, 17, config,
-                             engines=ProbeEngine(), layout=SimpleNamespace(dim=3))
 
 
 def test_sink_keeps_both_euclidean_and_diagonal_second_moments(monkeypatch, tmp_path):
@@ -259,6 +382,7 @@ def test_sink_keeps_both_euclidean_and_diagonal_second_moments(monkeypatch, tmp_
     assert row["metric_weights_sha256"] == sha256_array(metric)
 
 
+
 def test_metric_resume_rejects_changed_weights_without_overwriting(tmp_path):
     from grace_gc.versions import sha256_array
 
@@ -273,6 +397,7 @@ def test_metric_resume_rejects_changed_weights_without_overwriting(tmp_path):
     with pytest.raises(ValueError, match="metric weights differ"):
         script.prepare_metric(tmp_path, np.ones(3))
     assert (tmp_path / "metric_weights.npy").read_bytes() == original
+
 
 
 @pytest.mark.parametrize("stale_source", ["prefix", "worker-0", "worker-1"])
@@ -305,6 +430,7 @@ def test_merge_rejects_changed_metric_before_writing_replay(monkeypatch, tmp_pat
     assert not (tmp_path / "replay").exists()
 
 
+
 def test_diagonal_metric_requires_weighted_second_moments_even_in_legacy_mode():
     from grace_gc.versions import sha256_array
 
@@ -315,6 +441,7 @@ def test_diagonal_metric_requires_weighted_second_moments_even_in_legacy_mode():
                                       False, prefix=True, allow_legacy=True)
     with pytest.raises(ValueError, match="lack metric provenance"):
         script.validate_metric_record({}, metric_hash, False, prefix=True, allow_legacy=True)
+
 
 
 def test_benefit_cannot_fall_back_to_euclidean_second_moments(tmp_path):
@@ -334,6 +461,7 @@ def test_benefit_cannot_fall_back_to_euclidean_second_moments(tmp_path):
         "metric_weights_sha256": sha256_array(metric)})
     with pytest.raises(ValueError, match="lacks second moments"):
         script.report_benefit(replay, tmp_path / "benefit")
+
 
 
 @pytest.mark.parametrize("gpus", [[0, 2], [0, 2, 3]])
@@ -387,6 +515,7 @@ def test_supervisor_assigns_all_problems_to_requested_gradient_workers(tmp_path,
     assert phases[-1][0] == "completed"
 
 
+
 def test_collection_scope_preserves_sample_count_on_resume(tmp_path):
     script = load_script("audit_separated_thinking")
     expected = script.prepare_collection_scope(tmp_path, 32)
@@ -395,6 +524,21 @@ def test_collection_scope_preserves_sample_count_on_resume(tmp_path):
     with pytest.raises(ValueError, match="parameters differ"):
         script.prepare_collection_scope(tmp_path, 64)
     assert json.loads((tmp_path / "collection_scope.json").read_text()) == expected
+
+
+
+def test_learning_completion_scope_keeps_its_dimensions_and_legacy_resume(tmp_path):
+    script = load_script("audit_separated_thinking")
+    script.write_json(tmp_path / "worker-0-provenance.json", {
+        "reward_protocol_version": 3, "require_complete_answers": True})
+    options = dict(n_prefixes=4, n_baseline=16, max_new_tokens=8192,
+                   decision_grid=[256, 512, 1024, 2048, 4096], learning_completion=True)
+    scope = script.prepare_collection_scope(tmp_path, 8, **options)
+    assert scope["n_prefixes"] == 4
+    assert scope["decision_grid"] == options["decision_grid"]
+    assert script.prepare_collection_scope(tmp_path, 8, **options) == scope
+    with pytest.raises(ValueError, match="parameters differ"):
+        script.prepare_collection_scope(tmp_path, 8, **{**options, "n_prefixes": 2})
 
 
 def test_collection_scope_does_not_relabel_legacy_64_sample_results(tmp_path):

@@ -1,0 +1,89 @@
+[
+  {
+    "text": " 990",
+    "reward": 0.0,
+    "seed": 384454839,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 990",
+    "token_ids": [
+      220,
+      24,
+      24,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 100",
+    "reward": 0.0,
+    "seed": 1189806706,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 100",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 100\n\nWait, no, that can't be right. I need to actually solve the problem properly. Let me go back.\n\nStarting again with",
+    "reward": 0.0,
+    "seed": 1189967712,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 100\n\nWait, no, that can't be right. I need to actually solve the problem properly. Let me go back.\n\nStarting again with",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      271,
+      14190,
+      11,
+      902,
+      11,
+      429,
+      646,
+      944,
+      387,
+      1290,
+      13,
+      358,
+      1184,
+      311,
+      3520,
+      11625,
+      279,
+      3491,
+      10277,
+      13,
+      6771,
+      752,
+      728,
+      1182,
+      382,
+      24617,
+      1549,
+      448
+    ]
+  },
+  {
+    "text": " 100",
+    "reward": 0.0,
+    "seed": 45165012,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 100",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      151645
+    ]
+  }
+]

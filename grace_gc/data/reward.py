@@ -57,19 +57,20 @@ def _boxed_span_end(text: str) -> int | None:
     return i
 
 
+def _answer_text(text: str) -> str:
+    """Only text after the last closed reasoning section is a final response."""
+    think_start = text.rfind("<think>")
+    think_end = text.rfind("</think>")
+    if think_start > think_end:
+        return ""
+    return text[think_end + len("</think>"):] if think_end >= 0 else text
+
+
 def answer_already_emitted(text: str | None) -> bool:
     """True only when the prefix already committed a final-line answer."""
     if not text:
         return False
-    s = str(text)
-    # In reasoning mode, a boxed value or an ``Answer:`` phrase inside an
-    # unfinished <think> block is working text, not an emitted answer.
-    think_start = s.rfind("<think>")
-    think_end = s.rfind("</think>")
-    if think_start >= 0:
-        if think_end <= think_start:
-            return False
-        s = s[think_end + len("</think>"):]
+    s = _answer_text(str(text))
     finals = list(FINAL.finditer(s))
     if finals and not s[finals[-1].end() :].strip():
         return True
@@ -101,6 +102,7 @@ def extract_answer(text: str) -> str | None:
     text = completed_answer_text(text)
     if text is None:
         return None
+    text = _answer_text(str(text))
     boxed = extract_boxed(text)
     finals = list(FINAL.finditer(text))
     last_final = finals[-1].group(1).strip() if finals else ""
@@ -220,14 +222,14 @@ def require_math_verify() -> None:
         )
 
 
-def rule_reward(text: str | None, gold: str, truncated: bool = False) -> float | None:
+def rule_reward(text: str | None, gold: str, truncated: bool = False,
+                *, require_complete: bool = False) -> float | None:
     if text is None:
         return None
-    # A length-capped trajectory is a failed rollout even if its unfinished
-    # reasoning happened to contain the gold value.  This flag is part of the
-    # policy-gradient label, not merely descriptive metadata.
-    if truncated:
+    thinking = "<think>" in text or "</think>" in text
+    if truncated and (require_complete or thinking):
         return 0.0
+    text = _answer_text(str(text))
     pred = extract_answer(text)
     gold_s = str(gold).replace("\u03c0", r"\pi")
     if pred is not None:
@@ -274,4 +276,4 @@ def score_prefilled_answer(decoded_continuation: str | None, gold: str,
         scored = continuation
     else:
         scored = "Answer:" + continuation
-    return rule_reward(scored, gold, truncated=truncated)
+    return rule_reward(scored, gold, truncated=truncated, require_complete=True)

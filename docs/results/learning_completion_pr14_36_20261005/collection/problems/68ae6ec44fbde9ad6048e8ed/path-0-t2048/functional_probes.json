@@ -1,0 +1,85 @@
+[
+  {
+    "text": " 7",
+    "reward": 0.0,
+    "seed": 1635991888,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 7",
+    "token_ids": [
+      220,
+      22,
+      151645
+    ]
+  },
+  {
+    "text": " 10",
+    "reward": 0.0,
+    "seed": 801460002,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 10",
+    "token_ids": [
+      220,
+      16,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 13\n\nWait, that can't be. Let me check again. Wait, I can't just say that d divides N because N is 1",
+    "reward": 0.0,
+    "seed": 282430042,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 13\n\nWait, that can't be. Let me check again. Wait, I can't just say that d divides N because N is 1",
+    "token_ids": [
+      220,
+      16,
+      18,
+      271,
+      14190,
+      11,
+      429,
+      646,
+      944,
+      387,
+      13,
+      6771,
+      752,
+      1779,
+      1549,
+      13,
+      13824,
+      11,
+      358,
+      646,
+      944,
+      1101,
+      1977,
+      429,
+      294,
+      64828,
+      451,
+      1576,
+      451,
+      374,
+      220,
+      16
+    ]
+  },
+  {
+    "text": " 14",
+    "reward": 0.0,
+    "seed": 1275719059,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 14",
+    "token_ids": [
+      220,
+      16,
+      19,
+      151645
+    ]
+  }
+]

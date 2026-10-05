@@ -1,0 +1,12 @@
+{
+  "archive": "/SSD/00/wja/pr13-pr14-results-20261005/pr13-pr14-results-small-20261005.tar.gz",
+  "bytes": 405653138,
+  "sha256": "8b361ab6d4868cebf32f6e4abe877c0ad2d14f1477928f840ba66ae645692de3",
+  "verified_included_files": 3342,
+  "runs": [
+    "grace-pr13-thinking-v3-8cac23f-c32-20261004-run",
+    "grace-pr14-learning-completion-36-20261004-run"
+  ],
+  "all_file_hashes_match": true,
+  "source_files_deleted": false
+}

@@ -1,0 +1,92 @@
+[
+  {
+    "text": " 1010",
+    "reward": 0.0,
+    "seed": 373055486,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1010",
+    "token_ids": [
+      220,
+      16,
+      15,
+      16,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 1000",
+    "reward": 0.0,
+    "seed": 916855903,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1000",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 2022 - 2*100 = 822? Wait, maybe not. Let me think again.\n\nLet me consider dividing",
+    "reward": 0.0,
+    "seed": 1343868137,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 2022 - 2*100 = 822? Wait, maybe not. Let me think again.\n\nLet me consider dividing",
+    "token_ids": [
+      220,
+      17,
+      15,
+      17,
+      17,
+      481,
+      220,
+      17,
+      9,
+      16,
+      15,
+      15,
+      284,
+      220,
+      23,
+      17,
+      17,
+      30,
+      13824,
+      11,
+      7196,
+      537,
+      13,
+      6771,
+      752,
+      1744,
+      1549,
+      382,
+      10061,
+      752,
+      2908,
+      49702
+    ]
+  },
+  {
+    "text": " 1001",
+    "reward": 0.0,
+    "seed": 691101365,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1001",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      16,
+      151645
+    ]
+  }
+]

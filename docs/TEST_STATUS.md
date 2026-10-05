@@ -2,6 +2,23 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
+## PR13 / PR14 integration (2026-10-05)
+
+- Full merged CPU suite: `893 passed, 1 skipped in 119.47s` using
+  `OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -o addopts=''`.
+- Preserves completed-answer scoring and both replay formats while integrating
+  PR13 metric, survivor, difficulty-selection, and execution fixes. Collection
+  scope records PR14's four paths, eight continuations, and five positions.
+- Completed-run evidence is recorded separately under `docs/results/`; these
+  CPU checks do not constitute new GPU measurements.
+
+## 实验 A 总体学习完成度分析（2026-10-04）
+
+服务器修复后相关 CPU 回归：`216 passed, 1 skipped in 18.56s`。
+命令：`python -m pytest tests/test_learning_completion.py tests/test_data_eval_audit.py tests/test_separated_thinking.py tests/test_measurement_remediation.py tests/test_learning_mechanism.py tests/test_review_audit.py tests/test_trajectory_audit.py tests/test_review2.py tests/test_fidelity.py -q -o addopts=''`。
+新增覆盖 thinking 内答案不计分、完整回答截断规则、probe 预填与实际结束原因、baseline/续写奖励一致、同大小/同时间戳数组替换时缓存失效、provenance 改变后不复用已删数组、Gram 内容损坏、缺失/删失穿越时间、采集分片直接接入分析和旧奖励续跑隔离。三卡入口的 CPU 参数与选题路径通过检查；GPU 采集另行记录在 run 目录。
+
+只新增 `tests/test_learning_completion.py`（7 项），在无 pytest 的云端容器中用最小 shim 逐个调用，7 项通过。覆盖：分块 Gram 与稠密加权 Gram 一致；给定前缀时总体 U 统计量和单题能量的无偏性（含 A/B 半与自身奖励相关的模拟）；逐前缀份额高而总体份额低、以及前缀方向同向时总体份额接近 1 的两种合成场景；二值奖励下 `rho_A` 分子分母的无偏性；bootstrap 重复抽到同题时不自配对；B 半视图不读 A 半向量；两分片、多位置、probe 分组和 Gram 缓存的端到端 CLI（删除大数组后结果一致）。统计类测试另用 6 个 seed 复跑均通过。全部为合成数据；未跑全量回归，没有 GPU 结果。
 ## Corrected PR13 completed run (2026-10-05)
 
 - Full CPU suite: `865 passed, 1 skipped in 114.34s` using
@@ -186,6 +203,13 @@ python scripts/train.py --config configs/experiments/minimal.yaml --run-dir runs
 ```
 
 当前工作树的 GPU 比较：`bash scripts/run_minimal_gpu.sh`。论文规模仍按 README：先 smoke Full-PG，再 Pilot。不把 tiny / 2026-09-16 两次 smoke / 那次 16 题链写成现役实测。
+
+## 2026-10-04 Learning completion execution optimization
+
+- PR14 targeted validation: 107 passed, including learning completion analysis and grouped-generation partial resume. Request seeds and saved per-prefix RNG states match sequential execution.
+- Grouping four prefixes with eight continuations each submits up to 32 requests while retaining the original 36 problems, five observation positions, and completed-answer scoring.
+- The frozen checkpoint is identical to PR13's. The shared 8192-response-token gradient benchmark averaged 2.249 s / 23.30 GiB with checkpointing, versus 2.304 s / 58.58 GiB without it. The latter had 0.775% relative gradient L2 difference, so checkpointing remains enabled.
+- Runtime settings expose generation concurrency and vLLM memory/sequence capacity. Actual throughput is reported separately from CPU correctness tests.
 
 ## 2026-10-04 Thinking audit execution optimization
 

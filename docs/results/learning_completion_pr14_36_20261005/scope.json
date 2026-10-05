@@ -1,0 +1,34 @@
+{
+  "experiment": "PR14 Experiment A: population learning completion vs answer resolution",
+  "model": "Qwen/Qwen3-4B",
+  "model_revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+  "enable_thinking": true,
+  "reward_protocol_version": 3,
+  "require_complete_answers": true,
+  "n_problems": 36,
+  "n_prefixes": 4,
+  "n_continuations": 8,
+  "n_baseline": 16,
+  "decision_grid": [
+    256,
+    512,
+    1024,
+    2048,
+    4096
+  ],
+  "max_new_tokens": 8192,
+  "primary_metric": "euclidean",
+  "crossing_thresholds": null,
+  "request_concurrency": 32,
+  "execution": {
+    "vllm_memory_utilization": 0.65,
+    "max_num_seqs": 32,
+    "batch_continuations": true,
+    "gradient_checkpointing": true,
+    "feature_batch_size": 1
+  },
+  "gpu_roles": {
+    "1": "gradient worker 0",
+    "3": "vLLM rollout server"
+  }
+}

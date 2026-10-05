@@ -157,7 +157,8 @@ def test_audit_records_are_rescorable_and_full_energy_precedes_sketch(monkeypatc
     monkeypatch.setattr(run, "_policy_grad_vec", lambda *a: np.array([3., 4., 0.]))
     encode = lambda rec, n: ([[1, 2] for _ in range(n)], [rec.problem_id]*n, [rec.answer]*n)
     bundles = run._bundles_from_engines([MathRecord("p", "q", "1")], Engine(),
-        SimpleNamespace(dim=3), 1, 8, [1, 2], 4, 17, encode, n_baseline=2)
+        SimpleNamespace(dim=3), 1, 8, [1, 2], 4, 17, encode, n_baseline=2,
+        require_complete_answers=True)
     assert len(bundles) == 2 and len(bundles[0].baseline_samples) == 2
     for bundle in bundles:
         restored = bundle_from_dict(json.loads(json.dumps(bundle_to_dict(bundle))))
@@ -168,7 +169,8 @@ def test_audit_records_are_rescorable_and_full_energy_precedes_sketch(monkeypatc
         assert restored.true_grad_norm_sq == [25.]*8
         for raw in restored.continuation_records:
             assert raw["seed"] is not None and raw["finish_reason"] == "length"
-            assert raw["reward"] == rule_reward(raw["text"], raw["gold"], raw["truncated"])
+            assert raw["reward"] == rule_reward(raw["text"], raw["gold"], raw["truncated"],
+                                                require_complete=True)
             assert raw["token_ids"][:len(restored.prefix_token_ids)] == restored.prefix_token_ids
     assert len(run._bundles_from_engines.last[0]["paths"]) == 1
 
@@ -224,7 +226,8 @@ def test_tiny_audit_persists_replay_artifacts_and_success_cost(tmp_path, monkeyp
     assert raw["gold"] == "2" and len(raw["baseline_samples"]) == 2
     assert raw["prefix_rng_state"] and raw["baseline_rng_state"]
     manifest = json.loads((tmp_path / "audit/audit_manifest.json").read_text())
-    assert manifest["reward_protocol_version"] == 3 and manifest["selection"] == "seeded"
+    from grace_gc.data.reward import REWARD_PROTOCOL_VERSION
+    assert manifest["reward_protocol_version"] == REWARD_PROTOCOL_VERSION and manifest["selection"] == "seeded"
     ledger = json.loads((tmp_path / "audit/compute_ledger.json").read_text())
     assert ledger["rows"][-1]["status"] == "completed"
     assert ledger["cpu_seconds"] >= 0 and ledger["gpu_reserved_seconds"] == 0
