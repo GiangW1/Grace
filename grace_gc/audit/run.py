@@ -11,7 +11,12 @@ from grace_gc.audit.prefix_audit import PrefixBundle, audit_bundles, bundle_to_d
 from grace_gc.core.layout import collect_lora_layout, pack_grads
 from grace_gc.data.format_prompt import apply_solve_instruction
 from grace_gc.data.math_data import MathRecord, select_records, select_records_difficulty, selection_manifest
-from grace_gc.data.reward import REWARD_PROTOCOL_VERSION, answer_already_emitted, extract_answer, rule_reward
+from grace_gc.data.reward import (
+    REWARD_PROTOCOL_VERSION,
+    answer_already_emitted,
+    extract_answer,
+    rule_reward,
+)
 from grace_gc.logging_util.forensics import persist_load_report, write_failed
 from grace_gc.logging_util.ledger import ComputeLedger, Timer
 from grace_gc.logging_util.run_dir import RunDirectory, resolve_run_dir, utc_now
@@ -513,10 +518,22 @@ def _bundles_from_engines(
                         finished=bool(finished[loc]),
                         prefix_tokens=max(len(prefix) - prompt_len, 0),
                         answer_emitted=answer_already_emitted(prefix_text),
+                        # Keep q-strata cross-fitted: replay materializes the
+                        # first continuation half as A and reserves B for
+                        # evaluation. Using all rewards here would let the
+                        # evaluation half define the strict subset.
+                        normal_q_mean_reward=(
+                            float(np.mean(rewards[:max(1, len(rewards) // 2)]))
+                            if rewards else None
+                        ),
                         qualification_mean_reward=qualification.get("qualification_mean_reward"),
                         qualification_n=qualification.get("qualification_n"),
+                        qualification_successes=qualification.get("qualification_successes"),
+                        qualification_failures=qualification.get("qualification_failures"),
+                        qualification_threshold=qualification.get("qualification_threshold"),
                         qualification_majority=qualification.get("qualification_majority"),
                         functional_recoverable=qualification.get("functional_recoverable"),
+                        qualification_threshold_rule=qualification.get("qualification_threshold_rule"),
                         qualification_protocol=qualification.get("qualification_protocol"),
                         prefix_text=prefix_text,
                         suffix_texts=suffix_texts,
@@ -811,7 +828,7 @@ def generate_bundles_gpu(
     qualification_cfg = (cfg.get("audit") or {}).get("functional_qualification")
     if qualification_cfg and bool(qualification_cfg.get("enabled", False)):
         from grace_gc.audit.qualification import (FORCED_ANSWER_PREFIX, classify_functional_recovery,
-                                                  score_functional_probe, validate_qualification_config)
+                                                  score_probe_sample, validate_qualification_config)
         probe_cfg = validate_qualification_config(qualification_cfg)
         if not hasattr(tokenizer, "encode"):
             raise ValueError("functional qualification needs a tokenizer.encode method")
@@ -831,11 +848,10 @@ def generate_bundles_gpu(
                 if result is None:
                     raise ValueError("functional qualification returned no sequence")
                 text = engines.decode(result[len(probe_prefix):]) if engines.decode else ""
-                truncated = _length_truncated(
-                    result, len(probe_prefix), probe_cfg["max_new_tokens"], False,
-                    getattr(engines, "eos_id", None), finish_reason=_continue_finish_reason(engines, 0)
-                )
-                rewards.append(score_functional_probe(text, gold, truncated=truncated))
+                sample = score_probe_sample(
+                    result, len(probe_prefix), text, gold, probe_cfg["max_new_tokens"],
+                    eos_id=getattr(engines, "eos_id", None), finish_reason=_continue_finish_reason(engines, 0))
+                rewards.append(sample["reward"])
             return classify_functional_recovery(rewards, probe_cfg["majority"])
 
     # A caller may initialize this frozen engine once for another audit design.

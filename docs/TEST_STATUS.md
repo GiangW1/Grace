@@ -2,6 +2,16 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
+## PR13 / PR14 integration (2026-10-05)
+
+- Full merged CPU suite: `893 passed, 1 skipped in 119.47s` using
+  `OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -o addopts=''`.
+- Preserves completed-answer scoring and both replay formats while integrating
+  PR13 metric, survivor, difficulty-selection, and execution fixes. Collection
+  scope records PR14's four paths, eight continuations, and five positions.
+- Completed-run evidence is recorded separately under `docs/results/`; these
+  CPU checks do not constitute new GPU measurements.
+
 ## 实验 A 总体学习完成度分析（2026-10-04）
 
 服务器修复后相关 CPU 回归：`216 passed, 1 skipped in 18.56s`。
@@ -9,6 +19,18 @@
 新增覆盖 thinking 内答案不计分、完整回答截断规则、probe 预填与实际结束原因、baseline/续写奖励一致、同大小/同时间戳数组替换时缓存失效、provenance 改变后不复用已删数组、Gram 内容损坏、缺失/删失穿越时间、采集分片直接接入分析和旧奖励续跑隔离。三卡入口的 CPU 参数与选题路径通过检查；GPU 采集另行记录在 run 目录。
 
 只新增 `tests/test_learning_completion.py`（7 项），在无 pytest 的云端容器中用最小 shim 逐个调用，7 项通过。覆盖：分块 Gram 与稠密加权 Gram 一致；给定前缀时总体 U 统计量和单题能量的无偏性（含 A/B 半与自身奖励相关的模拟）；逐前缀份额高而总体份额低、以及前缀方向同向时总体份额接近 1 的两种合成场景；二值奖励下 `rho_A` 分子分母的无偏性；bootstrap 重复抽到同题时不自配对；B 半视图不读 A 半向量；两分片、多位置、probe 分组和 Gram 缓存的端到端 CLI（删除大数组后结果一致）。统计类测试另用 6 个 seed 复跑均通过。全部为合成数据；未跑全量回归，没有 GPU 结果。
+
+## PR13 thinking audit 修复（2026-10-04，8cac23f 后）
+
+相关 CPU/替身回归：`232 passed, 1 skipped in 29.67s`。
+覆盖合法零前缀题与缺失 bundle 的区分、保留原始题数与观测题数、
+probe 的真实 length/stop/EOS 评分、普通续写 q 与 probe 分层的隔离、
+续跑前保留旧权重、逐前缀和跨 worker 度量校验，以及非均匀对角权重下
+的完整 oracle/predictor/mechanism/benefit 分析。缺失加权二阶矩不会回退欧氏范数。
+
+命令：`OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest tests/test_separated_thinking.py tests/test_learning_mechanism.py tests/test_data_eval_audit.py tests/test_measurement_remediation.py tests/test_dynamic_score_experiments.py tests/test_trajectory_audit.py tests/test_review_audit.py tests/test_review2.py tests/test_fidelity.py -q -o addopts=''`。
+`audit_separated_thinking.py --help` 与 `git diff --check` 通过。
+所有新增分析数据均为合成测试；未启动新的真实 GPU 实验。
 
 ## GPU 运行修复交接（2026-09-21）
 
@@ -180,3 +202,10 @@ python scripts/train.py --config configs/experiments/minimal.yaml --run-dir runs
 - Grouping four prefixes with eight continuations each submits up to 32 requests while retaining the original 36 problems, five observation positions, and completed-answer scoring.
 - The frozen checkpoint is identical to PR13's. The shared 8192-response-token gradient benchmark averaged 2.249 s / 23.30 GiB with checkpointing, versus 2.304 s / 58.58 GiB without it. The latter had 0.775% relative gradient L2 difference, so checkpointing remains enabled.
 - Runtime settings expose generation concurrency and vLLM memory/sequence capacity. Actual throughput is reported separately from CPU correctness tests.
+
+## 2026-10-04 Thinking audit execution optimization
+
+- PR13 targeted validation: 109 passed. Grouped continuation tests compare request seeds, individual gradient statistics, per-prefix RNG states, and partial resume against sequential execution.
+- Execution knobs now expose HTTP concurrency, vLLM sequence capacity/memory budget, grouped prefix continuations, feature batch size, and activation checkpointing. Sample counts and scoring are independent of these knobs.
+- On the frozen Qwen3-4B actor, one real 8192-response-token score gradient averaged 2.249 s with checkpointing (23.30 GiB allocated peak), versus 2.304 s without it (58.58 GiB). Relative gradient L2 difference was 0.775%. Checkpointing remains enabled; two repeats do not establish a speed benefit from disabling it.
+- Runtime benchmark: `scripts/benchmark_audit_execution.py`. Generation throughput must be read from the resumed run logs; unit tests are not performance measurements.

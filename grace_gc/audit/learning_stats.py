@@ -143,22 +143,33 @@ def _difficulty_labels(rows, manifest):
 
 
 def _q_label(row):
-    value = row.get("qualification_mean_reward")
-    independent = value is not None
+    """Label ordinary continuation q, keeping functional probes separate."""
+    value = row.get("normal_q_mean_reward")
+    explicit = value is not None
     if value is None:
+        # Legacy bundles did not name this field, but half A is still the
+        # ordinary continuation estimate.  A forced Answer: probe is never a
+        # substitute for it.
         value = _half_rewards(row)[0]
     if not np.isfinite(value) or not 0 <= value <= 1:
         raise ValueError("qualification reward mean must lie in [0,1]")
     if value == 0.0:
-        return "observed_q_zero", independent
+        return "observed_q_zero", explicit
     if value == 1.0:
-        return "observed_q_one", independent
-    return "observed_q_uncertain", independent
+        return "observed_q_one", explicit
+    return "observed_q_uncertain", explicit
+
+
+def _functional_label(row):
+    if row.get("functional_recoverable") is None:
+        return "functional_unavailable"
+    return ("functional_recoverable" if bool(row["functional_recoverable"])
+            else "functional_unrecoverable")
 
 
 def _strict_pre_answer(row):
-    q, independent = _q_label(row)
-    return bool(independent and q == "observed_q_uncertain" and
+    q, _explicit = _q_label(row)
+    return bool(q == "observed_q_uncertain" and
                 row.get("answer_emitted") is False and
                 row.get("functional_recoverable") is False and
                 not row.get("finished", False))
@@ -172,6 +183,7 @@ def grouped_reports(rows, metric_name, difficulty_manifest=None, bootstrap=1000,
     for index, row in enumerate(rows):
         q, _independent = _q_label(row)
         groups.setdefault(q, []).append(index)
+        groups.setdefault(_functional_label(row), []).append(index)
         position = f"position/{row.get('enable_thinking')}/{row['t']}"
         groups.setdefault(position, []).append(index)
         if _strict_pre_answer(row):
@@ -180,7 +192,8 @@ def grouped_reports(rows, metric_name, difficulty_manifest=None, bootstrap=1000,
             groups.setdefault(f"difficulty/{labels[index]}", []).append(index)
             groups.setdefault(f"q_difficulty/{q}/{labels[index]}", []).append(index)
     return {
-        "q_strata": "independent qualification where available; legacy half-A q is exploratory",
+        "q_strata": "ordinary continuation q; legacy half-A q is the fallback; functional qualification is reported separately",
+        "functional_strata": "forced </think> + Answer: probe; never used as ordinary continuation q",
         "difficulty_manifest": (None if difficulty_manifest is None else
                                 str(Path(difficulty_manifest).resolve())),
         "groups": {name: problem_bootstrap_report(

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Persistently collect the original 32 problems and run the offline analysis."""
 
+import argparse
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
@@ -12,6 +13,7 @@ import time
 import urllib.request
 
 from audit_separated_thinking import REVISION, utc, write_json
+from grace_gc.data.reward import REWARD_PROTOCOL_VERSION
 
 REPO = Path(__file__).resolve().parents[1]
 ROOT = Path("/SSD/01/wja/grace-pr13-thinking-20261001")
@@ -20,6 +22,10 @@ PYTHON = Path("/SSD/00/wja/GRACE/runs/conda/envs/grace/bin/python")
 VLLM = PYTHON.with_name("vllm")
 CHECKPOINT = ROOT / "frozen-thinking-lora.npz"
 URL = "http://127.0.0.1:18013"
+METRIC_FILE = os.environ.get("GRACE_METRIC_FILE")
+METRIC_NAME = os.environ.get("GRACE_METRIC_NAME")
+DIFFICULTY_MANIFEST = os.environ.get("GRACE_DIFFICULTY_MANIFEST")
+DIFFICULTY_COUNTS = os.environ.get("GRACE_DIFFICULTY_COUNTS")
 ENVIRONMENT = {**os.environ, "OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1",
                "TOKENIZERS_PARALLELISM": "false", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"}
 children = []
@@ -63,6 +69,19 @@ def launch(command, log, gpu=None):
     return process
 
 
+def audit_flags():
+    flags = []
+    if METRIC_FILE:
+        flags += ["--metric-file", METRIC_FILE]
+    if METRIC_NAME:
+        flags += ["--metric-name", METRIC_NAME]
+    if DIFFICULTY_MANIFEST:
+        flags += ["--difficulty-manifest", DIFFICULTY_MANIFEST]
+    if DIFFICULTY_COUNTS:
+        flags += ["--difficulty-counts", DIFFICULTY_COUNTS]
+    return flags
+
+
 def cleanup(*_args):
     for process in children:
         if process.poll() is None:
@@ -84,6 +103,7 @@ def worker(index, gpu, smoke=False, extra_args=()):
     log = ROOT / "logs" / (name + ".log")
     command = [PYTHON, "-u", REPO / "scripts/audit_separated_thinking.py", "--run-dir", directory,
                "--checkpoint", CHECKPOINT, "--worker-index", str(index), *extra_args]
+    command.extend(audit_flags())
     if smoke:
         command.append("--smoke")
     while True:
@@ -123,17 +143,75 @@ def verify_smoke():
         raise RuntimeError("smoke execution is missing requested thinking or gradient artifacts")
 
 
-def main():
+def main(argv=None):
+    global ROOT, MODEL, CHECKPOINT, URL
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--run-dir", default=str(ROOT))
+    parser.add_argument("--model-path", default=str(MODEL))
+    parser.add_argument("--data-dir", default="/SSD/00/wja/grace-pr13-20260929/input-shards-32")
+    parser.add_argument("--checkpoint")
+    parser.add_argument("--n-problems", type=int, default=32)
+    parser.add_argument("--n-continuations", type=int, default=64)
+    parser.add_argument("--request-concurrency", type=int, default=8)
+    parser.add_argument("--vllm-memory-utilization", type=float, default=.40)
+    parser.add_argument("--max-num-seqs", type=int, default=16)
+    parser.add_argument("--batch-continuations", action="store_true")
+    parser.add_argument("--gradient-checkpointing", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--feature-batch-size", type=int, default=1)
+    parser.add_argument("--gpus", type=int, nargs="+", default=[0, 2, 3],
+                        help="one or two gradient GPUs followed by the rollout GPU")
+    parser.add_argument("--port", type=int, default=18013)
+    args = parser.parse_args(argv)
+    if len(args.gpus) not in (2, 3) or len(set(args.gpus)) != len(args.gpus):
+        parser.error("two or three distinct GPUs are required; the last GPU generates rollouts")
+    if args.n_problems < 1:
+        parser.error("n_problems must be positive")
+    if args.request_concurrency < 1:
+        parser.error("request concurrency must be positive")
+    if args.n_continuations < 2:
+        parser.error("A/B continuation statistics require at least two samples")
+    if not 0 < args.vllm_memory_utilization < 1 or args.max_num_seqs < 1 or args.feature_batch_size < 1:
+        parser.error("invalid execution memory budget or batch size")
+    ROOT, MODEL = Path(args.run_dir).resolve(), Path(args.model_path).resolve()
+    CHECKPOINT = Path(args.checkpoint).resolve() if args.checkpoint else ROOT / "frozen-thinking-lora.npz"
+    URL = f"http://127.0.0.1:{args.port}"
+    gradient_gpus, rollout_gpu = args.gpus[:-1], args.gpus[-1]
+    extra = ["--workers", str(len(gradient_gpus)), "--data-dir", str(Path(args.data_dir).resolve()),
+             "--n-problems", str(args.n_problems), "--model-path", str(MODEL),
+             "--server-url", URL, "--server-model", "grace-thinking",
+             "--request-concurrency", str(args.request_concurrency),
+             "--n-continuations", str(args.n_continuations),
+             "--feature-batch-size", str(args.feature_batch_size),
+             "--gradient-checkpointing" if args.gradient_checkpointing else "--no-gradient-checkpointing"]
+    if args.batch_continuations:
+        extra.append("--batch-continuations")
     ROOT.mkdir(parents=True, exist_ok=True)
     (ROOT / "logs").mkdir(exist_ok=True)
-    write_json(ROOT / "scope.json", {"n_problems": 32, "append_32": False,
+    if (ROOT / "scope.json").is_file():
+        saved_scope = json.loads((ROOT / "scope.json").read_text())
+        if saved_scope.get("n_continuations", 64) != args.n_continuations:
+            raise ValueError("saved continuation count differs; use a new run directory")
+    write_json(ROOT / "scope.json", {"n_problems": args.n_problems, "append_32": False,
                "model": "Qwen/Qwen3-4B", "model_revision": REVISION, "enable_thinking": True,
-               "n_prefixes": 2, "n_continuations": 64, "n_baseline": 16,
+               "n_prefixes": 2, "n_continuations": args.n_continuations, "n_baseline": 16,
+               "request_concurrency": args.request_concurrency,
+               "execution": {"vllm_memory_utilization": args.vllm_memory_utilization,
+                             "max_num_seqs": args.max_num_seqs,
+                             "batch_continuations": args.batch_continuations,
+                             "gradient_checkpointing": args.gradient_checkpointing,
+                             "feature_batch_size": args.feature_batch_size},
                "max_new_tokens": 8192, "decision_grid": [1024, 2048],
-               "functional_probes": {"n": 4, "max_new_tokens": 32, "majority": .5},
-               "gpu_roles": {"0": "actor gradients", "2": "actor gradients", "3": "vLLM generation"},
-               "primary_metric": "euclidean", "adam_metric": "unavailable: no optimizer history",
-               "difficulty_manifest": "unavailable; original 32 problems retained"})
+               "functional_probes": {"n": 4, "max_new_tokens": 32, "threshold": .5},
+               "gpu_roles": {**{str(gpu): f"gradient worker {index}" for index, gpu in enumerate(gradient_gpus)},
+                             str(rollout_gpu): "vLLM generation"},
+               "data_dir": str(Path(args.data_dir).resolve()), "checkpoint": str(CHECKPOINT),
+               "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO, text=True).strip(),
+               "reward_protocol_version": REWARD_PROTOCOL_VERSION,
+               "primary_metric": METRIC_NAME or "euclidean",
+               "metric_file": METRIC_FILE,
+               "adam_metric": ("not_requested" if not METRIC_FILE else "fixed_diagonal_metric"),
+               "difficulty_manifest": DIFFICULTY_MANIFEST,
+               "difficulty_counts": DIFFICULTY_COUNTS})
     signal.signal(signal.SIGTERM, cleanup)
     signal.signal(signal.SIGINT, cleanup)
     try:
@@ -143,30 +221,31 @@ def main():
             time.sleep(30)
         if marker.read_text().strip() != REVISION:
             raise ValueError("downloaded model revision differs")
-        wait_for_card(3)
-        status("starting_vllm")
-        command = [VLLM, "serve", MODEL, "--host", "127.0.0.1", "--port", "18013",
+        wait_for_card(rollout_gpu)
+        status("starting_vllm", gpu=rollout_gpu)
+        command = [VLLM, "serve", MODEL, "--host", "127.0.0.1", "--port", str(args.port),
                    "--served-model-name", "grace-thinking", "--dtype", "bfloat16", "--generation-config", "vllm",
-                   "--max-model-len", "9280", "--gpu-memory-utilization", "0.40",
-                   "--max-num-seqs", "16", "--enforce-eager", "--return-tokens-as-token-ids"]
-        server = launch(command, ROOT / "logs/vllm.log", 3)
+                   "--max-model-len", "9280", "--gpu-memory-utilization", str(args.vllm_memory_utilization),
+                   "--max-num-seqs", str(args.max_num_seqs), "--enforce-eager", "--return-tokens-as-token-ids"]
+        server = launch(command, ROOT / "logs/vllm.log", rollout_gpu)
         while not ready():
             if server.poll() is not None:
                 raise RuntimeError("vLLM exited during startup; see logs/vllm.log")
             time.sleep(5)
-        status("smoke_running")
-        worker(0, 0, smoke=True)
+        status("smoke_running", gpu=gradient_gpus[0])
+        worker(0, gradient_gpus[0], smoke=True, extra_args=extra)
         verify_smoke()
-        status("collecting_32")
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            futures = [pool.submit(worker, index, gpu) for index, gpu in ((0, 0), (1, 2))]
+        status("collecting", n_problems=args.n_problems, gradient_gpus=gradient_gpus, rollout_gpu=rollout_gpu)
+        with ThreadPoolExecutor(max_workers=len(gradient_gpus)) as pool:
+            futures = [pool.submit(worker, index, gpu, extra_args=extra)
+                       for index, gpu in enumerate(gradient_gpus)]
             for future in futures:
                 future.result()
-        os.killpg(server.pid, signal.SIGTERM)
-        server.wait(timeout=30)
+        cleanup()
         status("offline_predictor_analysis")
         command = [PYTHON, "-u", REPO / "scripts/audit_separated_thinking.py", "--run-dir", ROOT / "collection",
                    "--checkpoint", CHECKPOINT, "--analyze-only"]
+        command.extend(audit_flags())
         if launch(command, ROOT / "logs/offline-analysis.log").wait():
             raise RuntimeError("offline analysis failed; see logs/offline-analysis.log")
         status("completed", summary=str(ROOT / "collection/benefit/predictor_benefit_summary.json"))

@@ -76,23 +76,30 @@ def select_records_difficulty(records: list[MathRecord], n: int, manifest: str |
         remainder -= 1
     if sum(requested.values()) != n:
         raise ValueError("difficulty counts must sum to n_problems")
+    insufficient = {
+        label: (requested[label], len(strata[label]))
+        for label in strata
+        if requested[label] > len(strata[label])
+    }
+    if insufficient:
+        details = ", ".join(
+            f"{label} requested={want} available={available}"
+            for label, (want, available) in sorted(insufficient.items())
+        )
+        raise ValueError(
+            "difficulty manifest cannot satisfy the preregistered mix: " + details
+        )
     import numpy as np
 
     rng = np.random.default_rng(int(seed))
     selected = []
-    leftovers = []
     for label in ("easy", "medium", "hard"):
         pool = sorted(strata[label], key=lambda record: record.problem_id)
         order = rng.permutation(len(pool))
-        take = min(requested[label], len(pool))
+        take = requested[label]
         selected.extend(pool[int(index)] for index in order[:take])
-        leftovers.extend(pool[int(index)] for index in order[take:])
-    if len(selected) < n:
-        order = rng.permutation(len(leftovers))
-        selected.extend(leftovers[int(index)] for index in order[:n - len(selected)])
-    if len(selected) < n:
-        raise ValueError(f"difficulty manifest has only {len(selected)} selectable problems for n={n}")
-    return selected[:n]
+    # Counts were checked above, so this is an exact preregistered allocation.
+    return selected
 
 
 def selection_manifest(records: list[MathRecord], selection: str, seed: int) -> dict:

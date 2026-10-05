@@ -2,8 +2,14 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 
-from grace_gc.audit.learning_stats import mechanism_values, problem_bootstrap_report
+from grace_gc.audit.learning_stats import (
+    _q_label,
+    _strict_pre_answer,
+    mechanism_values,
+    problem_bootstrap_report,
+)
 from grace_gc.audit.qualification import classify_functional_recovery
 from grace_gc.audit.streaming_replay import replay_statistics
 from grace_gc.backends.verl_trainer import cap_colocated_vllm_config
@@ -59,6 +65,20 @@ def test_functional_qualification_requires_fixed_binary_probe():
     report = classify_functional_recovery([0., 1., 1.], majority=0.5)
     assert report["qualification_mean_reward"] == 2.0 / 3.0
     assert report["functional_recoverable"] is True
+    assert report["qualification_successes"] == 2
+    assert report["qualification_failures"] == 1
+    assert report["qualification_threshold"] == 0.5
+
+
+def test_strict_gate_separates_normal_q_from_functional_probe():
+    row = {"half_mean_reward": [0.5, 0.5], "qualification_mean_reward": 0.0,
+           "normal_q_mean_reward": 0.5, "functional_recoverable": False,
+           "answer_emitted": False, "finished": False}
+    assert _q_label(row)[0] == "observed_q_uncertain"
+    assert _strict_pre_answer(row) is True
+    row["normal_q_mean_reward"] = 0.0
+    assert _q_label(row)[0] == "observed_q_zero"
+    assert _strict_pre_answer(row) is False
 
 
 def test_difficulty_selection_respects_preregistered_mix(tmp_path: Path):
@@ -75,6 +95,17 @@ def test_difficulty_selection_respects_preregistered_mix(tmp_path: Path):
               "h0": "hard", "h1": "hard"}
     assert {label: sum(labels[r.problem_id] == label for r in selected)
             for label in ("easy", "medium", "hard")} == {"easy": 1, "medium": 3, "hard": 2}
+
+
+def test_difficulty_selection_rejects_unavailable_preregistered_stratum(tmp_path: Path):
+    manifest = tmp_path / "difficulty.json"
+    manifest.write_text(json.dumps({"difficulty": {
+        "e0": "easy", "m0": "medium", "h0": "hard",
+    }}), encoding="utf-8")
+    records = [MathRecord(pid, pid, "1") for pid in ("e0", "m0", "h0")]
+    with pytest.raises(ValueError, match="cannot satisfy"):
+        select_records_difficulty(records, 3, manifest,
+                                   {"easy": 2, "medium": 1, "hard": 0}, seed=4)
 
 
 def test_colocated_vllm_cap_preserves_lower_explicit_limit():

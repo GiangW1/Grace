@@ -6,7 +6,7 @@
 
 - 使用真正支持 thinking 的后训练模型；`enable_thinking: true` 会同时作用于训练、独立评测和 GPU audit 的 chat template。
 - 用 8k 生成上限，在 1024 和 2048 两个位置采样；先用只采样审计检查截断率和剩余长度，再运行昂贵的全梯度 replay。
-- 每个前缀保存独立的固定预算 probe：强制追加 `</think>\nAnswer:`，采样 4 次，每次 32 token。它只用于资格审计，不进入原始续写或梯度标签；`functional_recoverable` 采用预先固定的多数票规则。
+- 每个前缀保存独立的固定预算 probe：强制追加 `</think>\nAnswer:`，采样 4 次，每次 32 token。它只用于资格审计，不进入原始续写或梯度标签；`functional_recoverable` 采用预先固定的 `mean_reward >= threshold` 规则（默认阈值 0.5）。
 - replay 的欧氏统计始终保留；Adam 度量必须在 replay 前由 checkpoint 导出，并用偏差修正后的二阶矩权重。流式模式只保存充分统计量，不落盘 `N×D` 全矩阵。
 - `difficulty_manifest` 在分析阶段显式传入，结果按 easy/medium/hard、独立 q 分层、严格答案未定子集和题目聚类 bootstrap 报告。
 - 单卡共置时默认把 vLLM 上限压到 30% 显存并把并发序列限制为 2；reasoning 配置进一步使用 25% 和单序列。HF actor 默认启用 gradient checkpointing，避免 8k 反向和 vLLM KV cache 同时挤满 A100。
@@ -46,4 +46,10 @@ python scripts/analyze_learning_mechanism.py `
 
 ## 解释边界
 
-截断在奖励和梯度标签中仍然是 `R=0`；只有长度和答案位置的描述把它作为删失。`strict_pre_answer_undecided` 同时要求独立资格 q 位于 0 和 1 之间、文本尚未发出答案、功能 probe 未可靠恢复、且前缀未自然结束。旧 replay 没有独立资格 probe 时仍可分析，但 q 分层会标记为 exploratory，不能冒充严格层。
+截断在奖励和梯度标签中仍然是 `R=0`；只有长度和答案位置的描述把它作为删失。奖励解析只读取闭合 `</think>` 后的答案通道，未闭合 thinking 中的 `\boxed{}` 或 `Answer:` 不会得分。功能 probe 的 decoded continuation 会恢复预填的 `Answer:` 再评分，并和普通续写 q 分开保存。`strict_pre_answer_undecided` 同时要求普通续写 q 位于 0 和 1 之间、文本尚未发出答案、功能 probe 未可靠恢复、且前缀未自然结束。旧 replay 没有显式普通 q 字段时回退到半 A 的普通续写均值；没有功能 probe 时仍可分析，但严格层不会把缺失资格误当成通过。
+
+功能 probe 同样按真实结束原因处理截断：`length` 得分为 0，自然停止或预算末尾 EOS 不视为截断。分离式审计保存每条 probe 的 `finish_reason`、`truncated`、token IDs 和奖励。
+
+某题所有路径在首个观测点前自然结束时，完成摘要记录 `n_bundles: 0`，合并报告保留该题并单列 `no_surviving_prefix_problem_ids`。`n_original_problems` 是原始入选题数，`n_observed_problems` 是实际存在观测前缀的题数；全体没有前缀时输出空分析，不制造收益数值。声明存在但缺失的 bundle 仍报错。
+
+分离式审计在续跑前核对保存的度量文件和各 worker/前缀的权重 hash，不覆盖不一致的旧权重；合并在写 replay 前重复核对。更换度量需使用新 run 目录并重新收集对应的加权二阶矩，不能由旧的欧氏二阶矩推算。`--allow-legacy` 只允许缺失度量登记的欧氏诊断，不允许混用不一致的权重或缺失的加权二阶矩。

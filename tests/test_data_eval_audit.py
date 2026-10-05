@@ -11,8 +11,10 @@ from grace_gc.data.reward import (
     _gold_has_pi_constant,
     _plain_pi_to_latex,
     extract_boxed,
+    extract_answer,
     first_parseable_index,
     rule_reward,
+    score_prefilled_answer,
 )
 from grace_gc.evaluation.eval_full import EvalItem, evaluate_items
 from grace_gc.evaluation.metrics import pass_at_k, time_to_target, wilson_interval
@@ -470,6 +472,7 @@ def test_completed_answer_reward_rejects_truncation_and_preserves_base_training(
 def test_extract_prefers_later_answer_line():
     from grace_gc.data.reward import extract_answer
 
+def test_extract_prefers_later_answer_line():
     assert extract_answer("work \\boxed{27} more\nAnswer: 343/27") == "343/27"
     assert extract_answer("Answer: 3\n\\boxed{(3,\\pi/2)}") == r"(3,\pi/2)"
     assert extract_answer("the answer is 90") == "90"
@@ -690,3 +693,14 @@ def test_lora_and_baseline_health_fields():
     assert ignored["n_short_response"] == 0
     counted = step_health(state, {"records": [stopped, short_done]})
     assert counted["n_short_response"] == 1
+
+
+def test_reasoning_reward_ignores_open_think_and_truncation():
+    assert rule_reward("<think>\\boxed{27}", "27") == 0.0
+    assert rule_reward("<think>\\boxed{27}</think>\\nAnswer: 27", "27") == 1.0
+    assert extract_answer("<think>\\boxed{27}") is None
+    assert extract_answer("<think>\\boxed{27}</think>\\nAnswer: 27") == "27"
+    assert rule_reward("Answer: 27", "27", truncated=True, require_complete=True) == 0.0
+    assert score_prefilled_answer(" 27", "27") == 1.0
+    assert score_prefilled_answer("Answer: 27", "27") == 1.0
+    assert score_prefilled_answer("The answer is 27", "27") == 1.0
