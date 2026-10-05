@@ -1,0 +1,14 @@
+phase=lopo feature_set=legacy model=zero
+phase=lopo feature_set=legacy model=constant
+phase=lopo feature_set=legacy model=ridge_l2_1
+phase=lopo feature_set=legacy model=ridge_l2_10
+phase=lopo feature_set=legacy model=ridge_l2_100
+phase=lopo feature_set=legacy model=mlp64
+phase=lopo feature_set=legacy model=mlp256
+phase=lopo feature_set=cheap model=zero
+phase=lopo feature_set=cheap model=constant
+phase=lopo feature_set=cheap model=ridge_l2_1
+phase=lopo feature_set=cheap model=ridge_l2_10
+phase=lopo feature_set=cheap model=ridge_l2_100
+phase=lopo feature_set=cheap model=mlp64
+phase=lopo feature_set=cheap model=mlp256

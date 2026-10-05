@@ -1,0 +1,208 @@
+{
+  "checked_utc": "2026-10-04T03:16:08.446533+00:00",
+  "model": "Qwen/Qwen3-4B",
+  "enable_thinking": true,
+  "n_problems": 32,
+  "totals": {
+    "prefixes": 128,
+    "answer_emitted_prefixes": 0,
+    "open_thinking_prefixes": 128,
+    "continuations": 8192,
+    "original_correct": 2481,
+    "truncated": 6133,
+    "original_correct_truncated": 728,
+    "completed_post_think_correct": 1753
+  },
+  "by_position": {
+    "1024": {
+      "prefixes": 64,
+      "answer_emitted_prefixes": 0,
+      "open_thinking_prefixes": 64,
+      "continuations": 4096,
+      "original_correct": 1232,
+      "truncated": 3084,
+      "original_correct_truncated": 375,
+      "completed_post_think_correct": 857
+    },
+    "2048": {
+      "prefixes": 64,
+      "answer_emitted_prefixes": 0,
+      "open_thinking_prefixes": 64,
+      "continuations": 4096,
+      "original_correct": 1249,
+      "truncated": 3049,
+      "original_correct_truncated": 353,
+      "completed_post_think_correct": 896
+    }
+  },
+  "original_correct_rate": 0.3028564453125,
+  "truncation_rate": 0.7486572265625,
+  "completed_post_think_correct_rate": 0.2139892578125,
+  "probe_rescore": {
+    "n": 512,
+    "original_correct": 0.0,
+    "rescored_correct": 84.0,
+    "recoverable_prefixes": 19,
+    "strict_pre_answer_undecided_prefixes": 13
+  },
+  "original_reward_comparisons_p05": [
+    {
+      "model": "independent_half_oracle",
+      "residual_ratio_to_zero": 0.9468678755382268,
+      "variance_cost_ratio": 1.1696246007752045,
+      "variance_cost_ci95": [
+        1.1432673815051948,
+        1.1939180978773754
+      ],
+      "token_cost_ratio": 0.600487434949843
+    },
+    {
+      "model": "legacy/zero",
+      "residual_ratio_to_zero": 1.0,
+      "variance_cost_ratio": 1.2015609115442916,
+      "variance_cost_ci95": [
+        1.1944624527298495,
+        1.2124423116414773
+      ],
+      "token_cost_ratio": 0.600487434949843
+    },
+    {
+      "model": "legacy/constant",
+      "residual_ratio_to_zero": 1.0003256133135918,
+      "variance_cost_ratio": 1.2017566290707176,
+      "variance_cost_ci95": [
+        1.193618226569315,
+        1.2139865549805458
+      ],
+      "token_cost_ratio": 0.600487434949843
+    },
+    {
+      "model": "legacy/ridge_l2_1",
+      "residual_ratio_to_zero": 1.0073179890834685,
+      "variance_cost_ratio": 1.2059595606843723,
+      "variance_cost_ci95": [
+        1.1980484620518348,
+        1.219448057323404
+      ],
+      "token_cost_ratio": 0.600487434949843
+    },
+    {
+      "model": "legacy/ridge_l2_10",
+      "residual_ratio_to_zero": 1.007293532819603,
+      "variance_cost_ratio": 1.205944860672826,
+      "variance_cost_ci95": [
+        1.1980408082554632,
+        1.219427122288979
+      ],
+      "token_cost_ratio": 0.600487434949843
+    },
+    {
+      "model": "legacy/ridge_l2_100",
+      "residual_ratio_to_zero": 1.0070568080085929,
+      "variance_cost_ratio": 1.205802571667676,
+      "variance_cost_ci95": [
+        1.1979911411688595,
+        1.2192241536460393
+      ],
+      "token_cost_ratio": 0.600487434949843
+    },
+    {
+      "model": "legacy/mlp64",
+      "residual_ratio_to_zero": 1.0136345471577095,
+      "variance_cost_ratio": 1.2097562762061669,
+      "variance_cost_ci95": [
+        1.2002111642039657,
+        1.22675237542995
+      ],
+      "token_cost_ratio": 0.600487434949843
+    },
+    {
+      "model": "legacy/mlp256",
+      "residual_ratio_to_zero": 1.0196039192502635,
+      "variance_cost_ratio": 1.2133443074429242,
+      "variance_cost_ci95": [
+        1.2032508213694633,
+        1.2301618536007917
+      ],
+      "token_cost_ratio": 0.600487434949843
+    },
+    {
+      "model": "cheap/zero",
+      "residual_ratio_to_zero": 1.0,
+      "variance_cost_ratio": 1.2015609115442916,
+      "variance_cost_ci95": [
+        1.1944624527298495,
+        1.2124423116414773
+      ],
+      "token_cost_ratio": 0.600487434949843
+    },
+    {
+      "model": "cheap/constant",
+      "residual_ratio_to_zero": 1.0003256133135918,
+      "variance_cost_ratio": 1.2017566290707176,
+      "variance_cost_ci95": [
+        1.193618226569315,
+        1.2139865549805458
+      ],
+      "token_cost_ratio": 0.600487434949843
+    },
+    {
+      "model": "cheap/ridge_l2_1",
+      "residual_ratio_to_zero": 1.00192746126543,
+      "variance_cost_ratio": 1.2027194573881046,
+      "variance_cost_ci95": [
+        1.1944664782954302,
+        1.214904927081052
+      ],
+      "token_cost_ratio": 0.600487434949843
+    },
+    {
+      "model": "cheap/ridge_l2_10",
+      "residual_ratio_to_zero": 1.001804849163753,
+      "variance_cost_ratio": 1.2026457585058772,
+      "variance_cost_ci95": [
+        1.1943877805099397,
+        1.2148352141230896
+      ],
+      "token_cost_ratio": 0.600487434949843
+    },
+    {
+      "model": "cheap/ridge_l2_100",
+      "residual_ratio_to_zero": 1.0011605157540466,
+      "variance_cost_ratio": 1.2022584667832188,
+      "variance_cost_ci95": [
+        1.1940359877328666,
+        1.2144652905589868
+      ],
+      "token_cost_ratio": 0.600487434949843
+    },
+    {
+      "model": "cheap/mlp64",
+      "residual_ratio_to_zero": 1.0007905309986243,
+      "variance_cost_ratio": 1.2020360787599902,
+      "variance_cost_ci95": [
+        1.193964108204157,
+        1.214069607565261
+      ],
+      "token_cost_ratio": 0.600487434949843
+    },
+    {
+      "model": "cheap/mlp256",
+      "residual_ratio_to_zero": 0.9985214391121333,
+      "variance_cost_ratio": 1.200672187811065,
+      "variance_cost_ci95": [
+        1.1915515933427647,
+        1.2132819652798637
+      ],
+      "token_cost_ratio": 0.600487434949843
+    }
+  ],
+  "limitations": [
+    "Original reward ignores the truncated flag and may extract answers inside thinking.",
+    "Original functional probes omit the prefilled Answer: when scoring; separate rescores restore it.",
+    "Predictor and gradient statistics have NOT been recomputed under a completed-answer reward.",
+    "Original strict-subset report has zero rows because of the probe scoring bug.",
+    "Fresh zero-B LoRA has no Adam optimizer metric; Euclidean statistics only.",
+    "Token-cost estimates exclude GPU, scheduling and feature overhead."
+  ]
+}

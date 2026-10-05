@@ -1,0 +1,82 @@
+[
+  {
+    "text": " 17",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      16,
+      22,
+      151645
+    ],
+    "seed": 1601720715
+  },
+  {
+    "text": " 45",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      19,
+      20,
+      151645
+    ],
+    "seed": 926925183
+  },
+  {
+    "text": " 15",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      16,
+      20,
+      151645
+    ],
+    "seed": 2005743386
+  },
+  {
+    "text": " 1 + 2 + 4 = 7. Wait, no. Let me check again. Wait, the total black area is the sum of the",
+    "reward": 0.0,
+    "finish_reason": "length",
+    "truncated": true,
+    "token_ids": [
+      220,
+      16,
+      488,
+      220,
+      17,
+      488,
+      220,
+      19,
+      284,
+      220,
+      22,
+      13,
+      13824,
+      11,
+      902,
+      13,
+      6771,
+      752,
+      1779,
+      1549,
+      13,
+      13824,
+      11,
+      279,
+      2790,
+      3691,
+      3082,
+      374,
+      279,
+      2629,
+      315,
+      279
+    ],
+    "seed": 1565286380
+  }
+]

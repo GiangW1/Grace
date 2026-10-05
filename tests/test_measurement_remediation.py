@@ -161,7 +161,9 @@ def test_audit_records_are_rescorable_and_full_energy_precedes_sketch(monkeypatc
     assert len(bundles) == 2 and len(bundles[0].baseline_samples) == 2
     for bundle in bundles:
         restored = bundle_from_dict(json.loads(json.dumps(bundle_to_dict(bundle))))
-        assert restored.gold == "1" and restored.baseline == 1
+        # The synthetic engine stops at the requested length, so the v3 reward
+        # protocol correctly treats every prescan rollout as truncated.
+        assert restored.gold == "1" and restored.baseline == 0
         assert restored.prefix_request_seed is not None
         assert restored.true_grad_norm_sq == [25.]*8
         for raw in restored.continuation_records:
@@ -222,7 +224,7 @@ def test_tiny_audit_persists_replay_artifacts_and_success_cost(tmp_path, monkeyp
     assert raw["gold"] == "2" and len(raw["baseline_samples"]) == 2
     assert raw["prefix_rng_state"] and raw["baseline_rng_state"]
     manifest = json.loads((tmp_path / "audit/audit_manifest.json").read_text())
-    assert manifest["reward_protocol_version"] == 2 and manifest["selection"] == "seeded"
+    assert manifest["reward_protocol_version"] == 3 and manifest["selection"] == "seeded"
     ledger = json.loads((tmp_path / "audit/compute_ledger.json").read_text())
     assert ledger["rows"][-1]["status"] == "completed"
     assert ledger["cpu_seconds"] >= 0 and ledger["gpu_reserved_seconds"] == 0

@@ -11,8 +11,10 @@ from grace_gc.data.reward import (
     _gold_has_pi_constant,
     _plain_pi_to_latex,
     extract_boxed,
+    extract_answer,
     first_parseable_index,
     rule_reward,
+    score_prefilled_answer,
 )
 from grace_gc.evaluation.eval_full import EvalItem, evaluate_items
 from grace_gc.evaluation.metrics import pass_at_k, time_to_target, wilson_interval
@@ -94,6 +96,21 @@ def test_hf_encode_uses_chat_template_when_present():
 
     with pytest.raises(ValueError, match="thinking open"):
         encode_prompt_hf(Thinks(), "1+1", 16)
+
+    class Reasoning:
+        chat_template = "dummy"
+
+        def apply_chat_template(self, messages, enable_thinking=None, **kwargs):
+            assert enable_thinking is True
+            return [1, 2]
+
+        def decode(self, ids):
+            return "<think>unfinished"
+
+        def __call__(self, text, **kwargs):
+            return {"input_ids": [1]}
+
+    assert encode_prompt_hf(Reasoning(), "1+1", 16, enable_thinking=True) == [1, 2]
 
     class ClosedThink:
         chat_template = "dummy"
@@ -412,11 +429,22 @@ def test_answer_already_emitted_ignores_process_boxed():
     assert answer_already_emitted("the answer is 10\nnow continue") is False
     assert answer_already_emitted("work\nAnswer: 343/27") is True
     assert answer_already_emitted("done \\boxed{27}") is True
+    assert answer_already_emitted("<think>work \\boxed{27}</think>\nAnswer: 27") is True
+    assert answer_already_emitted("<think>work \\boxed{27}") is False
+
+
+def test_reasoning_reward_ignores_open_think_and_truncation():
+    assert rule_reward("<think>\\boxed{27}", "27") == 0.0
+    assert rule_reward("<think>\\boxed{27}</think>\\nAnswer: 27", "27") == 1.0
+    assert extract_answer("<think>\\boxed{27}") is None
+    assert extract_answer("<think>\\boxed{27}</think>\\nAnswer: 27") == "27"
+    assert rule_reward("Answer: 27", "27", truncated=True) == 0.0
+    assert score_prefilled_answer(" 27", "27") == 1.0
+    assert score_prefilled_answer("Answer: 27", "27") == 1.0
+    assert score_prefilled_answer("The answer is 27", "27") == 1.0
 
 
 def test_extract_prefers_later_answer_line():
-    from grace_gc.data.reward import extract_answer
-
     assert extract_answer("work \\boxed{27} more\nAnswer: 343/27") == "343/27"
     assert extract_answer("Answer: 3\n\\boxed{(3,\\pi/2)}") == r"(3,\pi/2)"
     assert extract_answer("the answer is 90") == "90"

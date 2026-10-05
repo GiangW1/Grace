@@ -10,6 +10,24 @@ import pytest
 from scripts.archive_run import archive_run
 
 
+def test_explicit_glob_excludes_duplicate_cache_and_records_hash(tmp_path):
+    root = tmp_path / "run"
+    cache = root / "collection" / "rollout-cache"
+    cache.mkdir(parents=True)
+    duplicate = cache / "response.json"
+    duplicate.write_text('{"text":"duplicate"}')
+    evidence = root / "report.json"
+    evidence.write_text('{"status":"completed"}')
+    output = tmp_path / "filtered.tar.gz"
+    manifest = archive_run(root, output, include_paths=[cache],
+                           exclude_globs=["*/rollout-cache/*"])
+    files = {row["path"]: row for row in manifest["files"]}
+    assert files["report.json"]["included"]
+    excluded = files["collection/rollout-cache/response.json"]
+    assert not excluded["included"] and excluded["reason"] == "exclude_glob"
+    assert excluded["sha256"] == hashlib.sha256(duplicate.read_bytes()).hexdigest()
+
+
 def _write(root, relative, data=b"evidence" * 100):
     path = root / relative
     path.parent.mkdir(parents=True, exist_ok=True)

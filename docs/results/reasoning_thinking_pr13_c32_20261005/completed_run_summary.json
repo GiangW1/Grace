@@ -1,0 +1,20 @@
+{
+  "status": "completed",
+  "run_root": "/SSD/00/wja/grace-pr13-thinking-v3-8cac23f-c32-20261004-run",
+  "completion": {
+    "status": "completed",
+    "updated_utc": "2026-10-04T23:02:53.021956+00:00",
+    "summary": "/SSD/00/wja/grace-pr13-thinking-v3-8cac23f-c32-20261004-run/collection/benefit/predictor_benefit_summary.json"
+  },
+  "n_completed_problems": 32,
+  "prefixes": 128,
+  "continuations": 4096,
+  "correct_continuations": 901,
+  "truncated_continuations": 3047,
+  "continuation_correct_rate": 0.219970703125,
+  "continuation_truncation_rate": 0.743896484375,
+  "independent_baseline_answers": 512,
+  "git_export": "Compact statistics, reports, inputs, configuration, logs, and small analysis arrays",
+  "full_filtered_archive": "Retains generated text, token IDs, original bundles and raw problem records; excludes dense arrays, weights and duplicate HTTP caches",
+  "dense_arrays_deleted": false
+}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import hashlib
 import io
 import json
@@ -18,7 +19,7 @@ _ADAPTER_WEIGHTS = (
 
 
 def archive_run(root: Path, output: Path, max_file_mib=20, include_checkpoints=False,
-                *, include_paths=()):
+                *, include_paths=(), exclude_globs=()):
     root, output = root.resolve(), output.resolve()
     if not root.is_dir():
         raise FileNotFoundError(root)
@@ -44,8 +45,9 @@ def archive_run(root: Path, output: Path, max_file_mib=20, include_checkpoints=F
                     "explicit_npz_dependencies": "all basis-*.npy and predictor-*.npz in the selected NPZ's directory",
                     "adapter_weight_names": list(_ADAPTER_WEIGHTS),
                     "include_paths": [p.relative_to(root).as_posix() for p in selected],
+                    "exclude_globs": list(exclude_globs),
                 },
-                "note": "Excluded states remain on the server; a hash is not a recoverable checkpoint."}
+                "note": "Excluded files are not in this archive; check any separate cleanup receipt for deletion status. A hash is not a recoverable checkpoint."}
     # Snapshot before creating the archive, and never archive the archive itself.
     paths = sorted(p for p in root.rglob("*") if p.is_file() and p.resolve() != output
                    and p != root / "archive_manifest.json")
@@ -59,7 +61,10 @@ def archive_run(root: Path, output: Path, max_file_mib=20, include_checkpoints=F
             before = path.stat()
             size = before.st_size
             digest = hashlib.sha256()
-            if any(path.is_relative_to(p) for p in selected):
+            explicitly_excluded = any(fnmatch.fnmatchcase(rel, pattern) for pattern in exclude_globs)
+            if explicitly_excluded:
+                inclusion_reason = None
+            elif any(path.is_relative_to(p) for p in selected):
                 inclusion_reason = "explicit_path"
             elif path.parent in basis_directories and (path.match("basis-*.npy") or path.match("predictor-*.npz")):
                 inclusion_reason = "checkpoint_dependency"
@@ -88,7 +93,8 @@ def archive_run(root: Path, output: Path, max_file_mib=20, include_checkpoints=F
                         digest.update(chunk)
             after = path.stat()
             manifest["files"].append({"path": rel, "bytes": size, "sha256": digest.hexdigest(),
-                                      "included": include, "reason": None if include else "size_limit",
+                                      "included": include, "reason": None if include else
+                                      "exclude_glob" if explicitly_excluded else "size_limit",
                                       "inclusion_reason": inclusion_reason,
                                       "source_changed_during_archive": (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns),
                                       "hash_scope": "archive_bytes" if include else "source_read"})
@@ -110,8 +116,10 @@ if __name__ == "__main__":
                         help="also retain all NPZ states, basis sidecars and LoRA adapter weights, regardless of size; not base HF weights")
     parser.add_argument("--include", action="append", type=Path, default=[], metavar="PATH",
                         help="retain a file or directory regardless of size; NPZ includes neighboring basis sidecars (repeatable, relative to root)")
+    parser.add_argument("--exclude", action="append", default=[], metavar="GLOB",
+                        help="exclude matching relative paths, including explicitly included ones (repeatable)")
     args = parser.parse_args()
     manifest = archive_run(args.root, args.output, args.max_file_mib, args.include_checkpoints,
-                           include_paths=args.include)
+                           include_paths=args.include, exclude_globs=args.exclude)
     print(json.dumps({"archive": str(args.output), "included": sum(r["included"] for r in manifest["files"]),
                       "excluded": sum(not r["included"] for r in manifest["files"])}))

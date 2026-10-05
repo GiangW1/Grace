@@ -21,7 +21,33 @@ def start_experiment_run(path, kind, config):
     run = RunDirectory(destination)
     run.write_run_meta(kind=kind, started=utc_now(), requested=path)
     run.write_json("experiment_config.json", config)
+    # Capture the source actually executed, including uncommitted patches.
+    import subprocess
+    import hashlib
+    source = Path(__file__).resolve().parents[2]
+    try:
+        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip()
+        diff = subprocess.check_output(["git", "diff", "HEAD"], cwd=source)
+        status = subprocess.check_output(["git", "status", "--porcelain"], cwd=source, text=True)
+    except (OSError, subprocess.CalledProcessError):
+        commit, diff, status = None, b"", None
+    run.write_json("source_identity.json", {"commit": commit, "status": status,
+                                           "diff_sha256": hashlib.sha256(diff).hexdigest()})
+    if diff:
+        (destination / "source.patch").write_bytes(diff)
     return destination
+
+
+def finish_experiment_run(path, error=None):
+    """Record completion only after outputs were written."""
+    from grace_gc.logging_util.run_dir import RunDirectory, utc_now
+    root = Path(path)
+    meta = json.loads((root / "run_meta.json").read_text(encoding="utf-8"))
+    meta.update(finished=utc_now(), status="completed" if error is None else "failed",
+                exit_code=0 if error is None else 1)
+    if error is not None:
+        meta["error"] = str(error)
+    RunDirectory(root).write_json("run_meta.json", meta)
 
 
 def load_replay(path: str | Path):

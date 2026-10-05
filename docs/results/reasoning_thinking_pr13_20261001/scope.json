@@ -1,0 +1,28 @@
+{
+  "n_problems": 32,
+  "append_32": false,
+  "model": "Qwen/Qwen3-4B",
+  "model_revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+  "enable_thinking": true,
+  "n_prefixes": 2,
+  "n_continuations": 64,
+  "n_baseline": 16,
+  "max_new_tokens": 8192,
+  "decision_grid": [
+    1024,
+    2048
+  ],
+  "functional_probes": {
+    "n": 4,
+    "max_new_tokens": 32,
+    "majority": 0.5
+  },
+  "gpu_roles": {
+    "0": "actor gradients",
+    "2": "actor gradients",
+    "3": "vLLM generation"
+  },
+  "primary_metric": "euclidean",
+  "adam_metric": "unavailable: no optimizer history",
+  "difficulty_manifest": "unavailable; original 32 problems retained"
+}

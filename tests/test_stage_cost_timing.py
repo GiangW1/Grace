@@ -59,7 +59,9 @@ def test_stage_envelope_includes_setup_and_result_or_failure_persistence(
         spend(11, "generation")
         if stage == "batch_audit":
             return {"fixed_n": 1}
-        return [] if stage in {"eval", "audit_empty"} else [SimpleNamespace(t=1)]
+        return [] if stage in {"eval", "audit_empty"} else [
+            SimpleNamespace(t=1, continuation_records=[], functional_recoverable=None,
+                            answer_emitted=False)]
 
     write_json = RunDirectory.write_json
     append_jsonl = RunDirectory.append_jsonl

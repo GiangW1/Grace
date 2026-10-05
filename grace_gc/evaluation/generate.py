@@ -114,6 +114,7 @@ def generate_answers_vllm(
     max_prompt: int = 1024,
     sample_batch_size: int = 1,
     request_recorder=None,
+    enable_thinking: bool = False,
 ) -> list[EvalItem]:
     from grace_gc.backends.vllm_two_phase import (
         _require_known_finish,
@@ -132,7 +133,10 @@ def generate_answers_vllm(
     eos_id = collect_stop_token_ids(tokenizer)
     for rec in records:
         prompt_meta: list = []
-        prompts, _pids, _golds = encode_records_hf([rec] * n, tokenizer, int(max_prompt), prompt_meta=prompt_meta)
+        prompts, _pids, _golds = encode_records_hf(
+            [rec] * n, tokenizer, int(max_prompt), prompt_meta=prompt_meta,
+            enable_thinking=enable_thinking,
+        )
         answers = []
         truncated = []
         extracted = []
@@ -285,6 +289,8 @@ def eval_engine_config(cfg, max_new):
 
 
 def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, run_dir):
+    if bool(cfg.get("enable_thinking", False)) and backend != "gpu_verl":
+        raise ValueError("enable_thinking evaluation requires the gpu_verl backend")
     if backend == "gpu_verl":
         if not cfg.get("model_path"):
             raise ValueError("model_path is required for GPU evaluation")
@@ -348,6 +354,7 @@ def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, 
             max_prompt=int(cfg.get("prompt_max_tokens", 1024)),
             sample_batch_size=int((cfg.get("eval") or {}).get("sample_batch_size", 1)),
             request_recorder=lambda row: RunDirectory(run_dir).append_jsonl("eval_requests.jsonl", row),
+            enable_thinking=bool(cfg.get("enable_thinking", False)),
         )
     else:
         items = generate_answers_tiny(records, n, max_new, int(cfg.get("seed", 17)), cfg=cfg)

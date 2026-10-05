@@ -1,0 +1,16 @@
+{
+  "experiment": "PR13 thinking predictor audit under corrected reward/probe and metric semantics",
+  "requested_commit": "8cac23fa2001f5766fc915b4735cc2a325a6505c",
+  "fix_commit": "acfd82f",
+  "source_input_directory": "/SSD/00/wja/grace-pr13-20260929/input-shards-32",
+  "source_checkpoint": "/SSD/01/wja/grace-pr13-thinking-20261001/frozen-thinking-lora.npz",
+  "checkpoint_sha256": "a57086e2fdba2372947a1b735827bd1de7ef6810fcaa7e5019393ae1862119a0",
+  "n_problems": 32,
+  "comparison": "Same problems and frozen actor as the original PR13 thinking run; trajectories and gradient labels recomputed under reward protocol v3",
+  "gradient_gpu": 0,
+  "rollout_gpu": 2,
+  "reuse_old_gradient_labels": false,
+  "primary_metric": "euclidean",
+  "adam_metric": "not_requested; frozen checkpoint has no optimizer history",
+  "difficulty_manifest": null
+}

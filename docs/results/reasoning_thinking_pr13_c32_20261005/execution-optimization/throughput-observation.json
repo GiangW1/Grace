@@ -1,0 +1,21 @@
+{
+  "observed_utc": "2026-10-04T13:57:25.952025+00:00",
+  "experiment": "PR13",
+  "current_concurrency": 32,
+  "current_full_concurrency_log_windows": 7,
+  "current_generation_tokens_per_second": {
+    "min": 1375.9,
+    "max": 1833.6,
+    "mean": 1607.2285714285713
+  },
+  "baseline_concurrency": 16,
+  "baseline_recent_full_concurrency_log_windows": 20,
+  "baseline_generation_tokens_per_second": {
+    "min": 868.8,
+    "max": 935.9,
+    "mean": 921.95
+  },
+  "checkpointing_enabled": true,
+  "vllm_memory_utilization": 0.65,
+  "note": "Observed generation-stage log intervals, not a matched end-to-end timing comparison; request lengths and cache reuse differ."
+}

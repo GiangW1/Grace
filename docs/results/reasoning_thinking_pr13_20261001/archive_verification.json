@@ -1,0 +1,12 @@
+{
+  "status": "verified",
+  "archive": "/SSD/00/wja/grace-pr13-thinking-20261001-results-small.tar.gz",
+  "bytes": 213697486,
+  "sha256": "114df9c59cd705aa81790bc097f97df4edfa1b406e09e88025a9b69ad524d26a",
+  "included_files": 428,
+  "included_bytes": 1641561920,
+  "problems": 32,
+  "bundles": 128,
+  "probe_files": 128,
+  "verified_utc": "2026-10-04T03:21:41.820679+00:00"
+}

@@ -1,0 +1,16 @@
+{
+  "source_run": "/SSD/00/wja/grace-pr13-thinking-v3-8cac23f-20261004-run",
+  "reason": "User requested 32 continuations per prefix and retained 16 concurrent requests",
+  "n_problems": 32,
+  "n_prefixes": 2,
+  "n_continuations": 32,
+  "n_baseline": 16,
+  "decision_grid": [1024, 2048],
+  "max_new_tokens": 8192,
+  "request_concurrency": 16,
+  "gradient_gpu": 0,
+  "rollout_gpu": 2,
+  "reused": ["input questions", "frozen LoRA checkpoint", "unchanged two-continuation smoke", "exact request-keyed rollout cache"],
+  "reuse_old_gradient_statistics": false,
+  "note": "The 32-continuation run recomputes gradient statistics with A/B halves of 16. Exact request hashes permit cached responses to be reused; RNG-dependent requests that differ are generated anew. The source 64-continuation run is retained separately."
+}

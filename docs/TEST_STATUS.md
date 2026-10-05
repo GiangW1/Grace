@@ -2,6 +2,27 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
+## Corrected PR13 completed run (2026-10-05)
+
+- Full CPU suite: `865 passed, 1 skipped in 114.34s` using
+  `OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -o addopts=''`.
+- Completed 32-problem / 32-continuation GPU collection and all offline analyses
+  are recorded in `docs/results/reasoning_thinking_pr13_c32_20261005/`.
+- The timing test's synthetic bundle now exposes the trajectory summary fields
+  consumed by the audit. The CPU suite is separate from real GPU measurements.
+
+## PR13 thinking audit 修复（2026-10-04，8cac23f 后）
+
+相关 CPU/替身回归：`232 passed, 1 skipped in 29.67s`。
+覆盖合法零前缀题与缺失 bundle 的区分、保留原始题数与观测题数、
+probe 的真实 length/stop/EOS 评分、普通续写 q 与 probe 分层的隔离、
+续跑前保留旧权重、逐前缀和跨 worker 度量校验，以及非均匀对角权重下
+的完整 oracle/predictor/mechanism/benefit 分析。缺失加权二阶矩不会回退欧氏范数。
+
+命令：`OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest tests/test_separated_thinking.py tests/test_learning_mechanism.py tests/test_data_eval_audit.py tests/test_measurement_remediation.py tests/test_dynamic_score_experiments.py tests/test_trajectory_audit.py tests/test_review_audit.py tests/test_review2.py tests/test_fidelity.py -q -o addopts=''`。
+`audit_separated_thinking.py --help` 与 `git diff --check` 通过。
+所有新增分析数据均为合成测试；未启动新的真实 GPU 实验。
+
 ## GPU 运行修复交接（2026-09-21）
 
 服务器执行 `python -m pytest -q`，全量回归退出码 0，1 项跳过。
@@ -165,3 +186,10 @@ python scripts/train.py --config configs/experiments/minimal.yaml --run-dir runs
 ```
 
 当前工作树的 GPU 比较：`bash scripts/run_minimal_gpu.sh`。论文规模仍按 README：先 smoke Full-PG，再 Pilot。不把 tiny / 2026-09-16 两次 smoke / 那次 16 题链写成现役实测。
+
+## 2026-10-04 Thinking audit execution optimization
+
+- PR13 targeted validation: 109 passed. Grouped continuation tests compare request seeds, individual gradient statistics, per-prefix RNG states, and partial resume against sequential execution.
+- Execution knobs now expose HTTP concurrency, vLLM sequence capacity/memory budget, grouped prefix continuations, feature batch size, and activation checkpointing. Sample counts and scoring are independent of these knobs.
+- On the frozen Qwen3-4B actor, one real 8192-response-token score gradient averaged 2.249 s with checkpointing (23.30 GiB allocated peak), versus 2.304 s without it (58.58 GiB). Relative gradient L2 difference was 0.775%. Checkpointing remains enabled; two repeats do not establish a speed benefit from disabling it.
+- Runtime benchmark: `scripts/benchmark_audit_execution.py`. Generation throughput must be read from the resumed run logs; unit tests are not performance measurements.
