@@ -1,0 +1,50 @@
+[
+  {
+    "text": " 6",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      21,
+      151645
+    ],
+    "seed": 96044933
+  },
+  {
+    "text": " 3",
+    "reward": 1.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      18,
+      151645
+    ],
+    "seed": 1624932720
+  },
+  {
+    "text": " 4",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      19,
+      151645
+    ],
+    "seed": 2035168997
+  },
+  {
+    "text": " 5",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      20,
+      151645
+    ],
+    "seed": 20373616
+  }
+]

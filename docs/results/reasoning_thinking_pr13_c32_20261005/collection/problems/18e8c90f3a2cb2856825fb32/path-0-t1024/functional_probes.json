@@ -1,0 +1,88 @@
+[
+  {
+    "text": " 2020",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      15,
+      17,
+      15,
+      151645
+    ],
+    "seed": 1295337118
+  },
+  {
+    "text": " 2020",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      15,
+      17,
+      15,
+      151645
+    ],
+    "seed": 1079520180
+  },
+  {
+    "text": " 2020\n\nWait, no. The problem says the expected value of the sum is 2020. Therefore, the formula is E",
+    "reward": 0.0,
+    "finish_reason": "length",
+    "truncated": true,
+    "token_ids": [
+      220,
+      17,
+      15,
+      17,
+      15,
+      271,
+      14190,
+      11,
+      902,
+      13,
+      576,
+      3491,
+      2727,
+      279,
+      3601,
+      897,
+      315,
+      279,
+      2629,
+      374,
+      220,
+      17,
+      15,
+      17,
+      15,
+      13,
+      15277,
+      11,
+      279,
+      14806,
+      374,
+      468
+    ],
+    "seed": 1235121158
+  },
+  {
+    "text": " 2020",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      15,
+      17,
+      15,
+      151645
+    ],
+    "seed": 1946405158
+  }
+]

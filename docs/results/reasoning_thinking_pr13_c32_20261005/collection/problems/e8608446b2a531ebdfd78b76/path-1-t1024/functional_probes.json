@@ -1,0 +1,83 @@
+[
+  {
+    "text": " 25",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      20,
+      151645
+    ],
+    "seed": 1727230624
+  },
+  {
+    "text": " 133",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      16,
+      18,
+      18,
+      151645
+    ],
+    "seed": 2033460238
+  },
+  {
+    "text": " 21",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      16,
+      151645
+    ],
+    "seed": 306399837
+  },
+  {
+    "text": " 32 + 10 + 5 = 47\n\nWait, no. Wait, I didn't actually solve the problem. I need to",
+    "reward": 0.0,
+    "finish_reason": "length",
+    "truncated": true,
+    "token_ids": [
+      220,
+      18,
+      17,
+      488,
+      220,
+      16,
+      15,
+      488,
+      220,
+      20,
+      284,
+      220,
+      19,
+      22,
+      271,
+      14190,
+      11,
+      902,
+      13,
+      13824,
+      11,
+      358,
+      3207,
+      944,
+      3520,
+      11625,
+      279,
+      3491,
+      13,
+      358,
+      1184,
+      311
+    ],
+    "seed": 133729773
+  }
+]

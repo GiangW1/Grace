@@ -1,0 +1,34 @@
+{
+  "n_problems": 32,
+  "append_32": false,
+  "model": "Qwen/Qwen3-4B",
+  "model_revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+  "enable_thinking": true,
+  "n_prefixes": 2,
+  "n_continuations": 32,
+  "n_baseline": 16,
+  "request_concurrency": 16,
+  "max_new_tokens": 8192,
+  "decision_grid": [
+    1024,
+    2048
+  ],
+  "functional_probes": {
+    "n": 4,
+    "max_new_tokens": 32,
+    "threshold": 0.5
+  },
+  "gpu_roles": {
+    "0": "gradient worker 0",
+    "2": "vLLM generation"
+  },
+  "data_dir": "/SSD/00/wja/grace-pr13-thinking-v3-8cac23f-c32-20261004-run/inputs",
+  "checkpoint": "/SSD/00/wja/grace-pr13-thinking-v3-8cac23f-c32-20261004-run/frozen-thinking-lora.npz",
+  "source_commit": "7defe11f885072328eb29f56290bf5b9a33c4528",
+  "reward_protocol_version": 3,
+  "primary_metric": "euclidean",
+  "metric_file": null,
+  "adam_metric": "not_requested",
+  "difficulty_manifest": null,
+  "difficulty_counts": null
+}

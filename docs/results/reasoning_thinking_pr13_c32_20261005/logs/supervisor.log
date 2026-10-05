@@ -1,0 +1,12 @@
+2026-10-04T13:22:06.292814+00:00 phase=waiting_model_download {}
+2026-10-04T13:22:06.357992+00:00 phase=starting_vllm {'gpu': 2}
+2026-10-04T13:22:26.410733+00:00 phase=smoke_running {'gpu': 0}
+2026-10-04T13:22:26.443953+00:00 phase=collecting {'n_problems': 32, 'gradient_gpus': [0], 'rollout_gpu': 2}
+2026-10-04T13:22:26.508439+00:00 launch=worker-0 gpu=0
+2026-10-04T13:46:44.894820+00:00 phase=waiting_model_download {}
+2026-10-04T13:46:44.957611+00:00 phase=starting_vllm {'gpu': 2}
+2026-10-04T13:47:04.989342+00:00 phase=smoke_running {'gpu': 0}
+2026-10-04T13:47:05.004849+00:00 phase=collecting {'n_problems': 32, 'gradient_gpus': [0], 'rollout_gpu': 2}
+2026-10-04T13:47:05.052034+00:00 launch=worker-0 gpu=0
+2026-10-04T22:53:35.523788+00:00 phase=offline_predictor_analysis {}
+2026-10-04T23:02:53.022736+00:00 phase=completed {'summary': '/SSD/00/wja/grace-pr13-thinking-v3-8cac23f-c32-20261004-run/collection/benefit/predictor_benefit_summary.json'}

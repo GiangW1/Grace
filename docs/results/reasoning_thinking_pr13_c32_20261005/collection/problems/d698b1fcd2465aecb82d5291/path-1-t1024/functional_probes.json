@@ -1,0 +1,86 @@
+[
+  {
+    "text": " 15/4 * [1 + (-1)^{a + b + c}]/2 summed over all a, b, c?\n\nWait,",
+    "reward": 0.0,
+    "finish_reason": "length",
+    "truncated": true,
+    "token_ids": [
+      220,
+      16,
+      20,
+      14,
+      19,
+      353,
+      508,
+      16,
+      488,
+      10293,
+      16,
+      29776,
+      90,
+      64,
+      488,
+      293,
+      488,
+      272,
+      92,
+      9769,
+      17,
+      65666,
+      916,
+      678,
+      264,
+      11,
+      293,
+      11,
+      272,
+      1939,
+      14190,
+      11
+    ],
+    "seed": 1134548732
+  },
+  {
+    "text": " 167",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      16,
+      21,
+      22,
+      151645
+    ],
+    "seed": 652749011
+  },
+  {
+    "text": " 257",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      20,
+      22,
+      151645
+    ],
+    "seed": 1100163962
+  },
+  {
+    "text": " 1963",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      16,
+      24,
+      21,
+      18,
+      151645
+    ],
+    "seed": 84403081
+  }
+]

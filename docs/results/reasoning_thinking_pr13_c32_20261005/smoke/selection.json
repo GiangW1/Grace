@@ -1,0 +1,19 @@
+{
+  "selection": "provided",
+  "selection_seed": 17,
+  "n_problems": 1,
+  "prompt_normalization": "whitespace_v2_case_sensitive",
+  "problems": [
+    {
+      "problem_id": "9a9b6eb4-a1cb-49d1-8c1e-62eaf2f74079",
+      "prompt_sha256": "4ae0fed4decbb7cd98c9c8d31e88c7399ade1759aa12274fd2bbace337fb6b1c",
+      "gold_sha256": "86e50149658661312a9e0b35558d84f6c6d3da797f552a9657fe0558ca40cdef"
+    }
+  ],
+  "ordered_records_sha256": "2dad8f096f7dab8f6ed8d22db22cde7360e7d7c8b3e9a760a0e2878093d70b40",
+  "difficulty_manifest": null,
+  "difficulty_manifest_sha256": null,
+  "difficulty_counts": null,
+  "actual_difficulty_counts": null,
+  "reward_protocol_version": 3
+}
