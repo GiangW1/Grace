@@ -1,0 +1,7 @@
+{
+  "scope": "mainline_audit_only",
+  "reason": "Full-PG and ST single optimizer updates were already validated in the previous run. This queue repeats real short/16384 GPU smoke and paired audits; the actor stress benchmark validates changed checkpoint execution. No duplicate single-step training is needed for the frozen mainline audit.",
+  "deferred_jobs": ["full-pg-one-step", "st-one-step"],
+  "prior_training_validation_run": "/SSD/00/wja/grace-pr15-suffix-transport-1e4e496-20261006-run",
+  "validation_limit": "Previous full-PG/ST training updates used the 8192 horizon, not 16384. The 16384 audit remains frozen; this does not establish training gains."
+}

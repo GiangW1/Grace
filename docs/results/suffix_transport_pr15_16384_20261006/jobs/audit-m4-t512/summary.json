@@ -1,0 +1,152 @@
+{
+  "mode": "audit",
+  "n_groups": 64,
+  "n_live_groups": 64,
+  "n_problems": 32,
+  "methods": {
+    "full_pg": {
+      "mean_conditional_trace_variance": 29790.842855517203,
+      "problem_bootstrap_95ci": [
+        24308.690133706354,
+        35093.52405800294
+      ]
+    },
+    "full_rb": {
+      "mean_conditional_trace_variance": 138491.8731041202,
+      "problem_bootstrap_95ci": [
+        108253.95908293375,
+        175641.62255318236
+      ]
+    },
+    "st_lambda_0": {
+      "mean_conditional_trace_variance": 138491.87310411804,
+      "problem_bootstrap_95ci": [
+        108253.95908293195,
+        175641.62255317962
+      ]
+    },
+    "st_lambda_1": {
+      "mean_conditional_trace_variance": 138491.87310411804,
+      "problem_bootstrap_95ci": [
+        108253.95908293195,
+        175641.62255317962
+      ]
+    }
+  },
+  "contrasts": {
+    "full_pg_minus_donor": {
+      "mean_conditional_variance_difference": -108701.03024860084,
+      "paired_problem_bootstrap_95ci": [
+        -142400.26585672135,
+        -83797.67148962527
+      ],
+      "n_paired_problems": 32,
+      "direction": "negative means less variance than paired donor"
+    },
+    "full_rb_minus_donor": {
+      "mean_conditional_variance_difference": 2.147430677723605e-09,
+      "paired_problem_bootstrap_95ci": [
+        1.5645582607248798e-09,
+        2.818424604811298e-09
+      ],
+      "n_paired_problems": 32,
+      "direction": "negative means less variance than paired donor"
+    },
+    "st_lambda_1_minus_donor": {
+      "mean_conditional_variance_difference": 0.0,
+      "paired_problem_bootstrap_95ci": [
+        0.0,
+        0.0
+      ],
+      "n_paired_problems": 32,
+      "direction": "negative means less variance than paired donor"
+    }
+  },
+  "scope": "Conditional on frozen prefixes; includes live/N weighting, excludes between-prefix variance. No efficiency claim from replay time.",
+  "population": {
+    "methods": {
+      "full_pg": {
+        "second_moment": 32360.18520102318,
+        "mean_norm_squared_plugin": 121.1908948501132,
+        "mean_norm_squared_noise_corrected": 23.891701618951444,
+        "population_trace_variance": 32336.29349940423,
+        "note": "Finite-sample corrected estimates can be negative; they are not clipped or used as launch gates."
+      },
+      "full_rb": {
+        "second_moment": 141349.4719084815,
+        "mean_norm_squared_plugin": 363.1237783460628,
+        "mean_norm_squared_noise_corrected": 50.37372780962494,
+        "population_trace_variance": 141299.09818067186,
+        "note": "Finite-sample corrected estimates can be negative; they are not clipped or used as launch gates."
+      },
+      "st_lambda_0": {
+        "second_moment": 141349.47190848153,
+        "mean_norm_squared_plugin": 363.1237783460628,
+        "mean_norm_squared_noise_corrected": 50.37372780962494,
+        "population_trace_variance": 141299.0981806719,
+        "note": "Finite-sample corrected estimates can be negative; they are not clipped or used as launch gates."
+      },
+      "st_lambda_1": {
+        "second_moment": 141349.47190848153,
+        "mean_norm_squared_plugin": 363.1237783460628,
+        "mean_norm_squared_noise_corrected": 50.37372780962494,
+        "population_trace_variance": 141299.0981806719,
+        "note": "Finite-sample corrected estimates can be negative; they are not clipped or used as launch gates."
+      }
+    },
+    "scope": "Uniform selected problems; fresh independent prefix groups and suffix draws, original group denominator. Includes between-prefix variability. Does not turn audit replay wall time into training efficiency."
+  },
+  "full_rb": true,
+  "actor_execution": {
+    "fuse_audit_scores": true,
+    "posterior_score_batch_size": 4,
+    "audit_prefetch": true
+  },
+  "note": "Lambda optimum is descriptive; calibrate on separate problems before held-out testing. Short cap runs change the reward horizon.",
+  "stage_wall_seconds": {
+    "sync": 0.10046067833900452,
+    "setup": 35.513704773038626,
+    "prefix_generation": 335.330519026611,
+    "suffix_generation": 15168.86312149372,
+    "gradient": 9339.283041140996
+  },
+  "generated_tokens": 14562312,
+  "actual_completions": 2048,
+  "actual_successes": 1812,
+  "first_success_problem_ids": [
+    "0cad4bab-11b4-4aab-9df2-71404cfa2235",
+    "0ea80d5e-f068-4afa-b701-695865a0c25e",
+    "0f442dc9-6ef7-4a2b-9d81-49a86b3e2e8b",
+    "14b219ba-dc32-4486-9d01-4c51a5e54cf6",
+    "1cdd4375-df81-460c-afe6-151841923762",
+    "1d518931-3873-4ea4-b585-a9a482c8590d",
+    "28d9b609-23c7-46d2-a402-ff8b3c1e55f8",
+    "2a7effb7-bbfd-4276-8680-9ab0b6d5683b",
+    "2b8eb2a8-098c-4a78-b696-7d6bd2471324",
+    "2e7f8872-d8df-489a-95bd-f13a805418c8",
+    "33490cb3-5df6-4837-b40f-912337b71133",
+    "3abf39ba-d880-4786-aa9e-043e85a52421",
+    "6e551f34-8688-4c3e-8d4f-9bcd8d8a9be7",
+    "71b9c96e-2e7b-4f98-a03a-9bded9ceabbf",
+    "8221a386-160e-40d4-b604-b3c0f2fc84b9",
+    "8268468a-b6b2-4df2-9d56-e1a020f6dfe7",
+    "833b68a8-d586-4e67-97c4-f2b26b829382",
+    "88f545df-8558-42cb-95cc-ab2f6a1a1dc2",
+    "8f61f04c-152c-437d-92fc-ce564e9630f3",
+    "902499da-806d-4b59-b003-2115b7cefc58",
+    "a63eca76-43a6-4427-b987-299132f26148",
+    "a8d8ac0a-512c-4a08-82a1-2fa406302092",
+    "a9ea42cb-c7f4-4c4b-921d-8bc5e2a306bf",
+    "b59046b6-42da-4571-9461-d9c254f28ba1",
+    "ba93c5fa-84ee-406e-9c33-57908038237e",
+    "bab12583-53b0-49e9-960a-b1dc90d56809",
+    "bb838926-ff07-4e04-a18e-cd8b6c773ac1",
+    "c62eeade-4f54-42a0-bfaf-ce9588991185",
+    "d38d81c7-3bfe-47a1-9e47-2a7bd8bf354d",
+    "e55b8c91-fc19-4704-8f25-b0a5ea325d35",
+    "eef59bf3-e668-4cb9-9c62-ddf0c0f26a23"
+  ],
+  "actual_wall_seconds": 16428.61550990399,
+  "reserved_gpu_seconds": 32857.23101980798,
+  "timing_note": "Setup contains initial sync; stage totals overlap. Reserved GPU time is n_gpu*elapsed, not summed stages."
+}
