@@ -232,6 +232,41 @@ def test_audit_frozen_pairing_and_full_pg_control(tiny, tmp_path, monkeypatch):
     assert report["population"]["methods"]["full_pg"]["population_trace_variance"] is None
 
 
+@pytest.mark.parametrize("batch_size", [2, 8])
+def test_audit_draw_batches_preserve_donors_seeds_and_moments(tiny, tmp_path, monkeypatch, batch_size):
+    experiments, reports, requests = [], [], []
+    for name, size in (("reference", 1), ("batched", batch_size)):
+        directory = tmp_path / name
+        exp, _, _, _ = experiment_fixture(tiny, directory, monkeypatch)
+        exp.cfg["suffix_transport"]["audit_draw_batch_size"] = size
+        batches = []
+
+        def continuation(prefixes, chosen, max_new, rng, exp=exp, batches=batches):
+            indices = [i for i, selected in enumerate(chosen) if selected]
+            seeds = rng.integers("continuation", 2, 10, size=len(indices)).tolist()
+            mapping = dict(zip(indices, seeds))
+            exp.engines.last_rollout = {"continue_request_seeds": mapping}
+            batches.append(len(indices))
+            return [prefix + [mapping[i], 11] if chosen[i] else None
+                    for i, prefix in enumerate(prefixes)]
+
+        exp.engines.continue_selected = continuation
+        reports.append(exp.audit())
+        experiments.append(exp)
+        requests.append(batches)
+    assert requests[0] == [2, 2, 2]
+    assert requests[1] == ([4, 2] if batch_size == 2 else [6])
+    assert reports[0] == reports[1]
+    for stream in ("selection", "continuation"):
+        assert experiments[0].rng.streams[stream].bit_generator.state == experiments[1].rng.streams[stream].bit_generator.state
+    for filename in ("transport_draws.jsonl", "trajectories.jsonl", "groups.jsonl"):
+        assert (tmp_path / "reference" / filename).read_text() == (tmp_path / "batched" / filename).read_text()
+    with np.load(tmp_path / "reference/moments/problem-0-group-0.npz") as reference:
+        with np.load(tmp_path / "batched/moments/problem-0-group-0.npz") as batched:
+            for key in reference.files:
+                np.testing.assert_array_equal(reference[key], batched[key])
+
+
 def test_population_statistics_include_between_prefix_noise(tmp_path):
     from grace_gc.audit.suffix_transport import summarize_population
 

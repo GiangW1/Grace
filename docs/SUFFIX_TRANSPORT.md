@@ -182,3 +182,30 @@ CUDA_VISIBLE_DEVICES=1 python scripts/evaluate.py --generate --backend gpu_verl 
 配置、seed、源码 commit/diff、软件版本、选题 manifest、轨迹、梯度布局、
 开始/结束/失败状态及实际时间写入 run 目录。同名重跑自动加 UTC 后缀，不覆盖旧结果。
 中断日志保留已完成记录；下一次用新 run-dir，当前没有断点续采。
+
+## 2026-10-06 双卡服务器运行
+
+本轮基于 `1e4e496`，保留上一轮的 Qwen3-4B thinking、共同 zero-B actor、
+BF16 forward 和 activation checkpointing。GPU0 为 HF actor，GPU2 为 vLLM；
+vLLM memory utilization=0.65、max_num_seqs=32。直接批量 RPC 不需要 HTTP 并发参数。
+
+`suffix_transport_execution_a100_2.yaml` 将八个独立 audit draw 按 draw-major 顺序
+一起生成；m=4 时最多 32 条，m=2 时最多 16 条。selection RNG 与 continuation
+RNG 分开，donor 在采样前确定；独立 Full-PG 后缀、自然完成者和固定 N 保持原定义。
+`transport_draws.jsonl` 额外保存每条真实续写的 request seed。
+49 项 CPU 回归通过，包括分批/逐次采样的 donor、seed、记录、全空间统计和 RNG 状态比较。
+真实 CUDA/vLLM 的批量数值差异仍以 GPU smoke 及实际记录为准。
+
+专用输入选择 32 道 audit 题，排除 PR13/PR14 已使用题面和 MATH-500；
+与训练题面无精确重合。`input_manifest.json` 保留源数据、选题和共同 actor 的 hash。
+这不检查基础模型预训练时的题目接触历史。
+
+`supervise_suffix_transport.py` 持久化 CPU smoke、Full-PG 首次更新、GPU 短 smoke、
+ST 首次更新、完整长度 smoke、m=2/4 审计、三方法预算训练和独立 MATH-500 评测队列。
+训练沿文档使用 seed 17/29/43，每种方法各 3600 秒；三方法统一每步八题，
+Full-PG 每步最多 32 条续写，ST 和高效 donor-only 每步最多八条。
+质量比较读取最后一个预算内保存的 checkpoint，初始化和审计不计为训练预算收益。
+
+队列保留每次失败目录；OOM 时等待 GPU 可用后用新目录重启当前任务。
+已完成任务不重跑，但这不是单个 audit 或 ST optimizer/RNG 的断点续跑。
+状态在 run 根目录 `supervisor_status.json`，命令和日志在 `queue.json` / `logs/`。

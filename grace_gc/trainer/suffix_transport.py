@@ -35,6 +35,8 @@ def validate_experiment(cfg):
             raise ValueError(f"suffix_transport.{name} must be positive")
     if int(st["n_problems"]) < 0 or int(st["bootstrap"]) < 0:
         raise ValueError("n_problems and bootstrap must be nonnegative")
+    if int(st.get("audit_draw_batch_size", 1)) < 1:
+        raise ValueError("audit_draw_batch_size must be positive")
     if not np.isfinite(float(st["strength"])) or not np.isfinite(float(st["baseline"])):
         raise ValueError("strength and fixed baseline must be finite")
     if st["method"] not in {"full_pg", "donor_only", "suffix_transport"}:
@@ -389,6 +391,24 @@ class Experiment:
                 "budget_checkpoint": self.budget_checkpoint,
                 "note": "A batch already begun finishes; the budget can overshoot by one batch plus persistence/cleanup. Use timed checkpoints within budget for quality comparisons."}
 
+    def audit_completions(self, prefixes, group):
+        st = self.cfg["suffix_transport"]
+        draws = int(st["audit_draws"])
+        batch_size = int(st.get("audit_draw_batch_size", 1))
+        width = len(prefixes)
+        selected = [i in group for i in range(width)]
+        for begin in range(0, draws, batch_size):
+            count = min(batch_size, draws - begin)
+            # Selection and continuation have independent RNG streams. Preserve
+            # draw-major request order while selecting before suffix sampling.
+            donors = [draw_donors([group], self.rng)[0] for _ in range(count)]
+            full = self.continue_batch(prefixes * count, selected * count)
+            seeds = (self.engines.last_rollout or {}).get("continue_request_seeds", {})
+            for offset, donor in enumerate(donors):
+                first = offset * width
+                yield (begin + offset, donor, full[first:first + width],
+                       [seeds.get(first + i) for i in group])
+
     def audit(self):
         from grace_gc.versions import sha256_named
 
@@ -413,11 +433,8 @@ class Experiment:
                     plen = len(self.prompts[rec])
                     prefix_grads = np.stack([self.gradient(prefix, plen) for prefix in prefix_group])
                     ess_values, donor_masses = [], []
-                    for draw in range(int(st["audit_draws"])):
-                        donor = draw_donors([group], self.rng)[0]  # Uniform, before suffix sampling.
-                        chosen = [i in group for i in range(m)]
+                    for draw, donor, full, request_seeds in self.audit_completions(prefixes, group):
                         # Independent on-policy completions supply a real Full-PG control.
-                        full = self.continue_batch(prefixes, chosen)
                         own_grads, rewards = [], []
                         for i in group:
                             reward = self.observe(full[i], rec, group_id=group_id, draw=draw, start=i, phase="suffix")
@@ -443,6 +460,7 @@ class Experiment:
                         donor_masses.append(float(alpha[donor]))
                         self.run.append_jsonl("transport_draws.jsonl", {"problem_id": row["problem_id"],
                               "group_id": group_id, "draw": draw, "donor": donor, "live_start_indices": group,
+                              "request_seeds": request_seeds,
                               "suffix_token_ids": suffix, "alpha": alpha.tolist(), "log_likelihoods": likelihoods,
                               "counterfactual_rewards": (advantages + baseline).tolist(), "actual_rewards": rewards,
                               "counterfactuals_are_exploration_successes": False})
