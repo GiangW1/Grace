@@ -7,7 +7,8 @@ status: in-progress
 
 2026-10-06 增量：在 PR14 `exp-a-learning-completion` 上加入独立 GRACE-ST 后缀信用传递、
 冻结配对/总体方差审计、Full-PG/高效 donor-only/ST 训练与 CPU/GPU smoke。
-旧 HT 主入口保留。22 项新增合成检查及 159 项相关回归通过；真实 GPU 留给服务器执行。
+旧 HT 主入口保留。审查后 30 项 ST 合成检查及 187 项相关回归通过；真实 GPU 留给服务器执行。
+修正评测算法身份、预算内 checkpoint、lambda=0 日志；补全后缀概率/NaN smoke 和配对方差区间。
 本机全量旧失败及 PR14 基线复现见 [TEST_STATUS](../docs/TEST_STATUS.md)，
 具体运行命令与未实现边界见 [SUFFIX_TRANSPORT](../docs/SUFFIX_TRANSPORT.md)。
 

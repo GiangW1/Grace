@@ -4,8 +4,13 @@
 
 ## GRACE-ST suffix transport（2026-10-06）
 
-- 新增 22 项 CPU 检查通过；相关回归 `159 passed in 17.74s`。
-  命令：`OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python -m pytest tests/test_suffix_transport.py tests/test_rng.py tests/test_layout_and_reduce.py tests/test_rollout_pool.py tests/test_rollout_observability.py tests/test_data_eval_audit.py tests/test_estimator.py tests/test_fidelity.py tests/test_fixed_n_20260919.py tests/test_backward_reuse_20260919.py -q -o addopts=''`。
+- 审查修复后，30 项 ST CPU 检查通过；扩展相关回归 `187 passed in 21.36s`。
+  命令：`OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python -m pytest tests/test_suffix_transport.py tests/test_rng.py tests/test_layout_and_reduce.py tests/test_rollout_pool.py tests/test_rollout_observability.py tests/test_data_eval_audit.py tests/test_estimator.py tests/test_fidelity.py tests/test_fixed_n_20260919.py tests/test_backward_reuse_20260919.py tests/test_multistep_and_eval.py tests/test_eval_repeatability.py tests/test_eval_execution_trace.py tests/test_training_eval_exclusion.py -q -o addopts=''`。
+- 审查修复覆盖：旧评测入口按 checkpoint algorithm 报告 ST/donor-only 身份；预算末批
+  超时后仍有最后预算内 checkpoint；lambda=0 不伪造后验/反事实奖励；实际后缀
+  行为概率与 HF 序列概率差；NaN 梯度/概率不能通过 smoke；按题配对方差差值区间。
+  保存配置显式记录 BF16 compute 和 GPU backend；运行文档修正单卡评测账本、独立留出题
+  及 Full-PG 首次 GPU 作业顺序。GPU 数值与总体方差收益仍未验证。
 - 覆盖精确枚举无偏性、长 logsumexp、接收者自己的奖励、固定 N、自然 EOS、
   完整 q/v A/B、非零 B 下的 loss/参考梯度、符号、因果前缀图、checkpoint、RNG，
   三训练入口、真实 Full-PG 配对、条件/总体二阶矩和全部自然结束、预算耗尽。

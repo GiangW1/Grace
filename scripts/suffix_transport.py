@@ -93,6 +93,9 @@ def main(argv=None):
     starts_per_prompt = 1 if args.mode == "train" and st["method"] == "donor_only" else int(st["group_size"])
     cfg["n_start"] = cfg["n_prompts"] * starts_per_prompt
     cfg["baseline"] = {"mode": "fixed", "fixed_value": float(st["baseline"]), "prescan_n": 0}
+    cfg["lora"]["compute_dtype"] = "bfloat16"
+    if not args.cpu:
+        cfg["backend"] = "gpu_verl"
     validate_experiment(cfg)
     destination = start_experiment_run(args.run_dir, f"suffix_transport_{args.mode}", {"args": vars(args), "config": cfg})
     run, exp = RunDirectory(destination), None

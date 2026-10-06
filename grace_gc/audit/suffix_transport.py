@@ -66,6 +66,7 @@ def summarize_groups(rows, bootstrap=1000, seed=17):
     names = sorted({name for row in rows for name in row["moments"]["methods"]})
     rng = np.random.default_rng(seed)
     result = {}
+    per_method = {}
     ids = sorted({row["problem_id"] for row in rows})
     draws = [rng.choice(ids, len(ids), replace=True).tolist() for _ in range(bootstrap)] if ids else []
     for name in names:
@@ -76,12 +77,26 @@ def summarize_groups(rows, bootstrap=1000, seed=17):
                 # Collector already includes natural finishes and the fixed N.
                 by_problem.setdefault(row["problem_id"], []).append(value)
         averages = {pid: float(np.mean(values)) for pid, values in by_problem.items()}
+        per_method[name] = averages
         samples = [float(np.mean([averages[pid] for pid in draw if pid in averages]))
                    for draw in draws if any(pid in averages for pid in draw)]
         result[name] = {"mean_conditional_trace_variance": float(np.mean(list(averages.values()))) if averages else None,
                         "problem_bootstrap_95ci": np.quantile(samples, [.025, .975]).tolist() if samples else None}
+    contrasts = {}
+    reference = per_method.get("st_lambda_0", {})
+    for name, estimates in per_method.items():
+        if name == "st_lambda_0":
+            continue
+        differences = {pid: estimates[pid] - reference[pid] for pid in estimates.keys() & reference.keys()}
+        samples = [float(np.mean([differences[pid] for pid in draw if pid in differences]))
+                   for draw in draws if any(pid in differences for pid in draw)]
+        contrasts[f"{name}_minus_donor"] = {
+            "mean_conditional_variance_difference": float(np.mean(list(differences.values()))) if differences else None,
+            "paired_problem_bootstrap_95ci": np.quantile(samples, [.025, .975]).tolist() if samples else None,
+            "n_paired_problems": len(differences), "direction": "negative means less variance than paired donor"}
     return {"n_groups": len(rows), "n_live_groups": len(live), "n_problems": len({r['problem_id'] for r in rows}),
-            "methods": result, "scope": "Conditional on frozen prefixes; includes live/N weighting, excludes between-prefix variance. No efficiency claim from replay time."}
+            "methods": result, "contrasts": contrasts,
+            "scope": "Conditional on frozen prefixes; includes live/N weighting, excludes between-prefix variance. No efficiency claim from replay time."}
 
 
 def summarize_population(rows, root):

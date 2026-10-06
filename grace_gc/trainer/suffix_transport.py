@@ -39,6 +39,9 @@ def validate_experiment(cfg):
         raise ValueError("strength and fixed baseline must be finite")
     if st["method"] not in {"full_pg", "donor_only", "suffix_transport"}:
         raise ValueError("unknown ST training control")
+    budget = st.get("budget_seconds")
+    if budget is not None and (not np.isfinite(float(budget)) or float(budget) <= 0):
+        raise ValueError("budget_seconds must be finite and positive")
     optim = cfg.get("optim", {})
     if (not np.isfinite(float(optim.get("lr", 1e-4))) or float(optim.get("lr", 1e-4)) <= 0
             or not np.isfinite(float(optim.get("grad_clip", 1))) or float(optim.get("grad_clip", 1)) < 0):
@@ -82,6 +85,7 @@ class Experiment:
         self.llm = None
         self.actual_completions = self.actual_successes = self.generated_tokens = 0
         self.first_successes = set()
+        self.budget_checkpoint = None
         self.rng = IsolatedRNG.create(int(cfg.get("seed", 17)))
 
     def timed(self, name, action):
@@ -264,6 +268,13 @@ class Experiment:
         metadata = {"path": str(path), "step": step, "wall_seconds": elapsed,
                     "reserved_gpu_seconds": elapsed * int(self.cfg.get("hardware", {}).get("n_gpu", 1)),
                     "scope": "actor initialization/evaluation; no ST resume entry point"}
+        budget = self.cfg["suffix_transport"].get("budget_seconds")
+        if budget is not None:
+            metadata["within_budget"] = elapsed <= float(budget)
+            if metadata["within_budget"]:
+                self.budget_checkpoint = dict(metadata)
+            self.run.write_json("budget_checkpoint.json", self.budget_checkpoint or {
+                "path": None, "reason": "No checkpoint persisted within the configured wall budget"})
         self.run.write_json("latest_checkpoint.json", metadata)
         self.run.append_jsonl("checkpoints.jsonl", metadata)
         return path
@@ -331,7 +342,8 @@ class Experiment:
                     # lambda=0 is a cheap paired-mechanism ablation, not efficient donor-only.
                     if strength == 0:
                         alpha = np.eye(len(group))[donor]
-                        advantages = np.full(len(group), donor_reward - baseline)
+                        advantages = np.zeros(len(group))
+                        advantages[donor] = donor_reward - baseline
                         likelihoods = None
                     else:
                         alpha, likelihoods = self.posterior(prefix_group, suffix)
@@ -339,9 +351,12 @@ class Experiment:
                     self.timed("backward", lambda: backward_group(self.score, prefix_group, plen, suffix,
                                alpha, advantages, donor, len(group) / n_start, strength))
                     posterior_rows.append({"problem_id": self.records[rec].problem_id, "donor": donor,
-                                           "n_live": len(group), "alpha": alpha.tolist(),
-                                           "log_likelihoods": likelihoods, "counterfactual_rewards": (advantages + baseline).tolist(),
-                                           "ess": float(1 / (alpha @ alpha))})
+                                           "n_live": len(group), "donor_reward": donor_reward,
+                                           "posterior_computed": strength != 0,
+                                           "alpha": alpha.tolist() if strength != 0 else None,
+                                           "log_likelihoods": likelihoods,
+                                           "counterfactual_rewards": (advantages + baseline).tolist() if strength != 0 else None,
+                                           "ess": float(1 / (alpha @ alpha)) if strength != 0 else None})
             def update():
                 if any(p.grad is None or not torch.isfinite(p.grad).all() for _, p in self.named):
                     raise ValueError("missing or nonfinite q/v LoRA optimizer gradient")
@@ -353,7 +368,9 @@ class Experiment:
                 return norm
             norm = self.timed("optimizer", update)
             self.timed("sync", self.extra["sync"])
-            if step % int(st["checkpoint_every"]) == 0 or step == int(st["train_steps"]):
+            # A later batch can cross the budget. Keep every preceding budgeted
+            # step so evaluation never falls back ten updates just due to cadence.
+            if budget is not None or step % int(st["checkpoint_every"]) == 0 or step == int(st["train_steps"]):
                 self.timed("checkpoint", lambda: self.checkpoint(step, optimizer))
             self.run.append_jsonl("steps.jsonl", {"step": step, "method": method, "n_start": n_start,
                                   "natural_prefix_finishes": sum(finished), "n_suffixes": sum(chosen),
@@ -364,11 +381,12 @@ class Experiment:
                                   "first_success_problem_ids": sorted(self.first_successes)})
             print(f"step={step} method={method} starts={n_start} suffixes={sum(chosen)} grad_norm={norm:.6g}", flush=True)
             completed_steps = step
-        if (completed_steps and completed_steps < int(st["train_steps"])
+        if (st.get("budget_seconds") is None and completed_steps and completed_steps < int(st["train_steps"])
                 and completed_steps % int(st["checkpoint_every"]) != 0):
             self.timed("checkpoint", lambda: self.checkpoint(completed_steps, optimizer))
         return {"mode": "train", "method": method, "steps": completed_steps,
                 "requested_steps": int(st["train_steps"]), "budget_seconds": st.get("budget_seconds"),
+                "budget_checkpoint": self.budget_checkpoint,
                 "note": "A batch already begun finishes; the budget can overshoot by one batch plus persistence/cleanup. Use timed checkpoints within budget for quality comparisons."}
 
     def audit(self):

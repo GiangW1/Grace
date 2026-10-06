@@ -283,6 +283,14 @@ def test_gpu_smoke_workflow_with_cpu_engine_fixture(tiny, tmp_path, monkeypatch)
         exp.engines.last_rollout = {"prefix_token_logprobs": behavior}
         return prefixes, finished
     exp.engines.generate_prefix = generate
+    original_continue = exp.engines.continue_selected
+    def continuation(prefixes, *args):
+        full = original_continue(prefixes, *args)
+        exp.engines.last_rollout["continue_token_logprobs"] = {
+            i: hf_response_logprobs(exp.actor, tokens, len(prefixes[i]), 0, [11], max_n=None).tolist()
+            for i, tokens in enumerate(full) if tokens is not None}
+        return full
+    exp.engines.continue_selected = continuation
     def sync():
         exp.extra["lora_id"] += 1
         counts["sync"] += 1
@@ -290,6 +298,8 @@ def test_gpu_smoke_workflow_with_cpu_engine_fixture(tiny, tmp_path, monkeypatch)
     result = gpu_smoke(exp)
     assert result["checkpoint_roundtrip"] and result["optimizer_and_updated_adapter_sync"]
     assert result["hf_behavior_logprob_errors"][0]["restored_eos_without_behavior_logprob"]
+    assert len(result["suffix_hf_behavior_logprob_errors"]) == 1
+    assert result["suffix_hf_behavior_logprob_errors"][0]["signed_sequence_logprob_error"] == pytest.approx(0)
     assert counts["sync"] == 2
     assert sha256_named(exp.named) == exp.initial_sha
 
@@ -302,6 +312,108 @@ def test_budget_finishes_without_invented_steps(tiny, tmp_path, monkeypatch):
     result = exp.train()
     assert result["steps"] == 0 and counts["prefix"] == 0
     assert (tmp_path / "checkpoints" / "step-0.npz").exists()
+
+
+def test_budget_keeps_last_valid_step_before_overshooting_batch(tiny, tmp_path, monkeypatch):
+    import grace_gc.trainer.suffix_transport as module
+
+    exp, _, _, _ = experiment_fixture(tiny, tmp_path, monkeypatch)
+    exp.cfg["suffix_transport"].update(budget_seconds=6., train_steps=100, checkpoint_every=10)
+    clock = [0.]
+    monkeypatch.setattr(module, "perf_counter", lambda: clock[0])
+    old_sync = exp.extra["sync"]
+    def sync():
+        old_sync()
+        clock[0] += 4
+    exp.extra["sync"] = sync
+    result = exp.train()
+    assert result["steps"] == 2
+    assert (tmp_path / "checkpoints" / "step-1.npz").exists()
+    assert result["budget_checkpoint"]["step"] == 1
+    assert json.loads((tmp_path / "budget_checkpoint.json").read_text())["step"] == 1
+    latest = json.loads((tmp_path / "latest_checkpoint.json").read_text())
+    assert latest["step"] == 2 and not latest["within_budget"]
+
+
+def test_lambda_zero_does_not_invent_posterior_or_receiver_rewards(tiny, tmp_path, monkeypatch):
+    exp, _, _, _ = experiment_fixture(tiny, tmp_path, monkeypatch)
+    exp.cfg["suffix_transport"]["strength"] = 0
+    def no_scoring(*args):
+        raise AssertionError("lambda zero should not cross-score")
+    exp.posterior = no_scoring
+    exp.train()
+    group = json.loads((tmp_path / "steps.jsonl").read_text())["posterior_groups"][0]
+    assert group["donor_reward"] == 1
+    assert not group["posterior_computed"]
+    assert group["alpha"] is None and group["ess"] is None and group["counterfactual_rewards"] is None
+
+
+@pytest.mark.parametrize("method", ["suffix_transport", "donor_only", "full_pg"])
+def test_eval_reports_checkpoint_method_not_decoding_alias(tmp_path, monkeypatch, method):
+    from grace_gc.data.math_data import MathRecord
+    from grace_gc.evaluation import generate
+    from grace_gc.evaluation.eval_full import EvalItem
+    from grace_gc.trainer.checkpoint import save_checkpoint
+
+    checkpoint = tmp_path / "weights.npz"
+    estimator = {"method": method, "strength": .4, "group_size": 3}
+    save_checkpoint(checkpoint, {"actor": {"test": np.ones(2)}, "algorithm": method,
+                                "step": 1, "config": {"suffix_transport": estimator}})
+    cfg = config()
+    cfg.update(method="full_pg", backend="gpu_verl", checkpoint=str(checkpoint))
+    cfg["eval"] = {"max_new_tokens": 16, "n": 1, "k": 1}
+    monkeypatch.setattr(generate, "collect_environment", lambda *args: {})
+    monkeypatch.setattr(generate, "_generate_eval_items", lambda *args:
+                        [EvalItem("p", "4", ["Answer: 4"], [False])])
+    output = generate.run_eval([MathRecord("p", "2+2?", "4")], cfg, tmp_path / "evaluation")
+    assert output["method"] == method
+    assert output["training_estimator"] == estimator
+    assert json.loads((tmp_path / "evaluation" / "eval_summary.json").read_text())["method"] == method
+
+
+def test_nonfinite_st_backward_is_not_a_successful_smoke(tiny, monkeypatch):
+    from grace_gc.audit.suffix_transport_smoke import autograd_smoke
+    from grace_gc.backends import suffix_transport as backend
+
+    model, named = tiny
+    def score(ids, start, split=None, **kwargs):
+        return (backend.range_logprob(model, ids, start, 0) if split is None else
+                backend.split_logprob(model, ids, start, split, 0))
+    original = backend.backward_group
+    def corrupt(*args, **kwargs):
+        original(*args, **kwargs)
+        named[0][1].grad.flatten()[0] = float("nan")
+    monkeypatch.setattr(backend, "backward_group", corrupt)
+    with pytest.raises(AssertionError, match="nonfinite ST smoke gradient"):
+        autograd_smoke(score, named, [[1, 2, 3], [1, 4, 5]], 1, [6, 11])
+
+
+def test_behavior_probe_checks_suffix_sequence_drift_and_nan(monkeypatch):
+    from grace_gc.audit.suffix_transport_smoke import behavior_probe
+    from grace_gc.backends import logprob_probe
+
+    exp = SimpleNamespace(actor=None, extra={"pad_id": 0}, engines=SimpleNamespace(eos_id=[9]),
+                          cfg={"suffix_transport": {}})
+    monkeypatch.setattr(logprob_probe, "hf_response_logprobs", lambda *a, **kw: np.array([-1.01, -2.02]))
+    rollout = {"continue_token_logprobs": {3: [-1., -2.]}}
+    args = (exp, [[1, 2, 3, 4]], rollout, 1, [9])
+    report = behavior_probe(*args, phase="continue", starts=[2], indices=[3])[0]
+    assert report["signed_sequence_logprob_error"] == pytest.approx(-.03)
+    assert report["phase"] == "continue" and report["n_tokens"] == 2
+    monkeypatch.setattr(logprob_probe, "hf_response_logprobs", lambda *a, **kw: np.array([np.nan, -2.02]))
+    with pytest.raises(AssertionError, match="nonfinite HF continue"):
+        behavior_probe(*args, phase="continue", starts=[2], indices=[3])
+
+
+def test_variance_contrast_bootstraps_the_paired_difference():
+    rows = []
+    for i, donor in enumerate((1., 100., 10000.)):
+        methods = {"st_lambda_0": {"conditional_trace_variance": donor},
+                   "st_lambda_1": {"conditional_trace_variance": donor - .5}}
+        rows.append({"problem_id": str(i), "n_live": 2, "moments": {"methods": methods}})
+    contrast = summarize_groups(rows, 100)["contrasts"]["st_lambda_1_minus_donor"]
+    assert contrast["mean_conditional_variance_difference"] == pytest.approx(-.5)
+    assert contrast["paired_problem_bootstrap_95ci"] == pytest.approx([-.5, -.5])
 
 
 def test_cli_cpu_smoke_and_preserve_previous_run(tmp_path):

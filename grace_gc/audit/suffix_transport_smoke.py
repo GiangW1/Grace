@@ -71,6 +71,8 @@ def autograd_smoke(score, named, prefixes, prompt_len, suffix, *, rtol=1e-4, ato
         backward_group(score, prefixes, prompt_len, suffix, alpha, advantages, donor, .75, strength)
         actual = -np.concatenate([p.grad.detach().float().cpu().numpy().ravel() for _, p in named])
         expected = .75 * transport_gradient(prefix_grads, gd, alpha, advantages, donor, strength)
+        if not np.isfinite(actual).all() or not np.isfinite(expected).all():
+            raise AssertionError(f"nonfinite ST smoke gradient lambda={strength}")
         # BF16 short/long sequence kernels may differ slightly; a relative L2
         # error is more informative than per-coordinate tolerance at zeros.
         error = float(np.linalg.norm(actual - expected))
@@ -98,15 +100,19 @@ def autograd_smoke(score, named, prefixes, prompt_len, suffix, *, rtol=1e-4, ato
             "scope": "synthetic advantages on actual token graph; no scientific effect threshold"}
 
 
-def behavior_probe(exp, prefixes, rollout, plen, stop_ids):
+def behavior_probe(exp, prefixes, rollout, plen, stop_ids, *, phase="prefix", starts=None, indices=None):
     from grace_gc.backends.logprob_probe import hf_response_logprobs, logprob_error_summary
 
     errors = []
     for i, tokens in enumerate(prefixes):
-        behavior = (rollout.get("prefix_token_logprobs") or [])[i]
-        hf = hf_response_logprobs(exp.actor, tokens, plen, exp.extra["pad_id"], exp.engines.eos_id, max_n=None)
+        index = i if indices is None else indices[i]
+        start = plen if starts is None else starts[i]
+        behavior = (rollout.get(f"{phase}_token_logprobs") or [])[index]
+        hf = hf_response_logprobs(exp.actor, tokens, start, exp.extra["pad_id"], exp.engines.eos_id, max_n=None)
         if len(behavior) != len(hf):
-            raise AssertionError("sampled prefix logprobs missing/misaligned")
+            raise AssertionError(f"sampled {phase} logprobs missing/misaligned")
+        if not np.isfinite(hf).all():
+            raise AssertionError(f"nonfinite HF {phase} logprobs")
         # Some vLLM releases omit the named stop token and its logprob. The
         # two-phase engine restores that token; it must still be scored by HF.
         absent = [j for j, value in enumerate(behavior) if value is None]
@@ -114,8 +120,12 @@ def behavior_probe(exp, prefixes, rollout, plen, stop_ids):
             raise AssertionError("non-EOS sampled logprobs are missing")
         count = len(behavior) - len(absent)
         if not np.isfinite(behavior[:count]).all():
-            raise AssertionError("nonfinite sampled prefix logprobs")
-        error = logprob_error_summary(hf[:count], behavior[:count], tokens[plen:plen + count], plen)
+            raise AssertionError(f"nonfinite sampled {phase} logprobs")
+        error = logprob_error_summary(hf[:count], behavior[:count], tokens[start:start + count], start)
+        error.update(phase=phase, hf_sum=float(np.sum(hf[:count], dtype=np.float64)),
+                     behavior_sum=float(np.sum(behavior[:count], dtype=np.float64)),
+                     signed_sequence_logprob_error=float(np.sum(hf[:count], dtype=np.float64)
+                                                        - np.sum(behavior[:count], dtype=np.float64)))
         error["restored_eos_without_behavior_logprob"] = bool(absent)
         limit = float(exp.cfg["suffix_transport"].get("smoke_logprob_mean_abs_tolerance", .5))
         if error["mean_abs"] is not None and error["mean_abs"] > limit:
@@ -163,7 +173,11 @@ def gpu_smoke(experiment):
     # Compare actual sampled token scores to HF. Missing entries/large mismatch
     # can identify wrong adapter or EOS mapping before a long audit.
     result["hf_behavior_logprob_errors"] = behavior_probe(exp, prefixes, prefix_rollout, plen, stop_ids)
-    result["behavior_scores_note"] = "Roundoff is reported, not an exact HF/vLLM kernel equivalence claim. Review before full-length runs."
+    live = [i for i, chosen in enumerate(selected) if chosen]
+    result["suffix_hf_behavior_logprob_errors"] = behavior_probe(
+        exp, [full[i] for i in live], exp.engines.last_rollout, plen, stop_ids,
+        phase="continue", starts=[len(prefixes[i]) for i in live], indices=live)
+    result["behavior_scores_note"] = "Prefix and complete suffix errors are reported. Small per-token error can accumulate over long suffixes; this does not certify exact posterior weights or unbiasedness."
     for i, tokens in enumerate(full):
         exp.observe(tokens if tokens is not None else prefixes[i], 0, phase="smoke")
     actual = [tokens if tokens is not None else prefixes[i] for i, tokens in enumerate(full)]
