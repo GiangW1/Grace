@@ -78,6 +78,8 @@ The archive is 46,815,588 bytes (44.65 MiB), with 174 retained files and 140
 excluded files totaling 24,387,750,426 bytes. All retained payload hashes and
 the 64/64 groups, 512/512 donor draws, and 1024/2048 trajectories were verified.
 SHA-256: `488c78602b0725a973b9b7594b3728acd46e1ecc8322e05bc985a8ab66b5e348`.
+The published GitHub asset digest matches this hash. A fresh download from the
+public URL also matched byte count and SHA-256; see `archive_download.json`.
 
 The archive retains original generated text/token IDs, complete posterior
 draws/groups, request seeds, audit questions, metadata, logs and compact analysis.
