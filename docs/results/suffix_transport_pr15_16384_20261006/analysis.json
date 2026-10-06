@@ -1,0 +1,201 @@
+{
+  "requested_commit": "1e4e496333b6ea1b1f2c369e5baa1b19079ce185",
+  "source_run": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run",
+  "jobs": {
+    "audit-m2-t512": {
+      "source_identity": {
+        "commit": "4675a348c361002448f9898c84832f82d79b20d7",
+        "status": "",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "n_problems": 32,
+      "n_groups": 64,
+      "n_draws": 512,
+      "actual_completions": 1024,
+      "actual_successes": 883,
+      "sample_success_fraction": 0.8623046875,
+      "truncated": 52,
+      "truncated_fraction": 0.05078125,
+      "response_tokens": {
+        "min": 777,
+        "median": 7281.0,
+        "mean": 7719.119140625,
+        "max": 16384
+      },
+      "suffix_tokens": {
+        "min": 309,
+        "median": 6751.5,
+        "mean": 7147.505859375,
+        "max": 15872
+      },
+      "donor_posterior": {
+        "min": 1.0,
+        "median": 1.0,
+        "mean": 1.0,
+        "max": 1.0
+      },
+      "non_donor_mass": {
+        "min": 0.0,
+        "median": 3.846475824168006e-89,
+        "mean": 1.744614006718743e-31,
+        "max": 8.932423670631509e-29
+      },
+      "ess": {
+        "min": 1.0,
+        "median": 1.0,
+        "mean": 1.0,
+        "max": 1.0
+      },
+      "donor_loglik_gap": {
+        "min": 64.58527993107782,
+        "median": 203.58308698044448,
+        "mean": 230.1399613658322,
+        "max": 897.2333774861909
+      },
+      "donor_is_posterior_argmax": 512,
+      "correction_mean_norm_squared": {
+        "min": 0.0,
+        "median": 2.3916536994830524e-190,
+        "mean": 1.1358581553942613e-77,
+        "max": 7.269492194523069e-76
+      },
+      "correction_trace_variance": {
+        "min": 0.0,
+        "median": 1.9133229595864407e-189,
+        "mean": 9.086865243154095e-77,
+        "max": 5.815593755618458e-75
+      },
+      "conditional_st_over_full_pg": 1.9689021508059372,
+      "population_st_over_full_pg": 1.90835250511076,
+      "contrasts": {
+        "full_pg_minus_donor": {
+          "mean_conditional_variance_difference": -58841.98506956069,
+          "paired_problem_bootstrap_95ci": [
+            -70249.32032248574,
+            -48438.14164780692
+          ],
+          "n_paired_problems": 32,
+          "direction": "negative means less variance than paired donor"
+        },
+        "full_rb_minus_donor": {
+          "mean_conditional_variance_difference": 2.035505985986674e-09,
+          "paired_problem_bootstrap_95ci": [
+            1.6671037883497775e-09,
+            2.5019701865858224e-09
+          ],
+          "n_paired_problems": 32,
+          "direction": "negative means less variance than paired donor"
+        },
+        "st_lambda_1_minus_donor": {
+          "mean_conditional_variance_difference": 0.0,
+          "paired_problem_bootstrap_95ci": [
+            0.0,
+            0.0
+          ],
+          "n_paired_problems": 32,
+          "direction": "negative means less variance than paired donor"
+        }
+      },
+      "actual_wall_seconds": 10972.677888034843,
+      "reserved_gpu_seconds": 21945.355776069686
+    },
+    "audit-m4-t512": {
+      "source_identity": {
+        "commit": "4675a348c361002448f9898c84832f82d79b20d7",
+        "status": "",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "n_problems": 32,
+      "n_groups": 64,
+      "n_draws": 512,
+      "actual_completions": 2048,
+      "actual_successes": 1812,
+      "sample_success_fraction": 0.884765625,
+      "truncated": 79,
+      "truncated_fraction": 0.03857421875,
+      "response_tokens": {
+        "min": 623,
+        "median": 7193.0,
+        "mean": 7558.50390625,
+        "max": 16384
+      },
+      "suffix_tokens": {
+        "min": 123,
+        "median": 6652.5,
+        "mean": 7058.205078125,
+        "max": 15872
+      },
+      "donor_posterior": {
+        "min": 1.0,
+        "median": 1.0,
+        "mean": 1.0,
+        "max": 1.0
+      },
+      "non_donor_mass": {
+        "min": 8.982384077941951e-278,
+        "median": 3.2069310388321665e-76,
+        "mean": 1.807798442509436e-22,
+        "max": 9.255841885480367e-20
+      },
+      "ess": {
+        "min": 1.0,
+        "median": 1.0,
+        "mean": 1.0,
+        "max": 1.0
+      },
+      "donor_loglik_gap": {
+        "min": 43.82644695251656,
+        "median": 173.83120037341564,
+        "mean": 188.68841049019187,
+        "max": 637.9233905177448
+      },
+      "donor_is_posterior_argmax": 512,
+      "correction_mean_norm_squared": {
+        "min": 0.0,
+        "median": 1.5530747954857225e-152,
+        "mean": 1.7195384360698e-41,
+        "max": 1.100504599084672e-39
+      },
+      "correction_trace_variance": {
+        "min": 0.0,
+        "median": 1.2424598363885785e-151,
+        "mean": 1.3756307488558397e-40,
+        "max": 8.804036792677374e-39
+      },
+      "conditional_st_over_full_pg": 4.648806808716042,
+      "population_st_over_full_pg": 4.369675151027288,
+      "contrasts": {
+        "full_pg_minus_donor": {
+          "mean_conditional_variance_difference": -108701.03024860084,
+          "paired_problem_bootstrap_95ci": [
+            -142400.26585672135,
+            -83797.67148962527
+          ],
+          "n_paired_problems": 32,
+          "direction": "negative means less variance than paired donor"
+        },
+        "full_rb_minus_donor": {
+          "mean_conditional_variance_difference": 2.147430677723605e-09,
+          "paired_problem_bootstrap_95ci": [
+            1.5645582607248798e-09,
+            2.818424604811298e-09
+          ],
+          "n_paired_problems": 32,
+          "direction": "negative means less variance than paired donor"
+        },
+        "st_lambda_1_minus_donor": {
+          "mean_conditional_variance_difference": 0.0,
+          "paired_problem_bootstrap_95ci": [
+            0.0,
+            0.0
+          ],
+          "n_paired_problems": 32,
+          "direction": "negative means less variance than paired donor"
+        }
+      },
+      "actual_wall_seconds": 16428.61550990399,
+      "reserved_gpu_seconds": 32857.23101980798
+    }
+  },
+  "scope": "Frozen-actor variance audit, not trained accuracy or equal-cost training efficiency. Population variances are point estimates; conditional contrasts have paired problem-bootstrap intervals."
+}

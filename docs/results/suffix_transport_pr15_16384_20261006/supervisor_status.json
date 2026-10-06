@@ -1,0 +1,100 @@
+{
+  "completed": {
+    "cpu-math-smoke": {
+      "status": "completed",
+      "run_dir": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/jobs/cpu-math-smoke",
+      "finished_utc": "2026-10-06T03:55:54.840143+00:00"
+    },
+    "gpu-short-smoke": {
+      "status": "completed",
+      "run_dir": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/jobs/gpu-short-smoke",
+      "finished_utc": "2026-10-06T03:56:55.325727+00:00"
+    },
+    "gpu-long-smoke": {
+      "status": "completed",
+      "run_dir": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/jobs/gpu-long-smoke",
+      "finished_utc": "2026-10-06T03:59:26.494154+00:00"
+    },
+    "audit-m2-t512": {
+      "status": "completed",
+      "run_dir": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/jobs/audit-m2-t512",
+      "finished_utc": "2026-10-06T07:02:35.424757+00:00"
+    },
+    "audit-m4-t512": {
+      "status": "completed",
+      "run_dir": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/jobs/audit-m4-t512",
+      "finished_utc": "2026-10-06T11:36:35.981981+00:00"
+    }
+  },
+  "attempts": {},
+  "deferred": {
+    "full-pg-one-step": {
+      "reason": "Full-PG and ST single optimizer updates were already validated in the previous run. This queue repeats real short/16384 GPU smoke and paired audits; the actor stress benchmark validates changed checkpoint execution. No duplicate single-step training is needed for the frozen mainline audit.",
+      "updated_utc": "2026-10-06T03:55:54.840784+00:00"
+    },
+    "st-one-step": {
+      "reason": "Full-PG and ST single optimizer updates were already validated in the previous run. This queue repeats real short/16384 GPU smoke and paired audits; the actor stress benchmark validates changed checkpoint execution. No duplicate single-step training is needed for the frozen mainline audit.",
+      "updated_utc": "2026-10-06T03:56:55.327075+00:00"
+    }
+  },
+  "current_job": null,
+  "status": "completed",
+  "updated_utc": "2026-10-06T11:36:35.982736+00:00",
+  "supervisor_pid": 1832563,
+  "child_pid": 2026603,
+  "run_dir": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/jobs/audit-m4-t512",
+  "log": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/logs/audit-m4-t512.log",
+  "command": [
+    "/SSD/00/wja/GRACE/runs/conda/envs/grace/bin/python",
+    "-u",
+    "/SSD/00/wja/Grace-pr15-suffix-transport-20261006/scripts/suffix_transport.py",
+    "--config",
+    "configs/hardware/a100_1.yaml",
+    "--config",
+    "configs/experiments/suffix_transport.yaml",
+    "--config",
+    "configs/experiments/suffix_transport_execution_a100_2.yaml",
+    "--gpus",
+    "0,2",
+    "--model-path",
+    "/SSD/00/wja/GRACE/data/Qwen3-4B",
+    "--eval-data-path",
+    "/SSD/00/wja/GRACE/data/math500/test.jsonl",
+    "--init-checkpoint",
+    "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/shared-initial-actor.npz",
+    "--config",
+    "configs/experiments/suffix_transport_optimized_16384.yaml",
+    "--mode",
+    "audit",
+    "--data-path",
+    "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/input/audit.jsonl",
+    "--group-size",
+    "4",
+    "--n-problems",
+    "32",
+    "--groups-per-problem",
+    "2",
+    "--audit-draws",
+    "8",
+    "--decision-tokens",
+    "512",
+    "--max-new-tokens",
+    "16384",
+    "--run-dir",
+    "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/jobs/audit-m4-t512"
+  ],
+  "gpu_snapshot": [
+    {
+      "gpu": 0,
+      "free_mib": 81140,
+      "utilization": 0
+    },
+    {
+      "gpu": 2,
+      "free_mib": 81137,
+      "utilization": 0
+    }
+  ],
+  "exit_code": 0,
+  "deferred_job": "st-one-step"
+}

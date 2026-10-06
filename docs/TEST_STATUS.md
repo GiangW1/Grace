@@ -2,6 +2,32 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
+## GRACE-ST suffix transport（2026-10-06）
+
+- 审查修复后，30 项 ST CPU 检查通过；扩展相关回归 `187 passed in 21.36s`。
+  命令：`OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python -m pytest tests/test_suffix_transport.py tests/test_rng.py tests/test_layout_and_reduce.py tests/test_rollout_pool.py tests/test_rollout_observability.py tests/test_data_eval_audit.py tests/test_estimator.py tests/test_fidelity.py tests/test_fixed_n_20260919.py tests/test_backward_reuse_20260919.py tests/test_multistep_and_eval.py tests/test_eval_repeatability.py tests/test_eval_execution_trace.py tests/test_training_eval_exclusion.py -q -o addopts=''`。
+- 审查修复覆盖：旧评测入口按 checkpoint algorithm 报告 ST/donor-only 身份；预算末批
+  超时后仍有最后预算内 checkpoint；lambda=0 不伪造后验/反事实奖励；实际后缀
+  行为概率与 HF 序列概率差；NaN 梯度/概率不能通过 smoke；按题配对方差差值区间。
+  保存配置显式记录 BF16 compute 和 GPU backend；运行文档修正单卡评测账本、独立留出题
+  及 Full-PG 首次 GPU 作业顺序。GPU 数值与总体方差收益仍未验证。
+- 覆盖精确枚举无偏性、长 logsumexp、接收者自己的奖励、固定 N、自然 EOS、
+  完整 q/v A/B、非零 B 下的 loss/参考梯度、符号、因果前缀图、checkpoint、RNG，
+  三训练入口、真实 Full-PG 配对、条件/总体二阶矩和全部自然结束、预算耗尽。
+  GPU smoke 的完整流程用 CPU actor/engine 替身执行，包括更新及 adapter id 同步/恢复；
+  这些都是合成检查，未执行真实 GPU smoke 或训练。
+- 本地隔离环境：Windows Python 3.12.4、torch 2.5.1+cpu、NumPy 2.5.3、pytest 9.1.1。
+  符号奖励相关检查补装 math-verify 0.9.0，统计依赖为 SciPy 1.18.1。
+  不改变服务器已经使用的 vLLM/PyTorch 版本。
+- 中途全量尝试为 `883 passed, 20 skipped, 10 failed in 87.75s`，不能称为全量通过。
+  补齐 SciPy 后，原来的两个统计区间失败消失；剩余 8 个失败在本分支和未修改的
+  PR14 `97775ba` 基线工作树上均复现（相同 5 个文件分别 `35 passed, 8 failed`）。
+  失败为 Windows mmap 文件替换/清理占用、scheduler handoff，以及调用该 handoff 的
+  Bash budget wrapper。没有改动这些旧实现。
+- `scripts/suffix_transport.py --help` 和 `git diff --check` 通过。
+  服务器短 smoke、完整长度 one-step Full-PG/ST、两卡/多卡 vLLM、真实方差与速度均待执行；
+  命令见 [SUFFIX_TRANSPORT](SUFFIX_TRANSPORT.md)。不承诺 smoke 能排除所有运行时/OOM 风险。
+
 ## PR13 / PR14 integration (2026-10-05)
 
 - Full merged CPU suite: `893 passed, 1 skipped in 119.47s` using

@@ -1,0 +1,18 @@
+{
+  "pid": 1832563,
+  "started_utc": "2026-10-06T03:55:39.679298+00:00",
+  "command": [
+    "/SSD/00/wja/GRACE/runs/conda/envs/grace/bin/python",
+    "-u",
+    "/SSD/00/wja/Grace-pr15-suffix-transport-20261006/scripts/supervise_suffix_transport.py",
+    "--run-dir",
+    "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run",
+    "--gpus",
+    "0,2",
+    "--mainline-only",
+    "--max-new-tokens",
+    "16384",
+    "--execution-config",
+    "configs/experiments/suffix_transport_optimized_16384.yaml"
+  ]
+}

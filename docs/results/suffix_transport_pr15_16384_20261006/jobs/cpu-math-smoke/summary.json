@@ -1,0 +1,21 @@
+{
+  "mode": "cpu_math_smoke",
+  "exact_enumeration_errors": {
+    "0.0": 3.8163916471489756e-17,
+    "0.4": 1.3877787807814457e-17,
+    "1.0": 1.3877787807814457e-17,
+    "-0.5": 7.28583859910259e-17
+  },
+  "checks": [
+    "unbiased full-space expectation",
+    "stable posterior",
+    "lambda zero",
+    "singleton",
+    "fixed N with natural completion",
+    "independent selection RNG"
+  ],
+  "gpu_checks": "not executed",
+  "actual_wall_seconds": 1.7749103610403836,
+  "reserved_gpu_seconds": 0,
+  "timing_note": "Setup contains initial sync; stage totals overlap. Reserved GPU time is n_gpu*elapsed, not summed stages."
+}

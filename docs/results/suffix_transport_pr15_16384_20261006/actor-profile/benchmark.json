@@ -1,0 +1,76 @@
+{
+  "scope": "Execution profile only; 16384 fixtures repeat real token IDs, not new model rollouts or scientific results.",
+  "source_run": "/SSD/00/wja/grace-pr15-suffix-transport-1e4e496-20261006-run/jobs/audit-m2-t512",
+  "profiles": {
+    "8192": {
+      "separate_all_checkpointed": {
+        "seconds": 7.350016294047236,
+        "peak_allocated_gib": 16.154231071472168,
+        "peak_reserved_gib": 17.1484375,
+        "max_gradient_relative_l2": 0.0,
+        "max_suffix_logprob_abs_error": 0.0
+      },
+      "fused_all_checkpointed": {
+        "seconds": 5.780429841019213,
+        "peak_allocated_gib": 16.153270721435547,
+        "peak_reserved_gib": 17.134765625,
+        "max_gradient_relative_l2": 0.009306276753948082,
+        "max_suffix_logprob_abs_error": 0.0
+      },
+      "fused_half_checkpointed": {
+        "seconds": 5.26977219292894,
+        "peak_allocated_gib": 33.59851551055908,
+        "peak_reserved_gib": 36.716796875,
+        "max_gradient_relative_l2": 0.009094762724176093,
+        "max_suffix_logprob_abs_error": 0.0
+      },
+      "posterior_serial": {
+        "seconds": 1.2610664619132876,
+        "peak_allocated_gib": 10.00385570526123,
+        "peak_reserved_gib": 11.0703125
+      },
+      "posterior_batch_2": {
+        "seconds": 1.2574016503058374,
+        "peak_allocated_gib": 12.569119930267334,
+        "peak_reserved_gib": 14.5703125,
+        "max_logprob_abs_error": 2.7284841053187847e-12
+      }
+    },
+    "16384": {
+      "separate_all_checkpointed": {
+        "seconds": 19.050387046765536,
+        "peak_allocated_gib": 24.597743034362793,
+        "peak_reserved_gib": 26.5625,
+        "max_gradient_relative_l2": 0.0,
+        "max_suffix_logprob_abs_error": 0.0
+      },
+      "fused_all_checkpointed": {
+        "seconds": 16.26810710085556,
+        "peak_allocated_gib": 24.596782684326172,
+        "peak_reserved_gib": 26.5625,
+        "max_gradient_relative_l2": 0.002044793674091446,
+        "max_suffix_logprob_abs_error": 0.0
+      },
+      "fused_half_checkpointed": {
+        "seconds": 15.072142876219004,
+        "peak_allocated_gib": 59.24693775177002,
+        "peak_reserved_gib": 65.453125,
+        "max_gradient_relative_l2": 0.0022887040394401325,
+        "max_suffix_logprob_abs_error": 0.0
+      },
+      "posterior_serial": {
+        "seconds": 2.8974626348353922,
+        "peak_allocated_gib": 12.339494705200195,
+        "peak_reserved_gib": 14.525390625
+      },
+      "posterior_batch_2": {
+        "seconds": 2.842549106106162,
+        "peak_allocated_gib": 17.206082820892334,
+        "peak_reserved_gib": 21.47265625,
+        "max_logprob_abs_error": 2.7284841053187847e-12
+      }
+    }
+  },
+  "actor_sha256": "64afe6011142d020e2ff2b5fe6e0077676e05c0325f0c8567e8aeabb2fcfe078",
+  "actor_unchanged": true
+}

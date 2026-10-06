@@ -319,7 +319,8 @@ def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, 
 
         actor_source = {
             "checkpoint": str(ckpt), "checkpoint_step": payload.get("step"),
-            "method": payload.get("spec"), "actor_sha256": sha256_named(named_lora_params(actor)),
+            "method": payload.get("spec") or payload.get("algorithm") or cfg.get("method"),
+            "actor_sha256": sha256_named(named_lora_params(actor)),
             "hash_stage": "loaded_checkpoint_before_generation", "layout": "all_qv_lora_A_B",
             "numerics": actor_numerics(actor),
         }
@@ -373,6 +374,7 @@ def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path
     hardware = str((cfg.get("hardware") or {}).get("name", "gpu" if backend == "gpu_verl" else "cpu"))
     ledger = ComputeLedger(n_gpu=n_gpu, hardware=hardware)
     versions, status = {}, "failed"
+    reporting_method = cfg.get("method", "grace")
     try:
         ckpt = cfg.get("checkpoint") or cfg.get("resume")
         if ckpt:
@@ -386,6 +388,10 @@ def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path
                 "scope": "checkpoint_all_tiny_parameters" if backend == "cpu_tiny" else "checkpoint_lora_only",
                 "note": "Hash of checkpoint tensors before loading; GPU loaded HF LoRA hash is in actor_source.json. Does not hash full GPU base weights or vLLM worker tensors."}
             cfg["method"] = payload.get("spec") or cfg.get("method", "grace")
+            # Standalone estimators reuse the full_pg decoding entry. Report the
+            # checkpoint's training algorithm, not that dispatch alias.
+            reporting_method = payload.get("spec") or payload.get("algorithm") or cfg["method"]
+            cfg["checkpoint_training_method"] = reporting_method
         n_source = len(records)
         math500 = looks_like_math500(records, path=cfg.get("data_path"), n_source=n_source)
         records = apply_solve_instruction(records)
@@ -416,7 +422,8 @@ def run_eval(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Path
             result["checkpoint_sha256"] = checkpoint_sha256 if ckpt else None
             result["checkpoint_identity"] = checkpoint_identity if ckpt else None
             result["actor_source"] = "checkpoint" if result["checkpoint"] else "base_or_random"
-            result["method"] = cfg.get("method")
+            result["method"] = reporting_method
+            result["training_estimator"] = ((payload.get("config") or {}).get("suffix_transport") if ckpt else None)
             result["evaluation_manifest"] = manifest
             result["measurement_version"] = 2
             result["n_problems_requested"] = len(records)

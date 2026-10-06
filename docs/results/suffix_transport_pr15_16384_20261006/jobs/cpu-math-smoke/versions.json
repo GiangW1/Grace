@@ -1,0 +1,64 @@
+{
+  "python": "3.11.16",
+  "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.31",
+  "packages": {
+    "numpy": "2.2.6",
+    "yaml": "6.0.3"
+  },
+  "package_version_sources": {
+    "numpy": "distribution_metadata",
+    "yaml": "distribution_metadata"
+  },
+  "file_hashes": {},
+  "missing": [],
+  "hostname": "DSEG-A100X4",
+  "cuda_visible_devices": "0,2",
+  "hf_endpoint": null,
+  "cuda": "12.8",
+  "gpu_name": "NVIDIA A100 80GB PCIe",
+  "gpu_count": 2,
+  "gpu_memory_bytes": 85095874560,
+  "nvidia_smi": "0, NVIDIA A100 80GB PCIe, 18, 81920, 0\n1, NVIDIA A100 80GB PCIe, 15, 81920, 0\n2, NVIDIA A100 80GB PCIe, 18, 81920, 0\n3, NVIDIA A100 80GB PCIe, 18, 81920, 0",
+  "nvidia_compute_processes": "",
+  "nvidia_power_clocks": [
+    {
+      "index": "0",
+      "uuid": "GPU-74963478-3a5c-6d5a-aa22-54e9fff68c80",
+      "power_draw_watts": 50.04,
+      "sm_clock_mhz": 210.0,
+      "memory_clock_mhz": 1512.0
+    },
+    {
+      "index": "1",
+      "uuid": "GPU-f686717d-2102-2a36-ef5e-921bb008d649",
+      "power_draw_watts": 51.57,
+      "sm_clock_mhz": 210.0,
+      "memory_clock_mhz": 1512.0
+    },
+    {
+      "index": "2",
+      "uuid": "GPU-23848dc4-cdf6-8b81-a854-e081ed3b1598",
+      "power_draw_watts": 48.72,
+      "sm_clock_mhz": 210.0,
+      "memory_clock_mhz": 1512.0
+    },
+    {
+      "index": "3",
+      "uuid": "GPU-2ea24442-6c85-c68d-a45d-d80bd492f126",
+      "power_draw_watts": 48.64,
+      "sm_clock_mhz": 210.0,
+      "memory_clock_mhz": 1512.0
+    }
+  ],
+  "disk": {
+    "free_bytes": 478194999296,
+    "total_bytes": 3936820731904,
+    "cwd": "/SSD/00/wja/Grace-pr15-suffix-transport-20261006"
+  },
+  "git": {
+    "head": "4675a348c361002448f9898c84832f82d79b20d7",
+    "dirty": false,
+    "tracked_dirty": false,
+    "untracked_entries": 0
+  }
+}

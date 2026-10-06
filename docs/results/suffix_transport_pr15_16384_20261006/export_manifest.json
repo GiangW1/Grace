@@ -1,0 +1,482 @@
+{
+  "source_run": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run",
+  "copied_files": [
+    {
+      "path": "actor-profile/benchmark.json",
+      "bytes": 2794,
+      "sha256": "6eaada846a27a27c546bc7bf01812ffea64b143457ad593002bf8b1f7852ac31",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "actor-profile/initial_actor.json",
+      "bytes": 376,
+      "sha256": "9c2e93e87df94648e698a5a702984947889fa8e5428379d7842d08810987ca7a",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "execution_transition.json",
+      "bytes": 924,
+      "sha256": "064ed34f626a5bd9be14c304cb030cb5ee29f096dd943c42b36e42e184bfae83",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "input/audit.jsonl",
+      "bytes": 37503,
+      "sha256": "20585664ac6e06cde7d48295040b8a5f6986c4cef94d6ca13aa4ea1481732709",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "input_manifest.json",
+      "bytes": 15390,
+      "sha256": "15de4ca151a4d9178a8bce59cdcea8bd23ecca120ac14a9d948d8345d514300a",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m2-t512/actor.json",
+      "bytes": 43098,
+      "sha256": "0dc70668258219f734f3c4958934de1bee0c09fbb4af6df48f35d7071570e62f",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m2-t512/config.yaml",
+      "bytes": 2077,
+      "sha256": "399a63d054af3d4748cb5f92be967651d34aa844093d475b0a00fd9f3ce26aa5",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m2-t512/data_conflicts.json",
+      "bytes": 250,
+      "sha256": "fb6a099270eebebaf3cdb615593b6d7166fc179596bee6bd018f7f1f153d4e4d",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m2-t512/data_manifest.json",
+      "bytes": 8309,
+      "sha256": "512dc7c045d734d866c921795f80b9a3df8ad342f607ac222cc09deda0574695",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m2-t512/experiment_config.json",
+      "bytes": 3958,
+      "sha256": "b6b382c1284c27b12495c190a9aea07c3793a5862ae4a7f3d78fbebadfb60ee4",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m2-t512/initial_actor.json",
+      "bytes": 370,
+      "sha256": "5d5b5a092a61c857f4eb5eb625e3d3b341586ce81e973db58d27a6dec07a2f52",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m2-t512/run_meta.json",
+      "bytes": 393,
+      "sha256": "db35172e472bb36ca1f73e0f170fc8dfec26699020aeccb594795c2a1fcf687b",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m2-t512/source_identity.json",
+      "bytes": 159,
+      "sha256": "4f5a004c50c69c533c0036e0168ff81b91c3750c82af1d5602bbc4a6d6114ab9",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m2-t512/summary.json",
+      "bytes": 5824,
+      "sha256": "a462210879097844837b5470a618fc7ea008f6d63cba16cf587469b785ccb2b2",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m2-t512/versions.json",
+      "bytes": 2496,
+      "sha256": "75b48669ed377ae93160bf50952d9ae6f390b86e96e2be4c2f1d5d0771d5a1f7",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m2-t512/vllm_engine.json",
+      "bytes": 751,
+      "sha256": "b528ad4507612cae160174c0b4642b8c3a9bc2363add6d6fb400503954ac3671",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m4-t512/actor.json",
+      "bytes": 43098,
+      "sha256": "0dc70668258219f734f3c4958934de1bee0c09fbb4af6df48f35d7071570e62f",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m4-t512/config.yaml",
+      "bytes": 2077,
+      "sha256": "e8bc3b1f333b12fefc3af3fb4c618943116170b381779b0d378c9499a46423f3",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m4-t512/data_conflicts.json",
+      "bytes": 250,
+      "sha256": "fb6a099270eebebaf3cdb615593b6d7166fc179596bee6bd018f7f1f153d4e4d",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m4-t512/data_manifest.json",
+      "bytes": 8309,
+      "sha256": "512dc7c045d734d866c921795f80b9a3df8ad342f607ac222cc09deda0574695",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m4-t512/experiment_config.json",
+      "bytes": 3958,
+      "sha256": "2755ee63f48c81a668dccfa14778f6f0983dde1d2fcd224193b531129183c245",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m4-t512/initial_actor.json",
+      "bytes": 370,
+      "sha256": "5d5b5a092a61c857f4eb5eb625e3d3b341586ce81e973db58d27a6dec07a2f52",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m4-t512/run_meta.json",
+      "bytes": 393,
+      "sha256": "969e14a6430636217896c0a874d8d682d375637ad16ae7e44243a65796b452ff",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m4-t512/source_identity.json",
+      "bytes": 159,
+      "sha256": "4f5a004c50c69c533c0036e0168ff81b91c3750c82af1d5602bbc4a6d6114ab9",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m4-t512/summary.json",
+      "bytes": 5824,
+      "sha256": "40e8f35043f07bed3f43010766240a0ba1663f8f908b646d806f3c24253a6274",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m4-t512/versions.json",
+      "bytes": 2497,
+      "sha256": "ab8a3b91b39e72ee34edb31b9f40766e2b50c9d4304d6ebaabe2d3cb16bcb127",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/audit-m4-t512/vllm_engine.json",
+      "bytes": 751,
+      "sha256": "b528ad4507612cae160174c0b4642b8c3a9bc2363add6d6fb400503954ac3671",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/cpu-math-smoke/config.yaml",
+      "bytes": 1492,
+      "sha256": "b0ec471912bedecfd3af967518f490020ffb3b21a158b77fd5d204fde9fbb09d",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/cpu-math-smoke/experiment_config.json",
+      "bytes": 2802,
+      "sha256": "10b05db129299599e8facd0a826023e36b9370ca1ac9dd034d91efec061f79ec",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/cpu-math-smoke/run_meta.json",
+      "bytes": 395,
+      "sha256": "682cdd20dede9b0a6de292e00726ef0d62345d5d7e67840ef189d34f5018f540",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/cpu-math-smoke/source_identity.json",
+      "bytes": 159,
+      "sha256": "4f5a004c50c69c533c0036e0168ff81b91c3750c82af1d5602bbc4a6d6114ab9",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/cpu-math-smoke/summary.json",
+      "bytes": 626,
+      "sha256": "1b2e401ba601a286dd6f82b6cad531d7b9ca83a3bd1686ce0669f805e5ec387d",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/cpu-math-smoke/versions.json",
+      "bytes": 1774,
+      "sha256": "3e49583e785f0e33265ed83621e65a507ab4c36873a5e6cae5d47db3d2955b99",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-long-smoke/actor.json",
+      "bytes": 43098,
+      "sha256": "0dc70668258219f734f3c4958934de1bee0c09fbb4af6df48f35d7071570e62f",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-long-smoke/checkpoints.jsonl",
+      "bytes": 270,
+      "sha256": "b442399ae89e0af37d25a3c4c8cb125e1cde74f5bcf7649ca9d05a9f6e407621",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-long-smoke/config.yaml",
+      "bytes": 2076,
+      "sha256": "29abc084c1dd381c720bb4dec4c2f8bd616c7b0ff5c3b409a0926643f5749a6d",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-long-smoke/data_conflicts.json",
+      "bytes": 250,
+      "sha256": "fb6a099270eebebaf3cdb615593b6d7166fc179596bee6bd018f7f1f153d4e4d",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-long-smoke/data_manifest.json",
+      "bytes": 496,
+      "sha256": "4a34d2204d5cd780c4e040cdbdaa08a08e38a239f0a82336193b83fddd4969c1",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-long-smoke/experiment_config.json",
+      "bytes": 3969,
+      "sha256": "e7fe91ed6285fd112d8c27ef9a14a6c0ee431a50b2eda334e69bc3025a1093b7",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-long-smoke/initial_actor.json",
+      "bytes": 370,
+      "sha256": "5d5b5a092a61c857f4eb5eb625e3d3b341586ce81e973db58d27a6dec07a2f52",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-long-smoke/latest_checkpoint.json",
+      "bytes": 281,
+      "sha256": "a6c4ade5bae278d15ec3e530c870416856118fb5ce1fb07da8f79df65de3e82d",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-long-smoke/run_meta.json",
+      "bytes": 395,
+      "sha256": "c02fef4a0b34bd693c68e22c20cc54e9db7172a112fd487d0634d87ea2c7f503",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-long-smoke/source_identity.json",
+      "bytes": 159,
+      "sha256": "4f5a004c50c69c533c0036e0168ff81b91c3750c82af1d5602bbc4a6d6114ab9",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-long-smoke/summary.json",
+      "bytes": 36643,
+      "sha256": "93ba1eacb128581cc3292ba833f41bb8519cfac75dd22cf7cc62620da3e34b5c",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-long-smoke/trajectories.jsonl",
+      "bytes": 120057,
+      "sha256": "35747e5496ad7283eb5f8b721813cf4ad8f185d48f9d52e23ddc90ea4ced2dc2",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-long-smoke/versions.json",
+      "bytes": 2497,
+      "sha256": "eda59e3d8800b71b2ab28d5e65e66c636506f8626d34d74809ae880909acb8ea",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-long-smoke/vllm_engine.json",
+      "bytes": 751,
+      "sha256": "b528ad4507612cae160174c0b4642b8c3a9bc2363add6d6fb400503954ac3671",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-short-smoke/actor.json",
+      "bytes": 43098,
+      "sha256": "0dc70668258219f734f3c4958934de1bee0c09fbb4af6df48f35d7071570e62f",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-short-smoke/checkpoints.jsonl",
+      "bytes": 270,
+      "sha256": "236179d84862bc014d9201396f9219251fe0b89ac4921db1458641c2bd192ee1",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-short-smoke/config.yaml",
+      "bytes": 2071,
+      "sha256": "c34d2c7f3678b239639ea1a49018de579a79aa48b44b6e8dce2ac752fbd7f35a",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-short-smoke/data_conflicts.json",
+      "bytes": 250,
+      "sha256": "fb6a099270eebebaf3cdb615593b6d7166fc179596bee6bd018f7f1f153d4e4d",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-short-smoke/data_manifest.json",
+      "bytes": 496,
+      "sha256": "4a34d2204d5cd780c4e040cdbdaa08a08e38a239f0a82336193b83fddd4969c1",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-short-smoke/experiment_config.json",
+      "bytes": 3965,
+      "sha256": "254e260e68a194a658461b6665f09c88cd8bc3cd19c89a890f019a2a87474ce6",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-short-smoke/initial_actor.json",
+      "bytes": 370,
+      "sha256": "5d5b5a092a61c857f4eb5eb625e3d3b341586ce81e973db58d27a6dec07a2f52",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-short-smoke/latest_checkpoint.json",
+      "bytes": 281,
+      "sha256": "acf20bb022636514fd21836b703e24e4fa29d1bc0f332b6586f1e690fc892ca7",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-short-smoke/run_meta.json",
+      "bytes": 397,
+      "sha256": "707e5a1608f381818f69682f3a5a97173adaf491d4e0f93bca20e47db582b8d6",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-short-smoke/source_identity.json",
+      "bytes": 159,
+      "sha256": "4f5a004c50c69c533c0036e0168ff81b91c3750c82af1d5602bbc4a6d6114ab9",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-short-smoke/summary.json",
+      "bytes": 36504,
+      "sha256": "d13632f609653df641b0c289ef0badb3e459055faa6c0581a975468eb3bf7bf6",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-short-smoke/trajectories.jsonl",
+      "bytes": 2356,
+      "sha256": "d796dfdb5e57323b974aeeb2f6eda33a083714e97e861e0af0779c0987c059be",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-short-smoke/versions.json",
+      "bytes": 2497,
+      "sha256": "ef64642f9bd6c4adaa51165f461fb6ab6491dd4eee79d48bd6f39b28efcb6a10",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "jobs/gpu-short-smoke/vllm_engine.json",
+      "bytes": 750,
+      "sha256": "eeffd418e1613f52b1cf46396209d13f00d786a6e582af4068875c2d85116f34",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "logs/audit-m2-t512.log",
+      "bytes": 14313,
+      "sha256": "ea13a4a01813abce2115aa16c376ddc81e529e8f08d3d6e4668e450c975504a5",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "logs/audit-m4-t512.log",
+      "bytes": 14313,
+      "sha256": "ee2ffde3e477b4f5c66765b682d7d92957cde9ed55730501a35258d035760552",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "logs/cpu-math-smoke.log",
+      "bytes": 122,
+      "sha256": "b038130e68df8aaf880a711e6c569b84e26ccbb3bbbb68eac202c5ac5b92c11f",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "logs/gpu-long-smoke.log",
+      "bytes": 12365,
+      "sha256": "11ff71c8632bd5008edaf89907f55dd9d1788fb4aa465395c7f037092b9e646e",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "logs/gpu-short-smoke.log",
+      "bytes": 12283,
+      "sha256": "d2b6133238b8fee64734de3f2effaadea770a93a0cd67c74da6c66152a758f3a",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "logs/supervisor.log",
+      "bytes": 119858,
+      "sha256": "1175e7d9d7a3849437c9754c4dac86c8ce8e5f346fcb2fd205044922cd26dc36",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "queue.json",
+      "bytes": 8086,
+      "sha256": "e8b51ab55b984f1de5cc92a4bf66e4fee8246b3459c3b00cf4c1627cb0470602",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "queue_control.json",
+      "bytes": 666,
+      "sha256": "ef036cd74f5d56c0ea8ec42bdb97b97e5faef7568fc2be107469ce73b78a8cb6",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "supervisor_launch.json",
+      "bytes": 510,
+      "sha256": "71787fb940342ad33afd57b23cc949b509ece2a294c19c96503773ff5702c5da",
+      "operation": "byte_identical_copy"
+    },
+    {
+      "path": "supervisor_status.json",
+      "bytes": 3619,
+      "sha256": "0c18d90d755d31a8b337c3970b3cae4c3f24bd8f313bbefaa43d67eb3ff55e8f",
+      "operation": "byte_identical_copy"
+    }
+  ],
+  "compacted_files": [
+    {
+      "source": "jobs/audit-m2-t512/groups.jsonl",
+      "source_sha256": "ed08571377311d9cd4c95eb1489d2743ef1fade6b641e0c68ced84284fd84bc7",
+      "path": "jobs/audit-m2-t512/groups_compact.jsonl",
+      "bytes": 83039,
+      "sha256": "1769f0e09db176f1c23c172fc28664116ca784acf07f8e7ee1f21be0988fda31",
+      "operation": "remove_generated_text_and_token_arrays; retain_lengths_and_hashes"
+    },
+    {
+      "source": "jobs/audit-m2-t512/transport_draws.jsonl",
+      "source_sha256": "420e30e9899b57df69601d20a93d1502e754b986350f8fbf6e09969c0580d76a",
+      "path": "jobs/audit-m2-t512/transport_draws_compact.jsonl",
+      "bytes": 318415,
+      "sha256": "69208ac14877e53dbaa5d042821283b27be7cc5ef1d01f1b8e02e6879d1b8588",
+      "operation": "remove_generated_text_and_token_arrays; retain_lengths_and_hashes"
+    },
+    {
+      "source": "jobs/audit-m2-t512/trajectories.jsonl",
+      "source_sha256": "44fb67b72e90a0b13d0bb29ba33c23e7b94fa6cb626599bf65e4f7702a5b8a40",
+      "path": "jobs/audit-m2-t512/trajectories_compact.jsonl",
+      "bytes": 426090,
+      "sha256": "3156a9f3c6062d304b07081b2806fad72fbf6a2a35ab754ca53baf7795db3748",
+      "operation": "remove_generated_text_and_token_arrays; retain_lengths_and_hashes"
+    },
+    {
+      "source": "jobs/audit-m4-t512/groups.jsonl",
+      "source_sha256": "7259ddfd9be414025150cd47ec3678889e2a0279eb29fce5c67e1968997f6c8c",
+      "path": "jobs/audit-m4-t512/groups_compact.jsonl",
+      "bytes": 93676,
+      "sha256": "3a65cc72c18a79fdb09ea4c405cbe66ba504e5d6211dd50284994d586bcafd1f",
+      "operation": "remove_generated_text_and_token_arrays; retain_lengths_and_hashes"
+    },
+    {
+      "source": "jobs/audit-m4-t512/transport_draws.jsonl",
+      "source_sha256": "85e2070bb798dfefa61560d709af8da5b18ac530599f2c2841264568d0f105c3",
+      "path": "jobs/audit-m4-t512/transport_draws_compact.jsonl",
+      "bytes": 388803,
+      "sha256": "b92738c64cc447eceb537c9b8336c5e5a8879e1da60bd6191443fb1a6e09ce3e",
+      "operation": "remove_generated_text_and_token_arrays; retain_lengths_and_hashes"
+    },
+    {
+      "source": "jobs/audit-m4-t512/trajectories.jsonl",
+      "source_sha256": "ca875e59e5d5d5debfad8a054e29a164a2f57e816af1abdbb51a59fa2359764d",
+      "path": "jobs/audit-m4-t512/trajectories_compact.jsonl",
+      "bytes": 852152,
+      "sha256": "8bc202a3bcf18bc16619d89a38d4305ab97b3bf1d4b83058e53310cf323e04d3",
+      "operation": "remove_generated_text_and_token_arrays; retain_lengths_and_hashes"
+    }
+  ],
+  "note": "Raw text/tokens are retained in the separate filtered archive. Dense moments, model/adapter weights and checkpoints are excluded from this export. Source files have not been deleted."
+}

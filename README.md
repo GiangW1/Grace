@@ -4,6 +4,8 @@ Qwen3-4B-Base 上的 GRACE 训练、评测和前缀审计。本机先做 CPU 检
 
 显示名用 **GRACE-GC**，避免和另外两篇同名工作混淆。主流程先单卡；另有“一张 actor 卡＋多张 rollout 卡”的离线对照，见 [实现与用法](docs/OFFLINE_PARALLEL_CONTROL_20260919.md)。actor allreduce 尚未接入。
 
+新增 **GRACE-ST 后缀信用传递**：独立的 CPU/GPU smoke、冻结配对审计和 Full-PG / 高效 donor-only / ST 共同预算训练，见 [服务器命令与实现边界](docs/SUFFIX_TRANSPORT.md)。此入口基于 PR14，尚无新 GPU 结果，旧 HT 入口保持原有行为。
+
 下面是一条能按顺序做完的全流程。第 1–7 节是同一条线的细节，卡住时再翻。
 
 ## 全流程
