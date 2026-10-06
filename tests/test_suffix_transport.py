@@ -120,6 +120,22 @@ def test_autograd_loss_sign_full_layout_and_causal_prefix(tiny):
     result = autograd_smoke(score, named, [[1, 2, 3], [1, 4, 5]], 1, [6, 7, 11])
     assert result["n_qv_lora_tensors"] == 8
     assert all(check["relative_l2"] < 1e-4 for check in result["loss_checks"].values())
+    assert all(check["relative_l2"] < 1e-4 for check in result["decomposition_checks"].values())
+
+
+def test_gradient_decomposition_uses_tensor_norm_at_cancelled_coordinates():
+    import torch
+    from grace_gc.audit.suffix_transport_smoke import _gradient_sum_check
+
+    prefix = torch.tensor([1., .01])
+    suffix = torch.tensor([-.9999, .98])
+    full = torch.tensor([.0002, .992])
+    report = _gradient_sum_check(prefix, suffix, full, rtol=.03, atol=1e-5, name="q_lora")
+    assert report["relative_l2"] < .003
+    with pytest.raises(AssertionError, match="gradient decomposition mismatch"):
+        _gradient_sum_check(prefix, -suffix, full, rtol=.03, atol=1e-5, name="q_lora")
+    with pytest.raises(AssertionError, match="nonfinite gradient decomposition"):
+        _gradient_sum_check(prefix, suffix, full * float("nan"), rtol=.03, atol=1e-5, name="q_lora")
 
 
 def test_token_ranges_include_actual_eos_and_empty_suffix(tiny):

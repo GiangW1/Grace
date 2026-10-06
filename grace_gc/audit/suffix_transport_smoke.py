@@ -46,6 +46,22 @@ def math_smoke():
             "lambda zero", "singleton", "fixed N with natural completion", "independent selection RNG"]}
 
 
+def _gradient_sum_check(prefix, suffix, full, *, rtol, atol, name):
+    """Check additivity by tensor norm, including BF16 cancellation at zeros."""
+    import torch
+
+    actual = prefix.detach().double() + suffix.detach().double()
+    reference = full.detach().double()
+    if not torch.isfinite(actual).all() or not torch.isfinite(reference).all():
+        raise AssertionError(f"nonfinite gradient decomposition: {name}")
+    error = float(torch.linalg.vector_norm(actual - reference))
+    scale = float(torch.linalg.vector_norm(reference))
+    relative = error / max(scale, 1e-12)
+    if error > atol + rtol * scale:
+        raise AssertionError(f"gradient decomposition mismatch {name}: relative L2={relative}")
+    return {"absolute_l2": error, "reference_l2": scale, "relative_l2": relative}
+
+
 def autograd_smoke(score, named, prefixes, prompt_len, suffix, *, rtol=1e-4, atol=1e-6):
     """Use unequal nonzero advantages even when the real rollout fails reward.
 
@@ -86,8 +102,10 @@ def autograd_smoke(score, named, prefixes, prompt_len, suffix, *, rtol=1e-4, ato
     gp = torch.autograd.grad(prefix_lp, params, retain_graph=True)
     gs = torch.autograd.grad(suffix_lp, params, retain_graph=True)
     gf = torch.autograd.grad(prefix_lp + suffix_lp, params)
-    for a, b, full in zip(gp, gs, gf):
-        torch.testing.assert_close(a + b, full, rtol=rtol, atol=atol)
+    decomposition = {
+        name: _gradient_sum_check(a, b, full, rtol=rtol, atol=atol, name=name)
+        for (name, _), a, b, full in zip(named, gp, gs, gf)
+    }
     with torch.no_grad():
         combined = float(score(prefixes[0] + suffix, prompt_len))
         parts = float(prefix_lp.detach() + suffix_lp.detach())
@@ -95,7 +113,9 @@ def autograd_smoke(score, named, prefixes, prompt_len, suffix, *, rtol=1e-4, ato
         raise AssertionError("token sum differs from prefix+suffix decomposition")
     for _, parameter in named:
         parameter.grad = None
-    return {"loss_checks": tests, "posterior": alpha.tolist(), "full_logprob": combined,
+    return {"loss_checks": tests, "decomposition_checks": decomposition,
+            "gradient_check_tolerances": {"relative_l2": rtol, "absolute_l2": atol},
+            "posterior": alpha.tolist(), "full_logprob": combined,
             "prefix_plus_suffix_logprob": parts, "n_qv_lora_tensors": len(named),
             "scope": "synthetic advantages on actual token graph; no scientific effect threshold"}
 

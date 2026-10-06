@@ -70,6 +70,9 @@ GPU smoke 检查实际生成/EOS路径、全 q/v LoRA loss 与参考梯度、梯
 prefix+suffix 分解、checkpoint roundtrip、前缀和实际后缀的 HF/采样 token logprob 对齐；
 还会执行小 SGD 更新、导出新 adapter 并再次 rollout，最后恢复初始权重与 adapter。
 合成 advantages 会明确标记，不作为实验结果。实现检查失败会非零退出。
+BF16 梯度分解按每个 q/v LoRA 参数张量的 L2 误差检查，避免相消后接近零的坐标
+使逐坐标相对误差失真；相对容忍值仍为 0.03，绝对容忍值为 1e-5。
+`autograd.decomposition_checks` 保存逐张量误差，非有限值和超出容忍值的误差仍会报错。
 logprob 平均绝对误差容忍值默认 0.5，可在 `suffix_transport.smoke_logprob_mean_abs_tolerance`
 配置；这是发现错误 adapter/映射的粗检查，不是数值无偏性的认证。
 查看 summary 的逐 token 误差和 `signed_sequence_logprob_error`；小的逐 token 偏差可能在长后缀上
