@@ -24,6 +24,15 @@ def utc():
     return datetime.now(timezone.utc).isoformat()
 
 
+def process_snapshot(pid):
+    try:
+        fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+    except FileNotFoundError:
+        return None
+    return {"state": fields[0], "ppid": int(fields[1]), "pgrp": int(fields[2]),
+            "start_ticks": int(fields[19]), "wait_status": int(fields[49])}
+
+
 def gpu_snapshot(gpus):
     try:
         value = subprocess.check_output([
@@ -48,6 +57,8 @@ def main():
     parser.add_argument("--train-seeds", type=int, nargs="+", default=[17, 29, 43])
     parser.add_argument("--budget-seconds", type=int, default=3600)
     parser.add_argument("--detach", action="store_true")
+    parser.add_argument("--adopt-current", action="store_true",
+                        help="Take over this run's active job without restarting its audit")
     args = parser.parse_args()
     gpus = args.gpus.split(",")
     if len(gpus) != 2 or len(set(gpus)) != 2:
@@ -110,6 +121,7 @@ def main():
     state_file = root / "supervisor_status.json"
     state = json.loads(state_file.read_text()) if state_file.exists() else {"completed": {}, "attempts": {}}
     child = None
+    adopted = None
 
     def status(phase, **extra):
         state.update(status=phase, updated_utc=utc(), supervisor_pid=os.getpid(), **extra)
@@ -117,6 +129,21 @@ def main():
         print(f"{utc()} phase={phase} job={state.get('current_job')}", flush=True)
 
     def stop(_signum, _frame):
+        if adopted is not None:
+            snapshot = process_snapshot(adopted["child_pid"])
+            if snapshot and snapshot["start_ticks"] == adopted["child_start_ticks"] and snapshot["state"] != "Z":
+                os.killpg(adopted["child_pid"], signal.SIGINT)
+                deadline = time.monotonic() + 30
+                while time.monotonic() < deadline:
+                    snapshot = process_snapshot(adopted["child_pid"])
+                    if snapshot is None or snapshot["state"] == "Z":
+                        break
+                    time.sleep(1)
+                else:
+                    os.killpg(adopted["child_pid"], signal.SIGTERM)
+            previous = process_snapshot(adopted["supervisor_pid"])
+            if previous and previous["start_ticks"] == adopted["supervisor_start_ticks"]:
+                os.kill(adopted["supervisor_pid"], signal.SIGKILL)
         if child is not None and child.poll() is None:
             os.killpg(child.pid, signal.SIGINT)
             try:
@@ -133,10 +160,63 @@ def main():
                    "OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1",
                    "TOKENIZERS_PARALLELISM": "false", "VLLM_WORKER_MULTIPROC_METHOD": "spawn",
                    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"}
+    if args.adopt_current:
+        previous_pid, active_pid = int(state["supervisor_pid"]), int(state["child_pid"])
+        previous, active = process_snapshot(previous_pid), process_snapshot(active_pid)
+        expected = str(Path(__file__).resolve()).encode()
+        command = Path(f"/proc/{previous_pid}/cmdline").read_bytes().split(b"\0") if previous else []
+        if (not previous or not active or expected not in command
+                or active["ppid"] != previous_pid or active["pgrp"] != active_pid
+                or state["status"] != "running"):
+            raise RuntimeError("active job ownership changed; adoption refused")
+        os.kill(previous_pid, signal.SIGSTOP)
+        persisted = json.loads(state_file.read_text())
+        if persisted["child_pid"] != active_pid or persisted["current_job"] != state["current_job"]:
+            os.kill(previous_pid, signal.SIGCONT)
+            raise RuntimeError("job changed during adoption; retry with the current state")
+        adopted = {"supervisor_pid": previous_pid, "supervisor_start_ticks": previous["start_ticks"],
+                   "child_pid": active_pid, "child_start_ticks": active["start_ticks"]}
+        try:
+            status("running", adopted_supervisor_pid=previous_pid, scheduling_control=str(root / "queue_control.json"))
+            # The stopped parent retains the exited child until we read its
+            # actual wait status; the GPU runner itself continues uninterrupted.
+            while True:
+                active = process_snapshot(active_pid)
+                if active is None or active["start_ticks"] != adopted["child_start_ticks"]:
+                    raise RuntimeError("adopted runner disappeared before its exit status was read")
+                if active["state"] == "Z":
+                    code = os.waitstatus_to_exitcode(active["wait_status"])
+                    break
+                time.sleep(15)
+                status("running", gpu_snapshot=gpu_snapshot(gpus))
+        finally:
+            previous = process_snapshot(previous_pid)
+            if previous and previous["start_ticks"] == adopted["supervisor_start_ticks"]:
+                os.kill(previous_pid, signal.SIGKILL)
+            adopted = None
+        name = state["current_job"]
+        if code == 0:
+            state["completed"][name] = {"status": "completed", "run_dir": state["run_dir"], "finished_utc": utc()}
+            status("job_completed", exit_code=0)
+        else:
+            failure = Path(state["log"]).read_text(errors="replace")
+            if "out of memory" in failure.lower() or "cuda error" in failure.lower():
+                state["attempts"][name] = state["attempts"].get(name, 0) + 1
+                status("retry_after_cuda_failure", exit_code=code, failed_run_dir=state["run_dir"])
+            else:
+                status("failed", exit_code=code, failed_run_dir=state["run_dir"])
+                raise RuntimeError(f"{name} failed; see {state['log']}")
     for job in jobs:
         name = job["name"]
         if name in state["completed"]:
             continue
+        control_file = root / "queue_control.json"
+        control = json.loads(control_file.read_text()) if control_file.exists() else {}
+        if name in control.get("deferred_jobs", []):
+            state.setdefault("deferred", {})[name] = {"reason": control.get("reason", "user deferred"), "updated_utc": utc()}
+            status("job_deferred", deferred_job=name)
+            continue
+        state.setdefault("deferred", {}).pop(name, None)
         state["current_job"] = name
         if "training_job" in job:
             trained = Path(state["completed"][job["training_job"]]["run_dir"])

@@ -205,6 +205,11 @@ RNG 分开，donor 在采样前确定；独立 Full-PG 后缀、自然完成者�
 
 `supervise_suffix_transport.py` 持久化 CPU smoke、Full-PG 首次更新、GPU 短 smoke、
 ST 首次更新、完整长度 smoke、m=2/4 审计、三方法预算训练和独立 MATH-500 评测队列。
+每个新阶段启动前读取 run 根目录的 `queue_control.json`；`deferred_jobs` 中的阶段
+记为暂缓，不伪装成已完成。主线先行时只保留 m=2/4 审计，其内部配对对照仍保留。
+这能检查冻结 actor 上的后缀共享/梯度方差，不能证明训练后的准确率收益。
+`--adopt-current` 可接管同一 run 的活动任务：暂停旧调度器，保留当前 GPU 子进程运行，
+等子进程退出后读取实际退出码并释放旧调度器，再按控制文件调度余下阶段。
 训练沿文档使用 seed 17/29/43，每种方法各 3600 秒；三方法统一每步八题，
 Full-PG 每步最多 32 条续写，ST 和高效 donor-only 每步最多八条。
 质量比较读取最后一个预算内保存的 checkpoint，初始化和审计不计为训练预算收益。
