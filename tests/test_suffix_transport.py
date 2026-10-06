@@ -153,6 +153,20 @@ def test_token_ranges_include_actual_eos_and_empty_suffix(tiny):
     assert gradient_vector(range_logprob(model, ids, len(ids), 0), named).shape[0] > 0
 
 
+def test_batched_scores_keep_ragged_ranges_eos_and_per_sample_values(tiny):
+    import torch
+    from grace_gc.backends.suffix_transport import range_logprob, range_logprob_batch
+
+    model, _ = tiny
+    tokens = [[1, 2, 11], [1, 4, 5, 6, 11], [1, 2]]
+    starts = [1, 3, 2]
+    with torch.no_grad():
+        expected = torch.stack([range_logprob(model, ids, start, 0) for ids, start in zip(tokens, starts)])
+        actual = range_logprob_batch(model, tokens, starts, 0, chunk_size=2)
+    torch.testing.assert_close(actual, expected, rtol=1e-5, atol=1e-6)
+    assert actual[2] == 0
+
+
 def experiment_fixture(tiny, tmp_path, monkeypatch, method="suffix_transport", early=True):
     from grace_gc.logging_util.run_dir import RunDirectory
     from grace_gc.trainer.suffix_transport import Experiment
@@ -281,6 +295,65 @@ def test_audit_draw_batches_preserve_donors_seeds_and_moments(tiny, tmp_path, mo
         with np.load(tmp_path / "batched/moments/problem-0-group-0.npz") as batched:
             for key in reference.files:
                 np.testing.assert_array_equal(reference[key], batched[key])
+
+
+def test_prefetch_preserves_generation_order_rng_and_audit_outputs(tiny, tmp_path, monkeypatch):
+    import threading
+
+    runs = []
+    for name, prefetch in (("serial", False), ("prefetch", True)):
+        exp, _, _, _ = experiment_fixture(tiny, tmp_path / name, monkeypatch)
+        exp.cfg["suffix_transport"].update(audit_prefetch=prefetch, groups_per_problem=2)
+        computing = threading.Event()
+        calls = []
+        original_gradient = exp.gradient
+
+        def gradient(*args, original=original_gradient, computing=computing):
+            computing.set()
+            return original(*args)
+
+        def prefix(prompts, max_new, rng, stream, calls=calls, prefetch=prefetch, computing=computing):
+            if prefetch and calls:
+                assert computing.wait(timeout=5)
+            seeds = rng.integers(stream, 2, 9, size=len(prompts)).tolist()
+            calls.append(seeds)
+            return [p + [seed, 11 if i == 0 else 5] for i, (p, seed) in enumerate(zip(prompts, seeds))], [True, False, False]
+
+        def continuation(prefixes, chosen, max_new, rng, exp=exp):
+            indices = [i for i, selected in enumerate(chosen) if selected]
+            seeds = rng.integers("continuation", 2, 9, size=len(indices)).tolist()
+            mapping = dict(zip(indices, seeds))
+            exp.engines.last_rollout = {"continue_request_seeds": mapping}
+            return [p + [mapping[i], 11] if chosen[i] else None for i, p in enumerate(prefixes)]
+
+        exp.gradient = gradient
+        exp.engines.generate_prefix, exp.engines.continue_selected = prefix, continuation
+        exp.audit()
+        runs.append((exp, calls))
+    assert runs[0][1] == runs[1][1]
+    for stream in ("token", "selection", "continuation"):
+        assert runs[0][0].rng.streams[stream].bit_generator.state == runs[1][0].rng.streams[stream].bit_generator.state
+    for filename in ("trajectories.jsonl", "transport_draws.jsonl", "groups.jsonl"):
+        assert (tmp_path / "serial" / filename).read_text() == (tmp_path / "prefetch" / filename).read_text()
+
+
+def test_fused_audit_reuses_scores_and_retains_independent_gradient_moments(tiny, tmp_path, monkeypatch):
+    for name, fused in (("separate", False), ("fused", True)):
+        exp, _, _, _ = experiment_fixture(tiny, tmp_path / name, monkeypatch)
+        exp.cfg["suffix_transport"]["fuse_audit_scores"] = fused
+        if fused:
+            exp.posterior = lambda *args: pytest.fail("fused full-RB audit repeated posterior forward")
+        exp.audit()
+    with np.load(tmp_path / "separate/moments/problem-0-group-0.npz") as reference:
+        with np.load(tmp_path / "fused/moments/problem-0-group-0.npz") as actual:
+            for key in reference.files:
+                np.testing.assert_allclose(actual[key], reference[key], rtol=1e-5, atol=1e-6)
+    reference = [json.loads(row) for row in (tmp_path / "separate/transport_draws.jsonl").read_text().splitlines()]
+    actual = [json.loads(row) for row in (tmp_path / "fused/transport_draws.jsonl").read_text().splitlines()]
+    for left, right in zip(reference, actual):
+        assert left["donor"] == right["donor"] and left["actual_rewards"] == right["actual_rewards"]
+        np.testing.assert_allclose(left["log_likelihoods"], right["log_likelihoods"], rtol=1e-6, atol=1e-6)
+        np.testing.assert_allclose(left["alpha"], right["alpha"], rtol=1e-6, atol=1e-6)
 
 
 def test_population_statistics_include_between_prefix_noise(tmp_path):

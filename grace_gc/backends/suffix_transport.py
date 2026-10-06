@@ -7,6 +7,22 @@ import numpy as np
 from grace_gc.core.suffix_transport import prefix_coefficients
 
 
+def configure_checkpoint_stride(model, stride):
+    """Use HF decoder checkpointing on every stride-th layer, preserving math."""
+    from transformers.modeling_layers import GradientCheckpointingLayer
+
+    if stride < 1:
+        raise ValueError("checkpoint stride must be positive")
+    layers = [module for module in model.modules() if isinstance(module, GradientCheckpointingLayer)]
+    if not layers:
+        raise ValueError("selective checkpointing needs HF checkpointable decoder layers")
+    for index, layer in enumerate(layers):
+        layer.gradient_checkpointing = index % stride == 0
+    model._grace_checkpoint_stride = stride
+    return {"stride": stride, "checkpointed_layers": sum(layer.gradient_checkpointing for layer in layers),
+            "total_layers": len(layers)}
+
+
 def range_logprob(model, token_ids, start, pad_id, *, end=None, chunk_size=64):
     """Sum probabilities of tokens [start:end], keeping the full causal graph.
 
@@ -43,6 +59,30 @@ def gradient_vector(logprob, named):
     result = np.concatenate([g.detach().float().cpu().numpy().ravel() for g in grads]).astype(np.float64)
     if not np.isfinite(result).all():
         raise ValueError("nonfinite q/v LoRA gradient")
+    return result
+
+
+def range_logprob_batch(model, sequences, starts, pad_id, *, chunk_size=128):
+    """Per-sequence sums with ragged causal masks; no averaging across tokens."""
+    import torch
+    from grace_gc.backends.hf_actor import actor_forward
+
+    if not sequences or len(sequences) != len(starts) or chunk_size < 1:
+        raise ValueError("invalid score batch")
+    if any(not 1 <= start <= len(tokens) for tokens, start in zip(sequences, starts)):
+        raise ValueError("invalid batched token logprob range")
+    out, ids, _ = actor_forward(model, sequences, pad_id)
+    begin = min(starts) - 1
+    ends = torch.tensor([len(tokens) for tokens in sequences], device=ids.device)
+    starts = torch.tensor(starts, device=ids.device)
+    result = out.logits[:, :1].sum(dim=(1, 2), dtype=torch.float64) * 0
+    for pos in range(begin, max(len(tokens) for tokens in sequences) - 1, chunk_size):
+        stop = min(pos + chunk_size, ids.shape[1] - 1)
+        values = out.logits[:, pos:stop].float().log_softmax(-1).gather(
+            -1, ids[:, pos + 1:stop + 1].unsqueeze(-1)).squeeze(-1)
+        positions = torch.arange(pos + 1, stop + 1, device=ids.device)
+        mask = (positions[None, :] >= starts[:, None]) & (positions[None, :] < ends[:, None])
+        result = result + values.masked_fill(~mask, 0).sum(dim=1, dtype=torch.float64)
     return result
 
 

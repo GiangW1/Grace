@@ -7,6 +7,7 @@ only separately timed train runs compare efficient Full-PG/donor-only/ST costs.
 from __future__ import annotations
 
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from time import perf_counter
 
@@ -37,6 +38,10 @@ def validate_experiment(cfg):
         raise ValueError("n_problems and bootstrap must be nonnegative")
     if int(st.get("audit_draw_batch_size", 1)) < 1:
         raise ValueError("audit_draw_batch_size must be positive")
+    if int(st.get("posterior_score_batch_size", 1)) < 1:
+        raise ValueError("posterior_score_batch_size must be positive")
+    if int(st.get("actor_checkpoint_stride", 1)) < 1:
+        raise ValueError("actor_checkpoint_stride must be positive")
     if not np.isfinite(float(st["strength"])) or not np.isfinite(float(st["baseline"])):
         raise ValueError("strength and fixed baseline must be finite")
     if st["method"] not in {"full_pg", "donor_only", "suffix_transport"}:
@@ -93,12 +98,15 @@ class Experiment:
     def timed(self, name, action):
         import torch
 
-        torch.cuda.synchronize()
+        generation = name in {"prefix_generation", "suffix_generation"}
+        if not generation:
+            torch.cuda.synchronize()
         tick = perf_counter()
         try:
             return action()
         finally:
-            torch.cuda.synchronize()
+            if not generation:
+                torch.cuda.synchronize()
             self.timings[name] += perf_counter() - tick
 
     def setup(self, mode):
@@ -157,12 +165,21 @@ class Experiment:
         for _, parameter in self.named:
             parameter.data = parameter.data.float()
         self.actor._grace_compute_dtype = "bfloat16"
+        checkpointing = None
+        stride = int(st.get("actor_checkpoint_stride", 1))
+        if stride != 1:
+            from grace_gc.backends.suffix_transport import configure_checkpoint_stride
+
+            if not getattr(self.actor, "_grace_gradient_checkpointing", False):
+                raise ValueError("selective checkpointing requires lora.gradient_checkpointing")
+            checkpointing = configure_checkpoint_stride(self.actor, stride)
         initialize_actor(self.actor, cfg, self.run)
         self.layout = collect_lora_layout(self.named)
         self.initial_sha = sha256_named(self.named)
         self.run.write_json("actor.json", {"initial_sha256": self.initial_sha,
                                            "layout": [vars(entry) for entry in self.layout.entries],
-                                           "dim": self.layout.dim, "numerics": actor_numerics(self.actor)})
+                                           "dim": self.layout.dim, "numerics": actor_numerics(self.actor),
+                                           "selective_checkpointing": checkpointing})
         vcfg = dict(cfg.get("vllm") or {})
         vcfg.update(seed=int(cfg.get("seed", 17)), max_model_len=vllm_needed_max_model_len(cfg))
         if workers:
@@ -187,6 +204,15 @@ class Experiment:
         from grace_gc.backends.suffix_transport import gradient_vector
 
         return self.timed("gradient", lambda: gradient_vector(self.score(tokens, start), self.named))
+
+    def gradient_and_suffix_score(self, tokens, start, split):
+        from grace_gc.backends.suffix_transport import gradient_vector
+
+        def evaluate():
+            prefix_lp, suffix_lp = self.score(tokens, start, split=split)
+            likelihood = float(suffix_lp.detach().cpu())
+            return gradient_vector(prefix_lp + suffix_lp, self.named), likelihood
+        return self.timed("gradient", evaluate)
 
     def reward(self, tokens, record_index):
         return reward_for_tokens(tokens, len(self.prompts[record_index]), self.records[record_index].answer,
@@ -234,10 +260,20 @@ class Experiment:
 
     def posterior(self, prefixes, suffix):
         import torch
+        from grace_gc.backends.suffix_transport import range_logprob_batch
 
         def evaluate():
             with torch.no_grad():
-                return [float(self.score(prefix + suffix, len(prefix)).detach().cpu()) for prefix in prefixes]
+                size = int(self.cfg["suffix_transport"].get("posterior_score_batch_size", 1))
+                if size == 1:
+                    return [float(self.score(prefix + suffix, len(prefix)).detach().cpu()) for prefix in prefixes]
+                likelihoods = []
+                for begin in range(0, len(prefixes), size):
+                    batch = prefixes[begin:begin + size]
+                    values = range_logprob_batch(self.actor, [prefix + suffix for prefix in batch],
+                                                [len(prefix) for prefix in batch], self.extra["pad_id"])
+                    likelihoods.extend(values.detach().cpu().tolist())
+                return likelihoods
         likelihoods = self.timed("cross_score", evaluate)
         return suffix_posterior(likelihoods), likelihoods
 
@@ -409,85 +445,128 @@ class Experiment:
                 yield (begin + offset, donor, full[first:first + width],
                        [seeds.get(first + i) for i in group])
 
+    def audit_groups(self):
+        st = self.cfg["suffix_transport"]
+        m = int(st["group_size"])
+
+        def prepare():
+            for rec in range(len(self.prompts)):
+                for group_id in range(int(st["groups_per_problem"])):
+                    prefixes, finished = self.prefixes([rec], m)
+                    group = live_groups(prefixes, finished, m)[0]
+                    completions = list(self.audit_completions(prefixes, group)) if group else []
+                    yield rec, group_id, prefixes, finished, group, completions
+
+        source = iter(prepare())
+        if not st.get("audit_prefetch", False):
+            yield from source
+            return
+        # One producer owns every sampling RNG and the vLLM RPC. The frozen
+        # actor can score the current group while the next group is generated.
+        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="st-rollout") as executor:
+            pending = executor.submit(next, source, None)
+            while True:
+                prepared = pending.result()
+                if prepared is None:
+                    break
+                pending = executor.submit(next, source, None)
+                yield prepared
+
     def audit(self):
         from grace_gc.versions import sha256_named
 
         cfg, st = self.cfg, self.cfg["suffix_transport"]
         m, baseline, strength = int(st["group_size"]), float(st["baseline"]), float(st["strength"])
+        fused = bool(st.get("fuse_audit_scores", False)) and bool(st.get("full_rb", True))
         rows = []
-        for rec in range(len(self.prompts)):
-            for group_id in range(int(st["groups_per_problem"])):
-                prefixes, finished = self.prefixes([rec], m)
-                group = live_groups(prefixes, finished, m)[0]
-                row = {"problem_id": self.records[rec].problem_id, "group_id": group_id,
-                       "n_start": m, "n_live": len(group), "prefix_token_ids": prefixes,
-                       "prefix_finished": finished, "baseline": baseline}
-                early = np.zeros(self.layout.dim)
-                for i, ended in enumerate(finished):
-                    if ended:
-                        reward = self.observe(prefixes[i], rec, group_id=group_id, start=i, phase="prefix")
-                        early += (reward - baseline) * self.gradient(prefixes[i], len(self.prompts[rec])) / m
-                moments = PairedMoments(self.layout.dim)
-                if group:
-                    prefix_group = [prefixes[i] for i in group]
-                    plen = len(self.prompts[rec])
-                    prefix_grads = np.stack([self.gradient(prefix, plen) for prefix in prefix_group])
-                    ess_values, donor_masses = [], []
-                    for draw, donor, full, request_seeds in self.audit_completions(prefixes, group):
-                        # Independent on-policy completions supply a real Full-PG control.
-                        own_grads, rewards = [], []
-                        for i in group:
-                            reward = self.observe(full[i], rec, group_id=group_id, draw=draw, start=i, phase="suffix")
-                            rewards.append(reward)
-                            own_grads.append((reward - baseline) * self.gradient(full[i], plen))
-                        d = group[donor]
-                        suffix = full[d][len(prefixes[d]):]
+        for rec, group_id, prefixes, finished, group, completions in self.audit_groups():
+            row = {"problem_id": self.records[rec].problem_id, "group_id": group_id,
+                   "n_start": m, "n_live": len(group), "prefix_token_ids": prefixes,
+                   "prefix_finished": finished, "baseline": baseline}
+            early = np.zeros(self.layout.dim)
+            for i, ended in enumerate(finished):
+                if ended:
+                    reward = self.observe(prefixes[i], rec, group_id=group_id, start=i, phase="prefix")
+                    early += (reward - baseline) * self.gradient(prefixes[i], len(self.prompts[rec])) / m
+            moments = PairedMoments(self.layout.dim)
+            if group:
+                prefix_group = [prefixes[i] for i in group]
+                plen = len(self.prompts[rec])
+                prefix_grads = np.stack([self.gradient(prefix, plen) for prefix in prefix_group])
+                ess_values, donor_masses = [], []
+                for draw, donor, full, request_seeds in completions:
+                    own_grads, rewards, own_likelihoods = [], [], []
+                    for i in group:
+                        reward = self.observe(full[i], rec, group_id=group_id, draw=draw, start=i, phase="suffix")
+                        rewards.append(reward)
+                        if fused:
+                            gradient, likelihood = self.gradient_and_suffix_score(full[i], plen, len(prefixes[i]))
+                            own_likelihoods.append(likelihood)
+                        else:
+                            gradient = self.gradient(full[i], plen)
+                        own_grads.append((reward - baseline) * gradient)
+                    d = group[donor]
+                    suffix = full[d][len(prefixes[d]):]
+                    advantages = np.array([self.reward(prefix + suffix, rec)[0] - baseline for prefix in prefix_group])
+                    gd = own_grads[donor]
+                    rb_grads = None
+                    if fused:
+                        likelihoods, rb_grads = [], []
+                        for j, prefix in enumerate(prefix_group):
+                            if j == donor:
+                                gradient, likelihood = gd, own_likelihoods[donor]
+                            else:
+                                raw, likelihood = self.gradient_and_suffix_score(prefix + suffix, plen, len(prefix))
+                                gradient = advantages[j] * raw
+                            rb_grads.append(gradient)
+                            likelihoods.append(likelihood)
+                        alpha = suffix_posterior(likelihoods)
+                    else:
                         alpha, likelihoods = self.posterior(prefix_group, suffix)
-                        advantages = np.array([self.reward(prefix + suffix, rec)[0] - baseline for prefix in prefix_group])
-                        gd = own_grads[donor]
-                        shared = transport_gradient(prefix_grads, gd, alpha, advantages, donor)
-                        controls = {"full_pg": np.mean(own_grads, axis=0)}
-                        if st.get("full_rb", True):
-                            rb = np.zeros_like(gd)
-                            for j, prefix in enumerate(prefix_group):
-                                gradient = own_grads[j] if j == donor else advantages[j] * self.gradient(prefix + suffix, plen)
-                                rb += alpha[j] * gradient
-                            controls["full_rb"] = rb
-                        weight = len(group) / m
-                        moments.add(early + weight * gd, weight * (shared - gd),
-                                    **{name: early + weight * value for name, value in controls.items()})
-                        ess_values.append(float(1 / (alpha @ alpha)))
-                        donor_masses.append(float(alpha[donor]))
-                        self.run.append_jsonl("transport_draws.jsonl", {"problem_id": row["problem_id"],
-                              "group_id": group_id, "draw": draw, "donor": donor, "live_start_indices": group,
-                              "request_seeds": request_seeds,
-                              "suffix_token_ids": suffix, "alpha": alpha.tolist(), "log_likelihoods": likelihoods,
-                              "counterfactual_rewards": (advantages + baseline).tolist(), "actual_rewards": rewards,
-                              "counterfactuals_are_exploration_successes": False})
-                    row.update(moments=moments.report(sorted({0.0, 1.0, strength})),
-                               mean_ess=float(np.mean(ess_values)), mean_donor_posterior=float(np.mean(donor_masses)))
-                else:
-                    controls = {"full_pg": early}
+                    shared = transport_gradient(prefix_grads, gd, alpha, advantages, donor)
+                    controls = {"full_pg": np.mean(own_grads, axis=0)}
                     if st.get("full_rb", True):
-                        controls["full_rb"] = early
-                    for _ in range(int(st["audit_draws"])):
-                        moments.add(early, np.zeros_like(early), **controls)
-                    row.update(moments=moments.report(sorted({0.0, 1.0, strength})),
-                               mean_ess=None, mean_donor_posterior=None)
-                # Full means allow population analysis without storing each dense draw.
-                path = self.run.root / "moments" / f"problem-{rec}-group-{group_id}.npz"
-                path.parent.mkdir(parents=True, exist_ok=True)
-                np.savez(path, donor_correction_sum=moments.sum, donor_correction_gram=moments.gram,
-                         n=moments.n, **{f"{name}_sum": value for name, value in moments.other_sum.items()})
-                row["moments_file"] = str(path.relative_to(self.run.root))
-                rows.append(row)
-                self.run.append_jsonl("groups.jsonl", row)
-                print(f"audit problem={rec + 1}/{len(self.prompts)} group={group_id} live={len(group)}", flush=True)
+                        if rb_grads is None:
+                            rb_grads = [own_grads[j] if j == donor else advantages[j] * self.gradient(prefix + suffix, plen)
+                                        for j, prefix in enumerate(prefix_group)]
+                        controls["full_rb"] = sum(alpha[j] * gradient for j, gradient in enumerate(rb_grads))
+                    weight = len(group) / m
+                    moments.add(early + weight * gd, weight * (shared - gd),
+                                **{name: early + weight * value for name, value in controls.items()})
+                    ess_values.append(float(1 / (alpha @ alpha)))
+                    donor_masses.append(float(alpha[donor]))
+                    self.run.append_jsonl("transport_draws.jsonl", {"problem_id": row["problem_id"],
+                          "group_id": group_id, "draw": draw, "donor": donor, "live_start_indices": group,
+                          "request_seeds": request_seeds,
+                          "suffix_token_ids": suffix, "alpha": alpha.tolist(), "log_likelihoods": likelihoods,
+                          "counterfactual_rewards": (advantages + baseline).tolist(), "actual_rewards": rewards,
+                          "counterfactuals_are_exploration_successes": False})
+                row.update(moments=moments.report(sorted({0.0, 1.0, strength})),
+                           mean_ess=float(np.mean(ess_values)), mean_donor_posterior=float(np.mean(donor_masses)))
+            else:
+                controls = {"full_pg": early}
+                if st.get("full_rb", True):
+                    controls["full_rb"] = early
+                for _ in range(int(st["audit_draws"])):
+                    moments.add(early, np.zeros_like(early), **controls)
+                row.update(moments=moments.report(sorted({0.0, 1.0, strength})),
+                           mean_ess=None, mean_donor_posterior=None)
+            path = self.run.root / "moments" / f"problem-{rec}-group-{group_id}.npz"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            np.savez(path, donor_correction_sum=moments.sum, donor_correction_gram=moments.gram,
+                     n=moments.n, **{f"{name}_sum": value for name, value in moments.other_sum.items()})
+            row["moments_file"] = str(path.relative_to(self.run.root))
+            rows.append(row)
+            self.run.append_jsonl("groups.jsonl", row)
+            print(f"audit problem={rec + 1}/{len(self.prompts)} group={group_id} live={len(group)}", flush=True)
         if sha256_named(self.named) != self.initial_sha:
             raise ValueError("frozen audit mutated actor parameters")
         return {"mode": "audit", **summarize_groups(rows, int(st["bootstrap"]), int(cfg.get("seed", 17))),
                 "population": summarize_population(rows, self.run.root),
                 "full_rb": bool(st.get("full_rb", True)),
+                "actor_execution": {"fuse_audit_scores": fused,
+                                    "posterior_score_batch_size": int(st.get("posterior_score_batch_size", 1)),
+                                    "audit_prefetch": bool(st.get("audit_prefetch", False))},
                 "note": "Lambda optimum is descriptive; calibrate on separate problems before held-out testing. Short cap runs change the reward horizon."}
 
     def close(self):

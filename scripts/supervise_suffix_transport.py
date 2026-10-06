@@ -56,6 +56,9 @@ def main():
     parser.add_argument("--eval-data", default="/SSD/00/wja/GRACE/data/math500/test.jsonl")
     parser.add_argument("--train-seeds", type=int, nargs="+", default=[17, 29, 43])
     parser.add_argument("--budget-seconds", type=int, default=3600)
+    parser.add_argument("--max-new-tokens", type=int, default=8192)
+    parser.add_argument("--mainline-only", action="store_true", help="Run validation and paired audits, deferring budget training/evaluation")
+    parser.add_argument("--execution-config", help="Additional actor/pipeline execution config")
     parser.add_argument("--detach", action="store_true")
     parser.add_argument("--adopt-current", action="store_true",
                         help="Take over this run's active job without restarting its audit")
@@ -83,6 +86,8 @@ def main():
             "--gpus", args.gpus, "--model-path", args.model_path,
             "--eval-data-path", args.eval_data,
             "--init-checkpoint", str(root / "shared-initial-actor.npz")]
+    if args.execution_config:
+        base += ["--config", args.execution_config]
     audit_data, train_data = str(root / "input/audit.jsonl"), str(root / "input/train.jsonl")
     batch = ["--config", "configs/experiments/suffix_transport_training_batch.yaml"]
     jobs = [{"name": "cpu-math-smoke", "cpu": True, "command": [sys.executable, "-u",
@@ -106,6 +111,16 @@ def main():
                 "--method", method, "--seed", str(seed), "--steps", "100000", "--n-problems", "0",
                 "--budget-seconds", str(args.budget_seconds)]})
             jobs.append({"name": f"eval-{method}-seed{seed}", "training_job": name})
+    if args.mainline_only:
+        jobs = [job for job in jobs if not job["name"].startswith(("train-", "eval-"))]
+    for job in jobs:
+        command = job.get("command", [])
+        if "--cpu" in command:
+            continue
+        if "--max-new-tokens" in command:
+            command[command.index("--max-new-tokens") + 1] = str(args.max_new_tokens)
+        elif job["name"] != "gpu-short-smoke":
+            command += ["--max-new-tokens", str(args.max_new_tokens)]
     queue = {"requested_commit": "1e4e496333b6ea1b1f2c369e5baa1b19079ce185",
              "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO, text=True).strip(),
              "gpu_roles": {gpus[0]: "HF actor/gradient", gpus[1]: "vLLM rollout"},
@@ -113,6 +128,8 @@ def main():
                            "gradient_checkpointing": True, "audit_draw_batch_size": 8,
                            "training_prompts_per_step": 8},
              "train_seeds": args.train_seeds, "training_budget_seconds_per_method": args.budget_seconds,
+             "max_new_tokens": args.max_new_tokens, "mainline_only": args.mainline_only,
+             "execution_config": args.execution_config,
              "jobs": jobs, "retry_scope": "OOM retries use a new run directory; completed jobs are skipped. No ST optimizer/RNG or partial-audit resume."}
     plan = root / "queue.json"
     if plan.exists() and json.loads(plan.read_text()) != queue:

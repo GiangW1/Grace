@@ -210,6 +210,27 @@ ST 首次更新、完整长度 smoke、m=2/4 审计、三方法预算训练和�
 这能检查冻结 actor 上的后缀共享/梯度方差，不能证明训练后的准确率收益。
 `--adopt-current` 可接管同一 run 的活动任务：暂停旧调度器，保留当前 GPU 子进程运行，
 等子进程退出后读取实际退出码并释放旧调度器，再按控制文件调度余下阶段。
+
+### 16384 主线执行优化
+
+叠加 `configs/experiments/suffix_transport_optimized_16384.yaml`，并给调度器传入
+`--max-new-tokens 16384 --mainline-only --execution-config configs/experiments/suffix_transport_optimized_16384.yaml`。
+仍是同一模型、初始 actor、32 题、t=512、温度 1、m=2/4 和完整 full-RB。
+8192 与 16384 属于不同奖励长度上限，必须使用独立 run 根目录，不合并方差统计。
+
+full-RB 所需的完整轨迹梯度和后缀 likelihood 由同一次前向取得，保留每条轨迹的
+独立梯度；其他需要后验评分的路径按最多 4 条批量评分，排除 padding 并保留 EOS。
+激活检查点每隔一层启用，增加保存的激活、减少反向时的重复前向；FP32 LoRA masters
+和 BF16 计算保持不变。GPU smoke 记录复用梯度误差和实际轨迹的批量评分漂移。
+
+冻结审计使用单个生成线程预取下一组，让 vLLM 与当前组 HF 反向重叠。
+全部生成 RNG、donor 选择和 vLLM RPC 仍由同一生产者按原顺序执行。
+生成计时等待 GPU worker RPC 完成，不再同步 actor GPU；各阶段耗时有重叠，不能相加
+当成整轮墙钟时间。训练路径没有启用该预取，因为更新 actor 后需要重新同步 adapter。
+
+`scripts/benchmark_suffix_transport_actor.py` 使用明确标记的 teacher-forcing 压力样本
+比较执行耗时、显存峰值及梯度误差；16384 压力样本重复已有 token，不是新生成结果。
+整轮收益仍需要真实流水线和审计结果，不能由这个小基准直接推断。
 训练沿文档使用 seed 17/29/43，每种方法各 3600 秒；三方法统一每步八题，
 Full-PG 每步最多 32 条续写，ST 和高效 donor-only 每步最多八条。
 质量比较读取最后一个预算内保存的 checkpoint，初始化和审计不计为训练预算收益。

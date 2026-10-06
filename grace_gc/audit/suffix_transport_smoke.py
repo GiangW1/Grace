@@ -156,6 +156,7 @@ def behavior_probe(exp, prefixes, rollout, plen, stop_ids, *, phase="prefix", st
 
 def gpu_smoke(experiment):
     """Real rollout -> actor scoring/backward -> checkpoint and adapter probe."""
+    import torch
     from grace_gc.trainer.checkpoint import load_checkpoint
     from grace_gc.versions import sha256_named
 
@@ -205,10 +206,29 @@ def gpu_smoke(experiment):
     full_gradient = exp.gradient(longest, plen)
     result["actual_trajectory_backward"] = {"response_tokens": len(longest) - plen,
                                              "full_gradient_norm": float(np.linalg.norm(full_gradient))}
+    longest_index = actual.index(longest)
+    split = len(prefixes[longest_index])
+    fused_gradient, fused_score = exp.gradient_and_suffix_score(longest, plen, split)
+    error = float(np.linalg.norm(fused_gradient - full_gradient) / max(np.linalg.norm(full_gradient), 1e-12))
+    if not np.isfinite(fused_gradient).all() or error > .03:
+        raise AssertionError(f"fused full-trajectory gradient mismatch: relative L2={error}")
+    with torch.no_grad():
+        separate_score = float(exp.score(longest, split))
+        sequences = [tokens for tokens in actual if len(tokens) > plen]
+        from grace_gc.backends.suffix_transport import range_logprob_batch
+
+        serial = np.array([float(exp.score(tokens, plen)) for tokens in sequences])
+        batched = range_logprob_batch(exp.actor, sequences, [plen] * len(sequences), exp.extra["pad_id"]).cpu().numpy()
+    if not np.isfinite(batched).all():
+        raise AssertionError("nonfinite batched actual-trajectory score")
+    result["fused_score_and_gradient"] = {"gradient_relative_l2": error,
+                                           "suffix_logprob_abs_error": abs(fused_score - separate_score)}
+    result["batched_actual_scores"] = {"batch_size": len(sequences),
+                                       "sequence_logprob_abs_errors": np.abs(batched - serial).tolist(),
+                                       "note": "BF16 batch kernel drift is recorded; this does not certify exact posterior weights."}
     # Exercise a real optimizer update and subsequent adapter sync, then restore
     # the shared starting actor. Smoke owns this actor; no experiment checkpoint
     # is overwritten. A normalized SGD step avoids Adam/clipping ambiguities.
-    import torch
     original = [parameter.detach().clone() for _, parameter in exp.named]
     optimizer = torch.optim.SGD([p for _, p in exp.named], lr=.001)
     old_id = exp.extra["lora_id"]
