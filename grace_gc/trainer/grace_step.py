@@ -194,12 +194,19 @@ def batch_token_costs(
     finished: np.ndarray,
     p: np.ndarray,
     max_new: int,
+    full_ids: list | None = None,
 ) -> tuple[float, float]:
     """Mean expected tokens paid vs mean full-budget tokens. Prefix is not free.
 
     Finished starts have no remaining budget. Unfinished starts pay the prefix
     and, in expectation, `p` of the leftover budget. Full-PG (`p=1`) therefore
     has paid == full and keeps N_ref.
+
+    With ``full_ids`` (realized sequences, ``p`` = realized Z), continued
+    starts cost their actual suffix and a stopped start's counterfactual suffix
+    is the batch mean of realized unfinished suffixes. Charging the whole
+    leftover budget instead credited stops with savings that a real rollout
+    (mean ~600-900 of 2048 tokens) would never have spent, inflating next N.
     """
     if not prefixes:
         return 0.0, 0.0
@@ -210,9 +217,22 @@ def batch_token_costs(
     paid = np.empty(len(prefixes), dtype=np.float64)
     full = np.empty(len(prefixes), dtype=np.float64)
     budget = int(max_new)
+    realized = None
+    if full_ids is not None:
+        if len(full_ids) != len(prefixes):
+            raise ValueError("full_ids dimension does not match prefixes")
+        realized = [None if finished[i] or full_ids[i] is None else
+                    max(len(full_ids[i]) - len(prefixes[i]), 0) for i in range(len(prefixes))]
+        observed = [r for r in realized if r is not None]
+        mean_suffix = float(np.mean(observed)) if observed else None
     for i, prefix in enumerate(prefixes):
         pref = max(len(prefix) - int(prompt_lens[i]), 0)
         rem = 0 if finished[i] else max(budget - pref, 0)
+        if realized is not None and not finished[i]:
+            if realized[i] is not None:
+                rem = realized[i]
+            elif mean_suffix is not None:
+                rem = min(mean_suffix, rem)
         # `p` may be the planned probability or the realized Z. Full-PG has
         # p=Z=1, so paid==full and N stays N_ref. GRACE uses realized Z.
         paid[i] = float(pref) + float(p[i]) * float(rem)

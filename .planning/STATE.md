@@ -5,6 +5,15 @@ status: in-progress
 
 # Project State
 
+2026-10-09 转向分析论文（ACL 2027）。审查结论、新主张和运行命令见
+[分析论文框架 v4](../GRACE_ACL分析论文框架_v4.md)。本地分支 `integrate/all-open-prs`
+= master `0621817` + PR #12–#15（无冲突合并）。9 月各轮在线对比因 N 被墙钟控制器压到 4、
+prescan 占约 60% 步时、预测器标签不足等问题作废，不作为论文证据；PR13–15 的零 B LoRA
+thinking 审计也不进主文。已修：截断回答 R=0（奖励协议 v4）、HT 基线截断到 [0,1]、
+token 记账按实际后缀、自锚定墙钟目标不再压 N。新增流式标量审计分析（`grace_gc/audit/synchrony.py`），
+审计 `tokens_only` / `skip_settled_problems`。下一步：服务器冒烟（20 题、1 个快照、t=512）测吞吐与跳题比例，
+再跑快照训练与完整审计。测试见 [TEST_STATUS](../docs/TEST_STATUS.md)。
+
 2026-10-07 服务器增量：PR15 请求版本 `1e4e496`，实测优化版本 `4675a34`。
 16384-token、Qwen3-4B thinking、GPU0 actor/GPU2 rollout 的 m=2/4 冻结审计
 各完成 32 题/64 组，无 OOM 或重启，已于 2026-10-06 19:36 HKT 全部结束。

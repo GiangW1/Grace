@@ -748,7 +748,7 @@ def run_algorithm1_step(
     pred_metrics["fresh_supervision"] = fresh_metrics
 
     timings["predictor"] = timer.lap()
-    used, full = batch_token_costs(prompt_lens, prefixes, finished, z, max_new)
+    used, full = batch_token_costs(prompt_lens, prefixes, finished, z, max_new, full_ids=full_ids)
     ratio = 1.0 if full <= 0.0 else used / full
     actual_response = [
         float(rec.response_tokens) for rec in records if float(rec.z) >= 1.0

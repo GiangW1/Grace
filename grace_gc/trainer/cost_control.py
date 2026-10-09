@@ -68,7 +68,7 @@ class CostControl:
             return "session_wall_seconds"
         return None
 
-    def observe(self, n, wall_seconds, step, group=1, minimum_n=None, *, main_seconds=None):
+    def observe(self, n, wall_seconds, step, group=1, minimum_n=None, *, main_seconds=None, reference_n=None):
         if not math.isfinite(wall_seconds) or wall_seconds <= 0 or n <= 0:
             raise ValueError("observed batch wall time and N must be positive")
         if main_seconds is not None and (not math.isfinite(main_seconds) or not 0 <= main_seconds <= wall_seconds):
@@ -102,6 +102,12 @@ class CostControl:
         if self.state.get("target_step_seconds") is None:
             self.state.update(target_step_seconds=float(wall_seconds), target_source="first_observed_complete_batch")
         available = max(0., float(self.state["target_step_seconds"]) - fixed_mean)
+        if reference_n is not None and self.state.get("target_source") != "explicit":
+            # A method's own first batch is not a shared budget. vLLM batch time is
+            # set by the longest sequence, so wall/N rises as N falls and the
+            # linear model spirals N down to one prompt (Sept runs: N 16 -> 4).
+            # Without an explicit shared target, cost feedback may only add starts.
+            minimum = max(minimum, (int(reference_n) // group) * group)
         # The tolerance only avoids rounding a mathematically integral group
         # down by one after subtracting the measured fixed component.
         next_n = max(minimum, math.floor(available / ema / group + 1e-12) * group) if ema > 0 else max(minimum, int(n))
@@ -214,7 +220,8 @@ def observe_batch_cost(controller, cfg, state, last, seconds):
     # This grouping is a scheduling approximation, not a GPU kernel model.
     main = None if not timings else sum(float(timings.get(name, 0.)) for name in
                                        ("prefix", "allocate", "continue", "backward", "audit", "behavior_probe"))
-    nxt = controller.observe(int(last["n"]), seconds, state.step, group, minimum, main_seconds=main)
+    nxt = controller.observe(int(last["n"]), seconds, state.step, group, minimum, main_seconds=main,
+                             reference_n=state.n_ref or None)
     if nxt is not None:
         last["next_n"] = nxt
     state.cost_control = controller.snapshot()

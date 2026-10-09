@@ -74,8 +74,28 @@ def replay_statistics(rows, score_fn, prefix_score_fn, dimension, output,
     target.mkdir(parents=True, exist_ok=True)
     started = perf_counter()
     batch, n_rows, n_suffixes, zero_keys, pids = {}, 0, 0, [], set()
-    with (target / "trajectory_scalars.jsonl").open("w", encoding="utf-8") as handle:
-        for index, row in enumerate(rows):
+    # Same-problem prefixes are independent starts, so sum_{i!=j} <Gbar_i, Gbar_j>
+    # is unbiased for k(k-1)||E[G|x, live at t]||^2. Rows are visited problem by
+    # problem (seeds still use the original index) so only one sum vector is open.
+    rows = list(rows)
+    order = sorted(range(len(rows)), key=lambda i: (str(rows[i].get("problem_id")),
+                                                    str(rows[i].get("enable_thinking")), str(rows[i].get("t"))))
+    cross = {"key": None}
+
+    def flush_cross(handle):
+        if cross["key"] is None:
+            return
+        pid, thinking, t = cross["key"]
+        out = {"problem_id": pid, "enable_thinking": thinking, "t": t, "n_prefixes": cross["n"], "metrics": {}}
+        for name, weight in metrics.items():
+            out["metrics"][name] = {"cross_mean_sum": _dot(weight, cross["sum"], cross["sum"]) - cross["self"][name]}
+        handle.write(json.dumps(out, ensure_ascii=False, allow_nan=False) + "\n")
+        cross["key"] = None
+
+    with (target / "trajectory_scalars.jsonl").open("w", encoding="utf-8") as handle, \
+            (target / "problem_cross.jsonl").open("w", encoding="utf-8") as cross_handle:
+        for index in order:
+            row = rows[index]
             if row.get("finished", False):
                 continue
             records = row.get("continuation_records") or []
@@ -128,6 +148,15 @@ def replay_statistics(rows, score_fn, prefix_score_fn, dimension, output,
                 gram["adv_suffix_energy_a"] = float(np.mean([
                     s["metrics"][name]["adv_suffix_norm_sq"] for s in samples if s["half"] == 0]))
                 info["trajectory_statistics"][name] = gram
+            key = (str(row["problem_id"]), row.get("enable_thinking"), row.get("t"))
+            if cross["key"] != key:
+                flush_cross(cross_handle)
+                cross.update(key=key, n=0, sum=np.zeros(dimension), self=dict.fromkeys(metrics, 0.))
+            full_mean = (counts[0] * means[0] + counts[1] * means[1]) / n
+            cross["sum"] += full_mean
+            cross["n"] += 1
+            for name, weight in metrics.items():
+                cross["self"][name] += _dot(weight, full_mean, full_mean)
             position = f"{row.get('enable_thinking')}/{row['t']}"
             for key in [position] + ([position + "/strict"] if _strict_pre_answer(info) else []):
                 acc = batch.setdefault(key, {"vectors": [np.zeros(dimension) for _ in range(4)],
@@ -149,6 +178,7 @@ def replay_statistics(rows, score_fn, prefix_score_fn, dimension, output,
             handle.flush()
             n_rows += 1; n_suffixes += n; pids.add(str(row["problem_id"]))
             print(f"statistics={n_rows} problem={row['problem_id']}", flush=True)
+        flush_cross(cross_handle)
     batches = {key: {name: _batch_report({**acc["metrics"][name], "vectors": acc["vectors"]}, weight)
                      for name, weight in metrics.items()} for key, acc in batch.items()}
     (target / "batch_statistics.json").write_text(json.dumps(batches, indent=2, allow_nan=False), encoding="utf-8")

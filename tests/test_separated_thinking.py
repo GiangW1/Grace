@@ -9,6 +9,7 @@ import pytest
 from grace_gc.audit import run
 from grace_gc.audit.prefix_audit import bundle_from_dict
 from grace_gc.data.math_data import MathRecord
+from grace_gc.data.reward import REWARD_PROTOCOL_VERSION
 
 
 def load_script(name):
@@ -124,7 +125,7 @@ def test_cpu_analysis_preserves_certain_q_despite_uncertain_probes(monkeypatch, 
             script.prepare_metric(tmp_path, metric)
         script.write_json(tmp_path / "selection.json", {
             "n_problems": 32, "problems": [{"problem_id": str(i)} for i in range(32)],
-            "reward_protocol_version": 3})
+            "reward_protocol_version": REWARD_PROTOCOL_VERSION})
     script.write_json(tmp_path / "worker-0-provenance.json", provenance)
     from grace_gc.core.rng import IsolatedRNG
     for index in range(32):
@@ -304,7 +305,7 @@ def test_merge_rejects_stale_problem_ids(tmp_path):
     script.write_json(tmp_path / "selection.json", {
         "n_problems": 1,
         "problems": [{"problem_id": "selected"}],
-        "reward_protocol_version": 3,
+        "reward_protocol_version": REWARD_PROTOCOL_VERSION,
     })
     directory = script.problem_directory(tmp_path, "stale")
     script.write_json(directory / "summary.json", {"status": "completed", "problem_id": "stale"})
@@ -317,7 +318,7 @@ def test_merge_rejects_stale_problem_ids(tmp_path):
 def test_merge_distinguishes_no_surviving_prefix_from_lost_bundles(tmp_path, n_bundles):
     script = load_script("audit_separated_thinking")
     script.write_json(tmp_path / "selection.json", {
-        "n_problems": 1, "problems": [{"problem_id": "short"}], "reward_protocol_version": 3})
+        "n_problems": 1, "problems": [{"problem_id": "short"}], "reward_protocol_version": REWARD_PROTOCOL_VERSION})
     script.write_json(script.problem_directory(tmp_path, "short") / "summary.json", {
         "status": "completed", "problem_id": "short", "n_bundles": n_bundles})
     args = SimpleNamespace(run_dir=str(tmp_path), seed=17, allow_legacy=False)
@@ -339,11 +340,11 @@ def test_merge_distinguishes_no_surviving_prefix_from_lost_bundles(tmp_path, n_b
 def test_merge_rejects_bundles_outside_selection(tmp_path):
     script = load_script("audit_separated_thinking")
     script.write_json(tmp_path / "selection.json", {
-        "n_problems": 1, "problems": [{"problem_id": "selected"}], "reward_protocol_version": 3})
+        "n_problems": 1, "problems": [{"problem_id": "selected"}], "reward_protocol_version": REWARD_PROTOCOL_VERSION})
     script.write_json(script.problem_directory(tmp_path, "selected") / "summary.json", {
         "status": "completed", "problem_id": "selected", "n_bundles": 0})
     script.write_json(script.problem_directory(tmp_path, "stale") / "path-0-t1024/bundle.json", {
-        "problem_id": "stale", "reward_protocol_version": 3})
+        "problem_id": "stale", "reward_protocol_version": REWARD_PROTOCOL_VERSION})
     with pytest.raises(ValueError, match="bundle problem IDs"):
         script.merge(SimpleNamespace(run_dir=str(tmp_path), seed=17, allow_legacy=False))
 
@@ -414,7 +415,7 @@ def test_merge_rejects_changed_metric_before_writing_replay(monkeypatch, tmp_pat
     script.write_json(directory / "summary.json", {
         "status": "completed", "problem_id": bundle.problem_id, "n_bundles": 1})
     script.write_json(tmp_path / "selection.json", {
-        "n_problems": 1, "problems": [{"problem_id": bundle.problem_id}], "reward_protocol_version": 3})
+        "n_problems": 1, "problems": [{"problem_id": bundle.problem_id}], "reward_protocol_version": REWARD_PROTOCOL_VERSION})
     provenance = {"layout_dim": 3, "metric_weights_sha256": sha256_array(metric)}
     script.write_json(tmp_path / "worker-0-provenance.json", provenance)
     if stale_source == "prefix":
@@ -530,7 +531,7 @@ def test_collection_scope_preserves_sample_count_on_resume(tmp_path):
 def test_learning_completion_scope_keeps_its_dimensions_and_legacy_resume(tmp_path):
     script = load_script("audit_separated_thinking")
     script.write_json(tmp_path / "worker-0-provenance.json", {
-        "reward_protocol_version": 3, "require_complete_answers": True})
+        "reward_protocol_version": REWARD_PROTOCOL_VERSION, "require_complete_answers": True})
     options = dict(n_prefixes=4, n_baseline=16, max_new_tokens=8192,
                    decision_grid=[256, 512, 1024, 2048, 4096], learning_completion=True)
     scope = script.prepare_collection_scope(tmp_path, 8, **options)

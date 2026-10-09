@@ -11,7 +11,9 @@ import sys
 
 
 FINAL = re.compile(r"(?:final\s+answer|answer)\s*(?:is\s+|[:=]\s*)(?:\n\s*)?([^\n]+)", re.I)
-REWARD_PROTOCOL_VERSION = 3
+# v4: every length-truncated response scores 0, Base included (paper: no complete
+# answer by the cap means R=0). v3 still scored truncated Base text.
+REWARD_PROTOCOL_VERSION = 4
 
 
 def extract_boxed(text: str) -> str | None:
@@ -226,8 +228,9 @@ def rule_reward(text: str | None, gold: str, truncated: bool = False,
                 *, require_complete: bool = False) -> float | None:
     if text is None:
         return None
-    thinking = "<think>" in text or "</think>" in text
-    if truncated and (require_complete or thinking):
+    # ``require_complete`` is kept for callers; truncation is always incomplete.
+    _ = require_complete
+    if truncated:
         return 0.0
     text = _answer_text(str(text))
     pred = extract_answer(text)

@@ -242,6 +242,8 @@ def _bundles_from_engines(
     bundle_resume=None,
     require_complete_answers: bool = False,
     batch_continuations: bool = False,
+    tokens_only: bool = False,
+    skip_settled_problems: bool = False,
 ) -> list[PrefixBundle]:
     from grace_gc.core.rng import IsolatedRNG
 
@@ -275,6 +277,19 @@ def _bundles_from_engines(
             if baseline_policy is not None:
                 b_grad = baseline_policy.prescan_estimate([row["reward"] for row in baseline_samples])
             baseline_source = "independent_prescan"
+        observed = [float(row["reward"]) for row in baseline_samples]
+        if skip_settled_problems and len(observed) >= 2 and len(set(observed)) == 1:
+            # All independent samples agree: no answer variance to resolve, and with
+            # b in {0, 1} most trajectories carry G = 0. Record and skip the problem.
+            _bundles_from_engines.last.append({
+                "problem_id": rec.problem_id, "prompt": rec.prompt, "gold": rec.answer,
+                "baseline": b_grad, "baseline_samples": baseline_samples,
+                "baseline_source": baseline_source, "skipped": "settled_baseline", "paths": [],
+                "decision_grid": decisions, "max_new_tokens": max_new,
+            })
+            print(f"phase=audit_problem_skipped problem_id={rec.problem_id} reason=settled_baseline "
+                  f"baseline={b_grad}", flush=True)
+            continue
         b_feat = b_grad
         prompts, _pids, _golds = encode_fn(rec, n_prefixes)
         encode_meta = getattr(encode_fn, "last_meta", None) or []
@@ -427,6 +442,8 @@ def _bundles_from_engines(
                 costs = []
                 suffix_texts = []
                 continuation_records = []
+                if tokens_only and (store_trajectory_gradients or u is not None):
+                    raise ValueError("tokens_only audit cannot store gradients or basis coordinates")
                 prefix_score_grad = (_score_grad_vec(engines, layout, prefix, prompt_len)
                                      if store_trajectory_gradients else None)
                 for full, cont_fr, suffix_seed in zip(fulls, finish_reasons, suffix_seeds):
@@ -465,7 +482,10 @@ def _bundles_from_engines(
                     # The policy-gradient helper sums log-probability over
                     # the response after the original problem prompt, so it
                     # already returns full G=(R-b)(g_h+g_s).
-                    full_grad = _policy_grad_vec(engines, layout, full, prompt_len, reward, b_grad)
+                    # tokens_only: the streaming replay computes every gradient once;
+                    # computing them here too would pay each backward twice.
+                    full_grad = (np.zeros(1) if tokens_only else
+                                 _policy_grad_vec(engines, layout, full, prompt_len, reward, b_grad))
                     grads.append(full_grad)
                     if prefix_score_grad is not None:
                         # Keep the full trajectory target identical to the
@@ -481,7 +501,7 @@ def _bundles_from_engines(
                         prefix, prompt_len, rec.answer, rec.problem_id, int(t), int(idx)
                     )
                 grads_arr = np.stack(grads, axis=0)
-                full_norm = np.sum(grads_arr * grads_arr, axis=1).tolist()
+                full_norm = None if tokens_only else np.sum(grads_arr * grads_arr, axis=1).tolist()
                 trajectory_arr = (None if prefix_score_grad is None else
                                   np.stack(trajectory_grads, axis=0))
                 trajectory_norm = (None if trajectory_arr is None else
@@ -499,7 +519,7 @@ def _bundles_from_engines(
                                                (trajectory_arr @ u), axis=1), 0.0))))
                 original_dim = int(grads_arr.shape[1])
                 m_pred = None if m_list[loc] is None else np.asarray(m_list[loc], dtype=np.float64)
-                if jl_dim and grads_arr.shape[1] > int(jl_dim):
+                if not tokens_only and jl_dim and grads_arr.shape[1] > int(jl_dim):
                     grads_arr = jl_project(grads_arr, int(jl_dim), int(jl_seed))
                     if m_pred is not None:
                         m_pred = jl_project(m_pred, int(jl_dim), int(jl_seed))
@@ -724,6 +744,8 @@ def generate_bundles_tiny(
         store_trajectory_gradients=store_trajectory_gradients,
         trajectory_dir=trajectory_dir,
         require_complete_answers=bool(audit_cfg.get("require_complete_answers", False)),
+        tokens_only=bool(audit_cfg.get("tokens_only", False)),
+        skip_settled_problems=bool(audit_cfg.get("skip_settled_problems", False)),
     )
 
 
@@ -897,6 +919,8 @@ def generate_bundles_gpu(
         qualification_fn=qualification_fn,
         require_complete_answers=bool(audit_cfg.get("require_complete_answers", False)
                                       or cfg.get("enable_thinking", False)),
+        tokens_only=bool(audit_cfg.get("tokens_only", False)),
+        skip_settled_problems=bool(audit_cfg.get("skip_settled_problems", False)),
     )
 
 
@@ -1062,6 +1086,9 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
             if cfg.get("audit", {}).get("jl_dim"):
                 analysis["jl_dim"] = int(cfg["audit"]["jl_dim"])
             result = audit_bundles(bundles, u, analysis, rng)
+            if (cfg.get("audit") or {}).get("tokens_only"):
+                result["gradient_statistics"] = ("not computed: tokens_only audit; gradient fields "
+                                                 "here are zero placeholders, use the streaming replay")
             continuation_rows = [record for bundle in bundles
                                  for record in (bundle.continuation_records or [])]
             probe_rows = [bundle for bundle in bundles

@@ -76,6 +76,9 @@ class HistoricalBaseline:
 
         Missing rewards stay missing. Their observed HT contribution is zero;
         the denominator remains the number of starts, not the completions.
+        The HT mean is clipped to the binary reward range [0, 1] before the
+        EMA: r/p can reach 1/p_min, which would push b above 1. b only has to
+        be history-only for an unbiased G, so clipping costs no unbiasedness.
         """
         rewards, probabilities = list(rewards), list(probabilities)
         if len(rewards) != len(probabilities):
@@ -85,7 +88,7 @@ class HistoricalBaseline:
         if any(not math.isfinite(float(p)) or not 0 < float(p) <= 1 for p in probabilities):
             raise ValueError("baseline inclusion probabilities must be in (0, 1]")
         estimate = sum(float(r) / float(p) for r, p in zip(rewards, probabilities) if r is not None) / len(rewards)
-        self.update(problem_id, estimate)
+        self.update(problem_id, min(max(estimate, 0.0), 1.0))
 
     def configuration(self) -> dict:
         return {"ema_alpha": self.alpha, "mode": self.mode, "fixed_value": self.fixed_value,

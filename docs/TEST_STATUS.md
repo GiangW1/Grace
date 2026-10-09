@@ -2,6 +2,19 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
+## 分析论文转向与审查修复（2026-10-09）
+
+- 分支 `integrate/all-open-prs`（master `0621817` + PR #12–#15）。本机全量：
+  `942 tests: 933 passed, 4 skipped, 5 failed`（Windows Python 3.11，`python -m pytest -p no:cacheprovider`）。
+  5 个失败与合并前、PR15 原始代码上相同，都是 Windows 打开的 NumPy memmap 被替换/删除
+  （`test_expected_gain_experiment` 1 个，`test_learning_completion` gram cache 4 个），属于环境问题。
+- 新增 `tests/test_review_20261009.py`（截断奖励、HT 基线范围、实际后缀 token 记账、
+  墙钟控制器不压 N）和 `tests/test_synchrony.py`（合成策略上用精确枚举检验 C1–C4
+  估计量无偏、跨前缀总体曲线、上限闭式、tokens_only 审计与跳过已定题）。全部为合成 CPU 检查。
+- 奖励协议升到 v4 后，`test_separated_thinking.py` 中硬编码的 v3 夹具改为引用常量。
+- 未运行：任何 GPU 训练、审计或重放。新配置 `analysis_snapshot_train.yaml`、
+  `analysis_audit.yaml` 尚未在服务器上冒烟。
+
 ## GRACE-ST suffix transport（2026-10-06）
 
 - 审查修复后，30 项 ST CPU 检查通过；扩展相关回归 `187 passed in 21.36s`。

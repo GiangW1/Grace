@@ -540,7 +540,7 @@ def merge(args):
         if (selection.get("reward_protocol_version") != REWARD_PROTOCOL_VERSION
                 and not allow_legacy):
             raise ValueError(
-                "selection manifest is not reward protocol v3; rerun collection "
+                f"selection manifest is not reward protocol v{REWARD_PROTOCOL_VERSION}; rerun collection "
                 "or pass --allow-legacy for explicitly unverified diagnostics"
             )
         expected_problem_ids = {str(row["problem_id"])

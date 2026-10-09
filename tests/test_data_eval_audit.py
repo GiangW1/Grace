@@ -460,12 +460,13 @@ def test_reward_and_parse_index_use_only_post_think_answers():
     assert rule_reward("<think>Evelyn</think>", r"\text{Evelyn}") == 0.0
 
 
-def test_completed_answer_reward_rejects_truncation_and_preserves_base_training():
+def test_completed_answer_reward_rejects_truncation_for_base_and_thinking():
     text = "<think>work</think>\nAnswer: 42"
     assert rule_reward(text, "42", truncated=True) == 0.0
     assert rule_reward(text, "42", truncated=False) == 1.0
     assert rule_reward("Answer: 42", "42", truncated=True, require_complete=True) == 0.0
-    assert rule_reward("Answer: 42", "42", truncated=True) == 1.0
+    assert rule_reward("Answer: 42", "42", truncated=True) == 0.0
+    assert rule_reward("Answer: 42", "42", truncated=False) == 1.0
     assert rule_reward(None, "42", truncated=True, require_complete=True) is None
 
 
