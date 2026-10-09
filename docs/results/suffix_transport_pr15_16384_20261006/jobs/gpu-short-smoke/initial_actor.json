@@ -1,0 +1,7 @@
+{
+  "checkpoint": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/shared-initial-actor.npz",
+  "checkpoint_sha256": "a57086e2fdba2372947a1b735827bd1de7ef6810fcaa7e5019393ae1862119a0",
+  "actor_sha256": "64afe6011142d020e2ff2b5fe6e0077676e05c0325f0c8567e8aeabb2fcfe078",
+  "source_step": 0,
+  "loaded": "actor only; fresh optimizer, baseline, predictor and RNG"
+}

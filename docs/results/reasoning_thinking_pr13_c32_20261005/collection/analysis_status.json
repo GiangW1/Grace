@@ -1,0 +1,12 @@
+{
+  "status": "completed",
+  "finished_utc": "2026-10-04T23:02:51.353656+00:00",
+  "n_original_problems": 32,
+  "n_prefixes": 128,
+  "enable_thinking": true,
+  "n_observed_problems": 32,
+  "no_surviving_prefix_problem_ids": [],
+  "metric_name": "euclidean",
+  "difficulty_manifest": null,
+  "summary": "/SSD/00/wja/grace-pr13-thinking-v3-8cac23f-c32-20261004-run/collection/benefit/predictor_benefit_summary.json"
+}

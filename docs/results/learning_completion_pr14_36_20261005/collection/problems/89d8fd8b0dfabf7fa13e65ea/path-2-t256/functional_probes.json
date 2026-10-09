@@ -1,0 +1,90 @@
+[
+  {
+    "text": " 100!",
+    "reward": 0.0,
+    "seed": 1137774916,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 100!",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      0,
+      151645
+    ]
+  },
+  {
+    "text": " 100",
+    "reward": 0.0,
+    "seed": 2002586055,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 100",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 100\n\nWait, that can't be right. Let me try again. Maybe I should rearrange the equation to find a recursive formula that's",
+    "reward": 0.0,
+    "seed": 277461914,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 100\n\nWait, that can't be right. Let me try again. Maybe I should rearrange the equation to find a recursive formula that's",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      271,
+      14190,
+      11,
+      429,
+      646,
+      944,
+      387,
+      1290,
+      13,
+      6771,
+      752,
+      1430,
+      1549,
+      13,
+      10696,
+      358,
+      1265,
+      55327,
+      844,
+      279,
+      23606,
+      311,
+      1477,
+      264,
+      30819,
+      14806,
+      429,
+      594
+    ]
+  },
+  {
+    "text": " 100",
+    "reward": 0.0,
+    "seed": 725486562,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 100",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      151645
+    ]
+  }
+]

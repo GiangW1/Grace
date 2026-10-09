@@ -1,0 +1,94 @@
+[
+  {
+    "text": " 10022",
+    "reward": 0.0,
+    "seed": 252286222,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 10022",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      17,
+      17,
+      151645
+    ]
+  },
+  {
+    "text": " 100000",
+    "reward": 0.0,
+    "seed": 1443101804,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 100000",
+    "token_ids": [
+      220,
+      16,
+      15,
+      15,
+      15,
+      15,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 2000\n\nWait, that seems too straightforward, but maybe not. Wait, but the problem is about the floor of 10^2",
+    "reward": 0.0,
+    "seed": 1928585458,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 2000\n\nWait, that seems too straightforward, but maybe not. Wait, but the problem is about the floor of 10^2",
+    "token_ids": [
+      220,
+      17,
+      15,
+      15,
+      15,
+      271,
+      14190,
+      11,
+      429,
+      4977,
+      2238,
+      30339,
+      11,
+      714,
+      7196,
+      537,
+      13,
+      13824,
+      11,
+      714,
+      279,
+      3491,
+      374,
+      911,
+      279,
+      6422,
+      315,
+      220,
+      16,
+      15,
+      61,
+      17
+    ]
+  },
+  {
+    "text": " 202",
+    "reward": 0.0,
+    "seed": 2138415300,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 202",
+    "token_ids": [
+      220,
+      17,
+      15,
+      17,
+      151645
+    ]
+  }
+]

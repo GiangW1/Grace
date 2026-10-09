@@ -1,0 +1,83 @@
+[
+  {
+    "text": " 2",
+    "reward": 1.0,
+    "seed": 1804258944,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 2",
+    "token_ids": [
+      220,
+      17,
+      151645
+    ]
+  },
+  {
+    "text": " 0\n</think>\n\nTo solve the problem of finding how many primes $ p $ satisfy the condition that there exists an integer $ m $ such that both congr",
+    "reward": 0.0,
+    "seed": 1994767510,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 0\n</think>\n\nTo solve the problem of finding how many primes $ p $ satisfy the condition that there exists an integer $ m $ such that both congr",
+    "token_ids": [
+      220,
+      15,
+      198,
+      151668,
+      271,
+      1249,
+      11625,
+      279,
+      3491,
+      315,
+      9271,
+      1246,
+      1657,
+      49433,
+      400,
+      281,
+      400,
+      26553,
+      279,
+      2971,
+      429,
+      1052,
+      6724,
+      458,
+      7546,
+      400,
+      296,
+      400,
+      1741,
+      429,
+      2176,
+      30169
+    ]
+  },
+  {
+    "text": " 1",
+    "reward": 0.0,
+    "seed": 1856343160,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1",
+    "token_ids": [
+      220,
+      16,
+      151645
+    ]
+  },
+  {
+    "text": " 2",
+    "reward": 1.0,
+    "seed": 527043035,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 2",
+    "token_ids": [
+      220,
+      17,
+      151645
+    ]
+  }
+]

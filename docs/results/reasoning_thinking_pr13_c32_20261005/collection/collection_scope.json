@@ -1,0 +1,10 @@
+{
+  "n_prefixes": 2,
+  "n_continuations": 32,
+  "n_baseline": 16,
+  "max_new_tokens": 8192,
+  "decision_grid": [
+    1024,
+    2048
+  ]
+}

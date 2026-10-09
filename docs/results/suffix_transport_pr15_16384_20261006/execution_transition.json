@@ -1,0 +1,14 @@
+{
+  "requested_pr_commit": "1e4e496333b6ea1b1f2c369e5baa1b19079ce185",
+  "previous_run": "/SSD/00/wja/grace-pr15-suffix-transport-1e4e496-20261006-run",
+  "previous_run_status": "stopped by user-directed length/execution change; partial outputs preserved",
+  "previous_audit_completed_groups_at_stop": 16,
+  "previous_audit_total_planned_groups": 64,
+  "previous_max_new_tokens": 8192,
+  "max_new_tokens": 16384,
+  "question_set": "same 32 audit questions and train inputs, copied without modification",
+  "initial_actor": "same shared frozen LoRA snapshot, copied without modification",
+  "gpu_roles": {"0": "HF actor/gradient", "2": "vLLM rollout"},
+  "scope": "validation and mainline paired m=2/m=4 audits; no budget training or MATH-500 evaluation",
+  "statistics_policy": "Keep 8192 and 16384 runs separate; changing cap changes trajectories and reward horizon. No partial-audit or optimizer/RNG resume is claimed."
+}

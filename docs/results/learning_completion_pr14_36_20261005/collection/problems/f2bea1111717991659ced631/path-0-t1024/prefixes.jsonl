@@ -1,0 +1,1 @@
+{"problem_id": "3ef0bdda-30f2-4663-a52c-e7b2f68dcf0b", "path_id": "3ef0bdda-30f2-4663-a52c-e7b2f68dcf0b:0", "t": 1024, "half_counts": [4, 4], "half_mean_reward": [0.0, 0.0], "baseline": 0.0, "answer_emitted": false, "finished": false, "functional_recoverable": false, "reward_protocol_version": 3, "require_complete_answers": true}

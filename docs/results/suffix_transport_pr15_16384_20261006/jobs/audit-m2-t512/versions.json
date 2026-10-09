@@ -1,0 +1,83 @@
+{
+  "python": "3.11.16",
+  "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.31",
+  "packages": {
+    "numpy": "2.2.6",
+    "torch": "2.10.0+cu128",
+    "yaml": "6.0.3",
+    "vllm": "0.18.0",
+    "verl": null,
+    "math_verify": "0.9.0",
+    "peft": "0.21.0",
+    "transformers": "4.57.6",
+    "datasets": null,
+    "huggingface_hub": "0.36.2"
+  },
+  "package_version_sources": {
+    "numpy": "distribution_metadata",
+    "torch": "distribution_metadata",
+    "yaml": "distribution_metadata",
+    "vllm": "distribution_metadata",
+    "verl": "unknown",
+    "math_verify": "distribution_metadata",
+    "peft": "distribution_metadata",
+    "transformers": "distribution_metadata",
+    "datasets": "unknown",
+    "huggingface_hub": "distribution_metadata"
+  },
+  "file_hashes": {},
+  "missing": [
+    "verl",
+    "datasets"
+  ],
+  "hostname": "DSEG-A100X4",
+  "cuda_visible_devices": "0,2",
+  "hf_endpoint": null,
+  "cuda": "12.8",
+  "gpu_name": "NVIDIA A100 80GB PCIe",
+  "gpu_count": 2,
+  "gpu_memory_bytes": 85095874560,
+  "nvidia_smi": "0, NVIDIA A100 80GB PCIe, 8142, 81920, 1\n1, NVIDIA A100 80GB PCIe, 15, 81920, 0\n2, NVIDIA A100 80GB PCIe, 53077, 81920, 1\n3, NVIDIA A100 80GB PCIe, 18, 81920, 0",
+  "nvidia_compute_processes": "GPU-74963478-3a5c-6d5a-aa22-54e9fff68c80, 1841966, /SSD/00/wja/GRACE/runs/conda/envs/grace/bin/python, 8118\nGPU-23848dc4-cdf6-8b81-a854-e081ed3b1598, 1842560, VLLM::EngineCore, 53054",
+  "nvidia_power_clocks": [
+    {
+      "index": "0",
+      "uuid": "GPU-74963478-3a5c-6d5a-aa22-54e9fff68c80",
+      "power_draw_watts": 72.23,
+      "sm_clock_mhz": 1410.0,
+      "memory_clock_mhz": 1512.0
+    },
+    {
+      "index": "1",
+      "uuid": "GPU-f686717d-2102-2a36-ef5e-921bb008d649",
+      "power_draw_watts": 52.08,
+      "sm_clock_mhz": 210.0,
+      "memory_clock_mhz": 1512.0
+    },
+    {
+      "index": "2",
+      "uuid": "GPU-23848dc4-cdf6-8b81-a854-e081ed3b1598",
+      "power_draw_watts": 70.6,
+      "sm_clock_mhz": 1410.0,
+      "memory_clock_mhz": 1512.0
+    },
+    {
+      "index": "3",
+      "uuid": "GPU-2ea24442-6c85-c68d-a45d-d80bd492f126",
+      "power_draw_watts": 48.83,
+      "sm_clock_mhz": 210.0,
+      "memory_clock_mhz": 1512.0
+    }
+  ],
+  "disk": {
+    "free_bytes": 477999939584,
+    "total_bytes": 3936820731904,
+    "cwd": "/SSD/00/wja/Grace-pr15-suffix-transport-20261006"
+  },
+  "git": {
+    "head": "4675a348c361002448f9898c84832f82d79b20d7",
+    "dirty": false,
+    "tracked_dirty": false,
+    "untracked_entries": 0
+  }
+}

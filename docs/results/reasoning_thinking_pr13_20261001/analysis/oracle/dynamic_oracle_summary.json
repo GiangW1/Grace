@@ -1,0 +1,616 @@
+{
+  "stage": "A",
+  "basis_kind": "prefix_score_gradient",
+  "gradient_target": "trajectory",
+  "gradient_label": "G=(reward-baseline)*grad log p(full_response|original_prompt)",
+  "basis_shape": [
+    128,
+    5898240,
+    1
+  ],
+  "gradient_dimension": 5898240,
+  "coefficients": 1,
+  "metric_name": "euclidean",
+  "metric_weights": {
+    "min": 1.0,
+    "max": 1.0,
+    "positive_count": 5898240
+  },
+  "basis_diagnostics": {
+    "n_prefixes": 128,
+    "rank_min": 1,
+    "rank_max": 1,
+    "condition_number_max": 1.0,
+    "condition_number_median": 1.0
+  },
+  "q_stratification": {
+    "available": true,
+    "definition": "half A observed reward mean: 0, (0,1), 1"
+  },
+  "difficulty_stratification": {
+    "available": false,
+    "manifest": null,
+    "definition": "predeclared problem difficulty; no outcome labels used"
+  },
+  "split": {
+    "train": [
+      "0e3e66e1-4eba-4aeb-b480-c1a2fea08d0f",
+      "186c94eb-3f6a-43b1-b2a4-f7dec58b7318",
+      "1d394a55-3ba5-40cd-90df-0eedf9a91e3b",
+      "248c2eeb-cc07-482e-9231-58cf442b7c93",
+      "374f27cd-2f00-43cd-ab54-d114f4712ce1",
+      "4c4f3cb8-c7ae-4f8e-b9eb-d2fcfc2dd442",
+      "5d21ea89-7190-4dc8-b6c2-540ec349219b",
+      "6ff0b17f-7e5c-4ae9-b5e9-63ebecd2b9f7",
+      "879b93ad-c7f5-4795-bc0a-3e9fe3c57566",
+      "9a9b6eb4-a1cb-49d1-8c1e-62eaf2f74079",
+      "ad6027e0-ad02-4d3f-8d6e-a69d711c44dc",
+      "b426d104-244d-4831-a2c4-cd756b61700a",
+      "b7119f82-4161-4e79-8194-93596b4f2fa3",
+      "b9fe2231-060d-4b0a-bf73-7d4cfc8b7dd0",
+      "bcdfd731-b3bb-4f5a-b775-a97e88c908b6",
+      "bf2cddfc-c4c0-4067-b320-3bb506875cf5",
+      "c37bdb6f-39ba-48c8-896f-e4e1760bd040",
+      "d3db6787-eeb1-4abf-8cdd-d26b37114c68",
+      "e4b51fc2-4672-4b39-bcbb-85270800a0e7",
+      "e4eede97-5bed-4a2a-9b64-5de4e8cde3e8"
+    ],
+    "validation": [
+      "06f17afd-4946-4188-8c5f-0d372bc3b07a",
+      "0ae83368-3a58-4faa-9ab6-91e989ac15e9",
+      "29f6a98f-0730-48f6-b637-2e902c24d9bd",
+      "34e6dee2-4e04-40c5-b334-ad1d42631c17",
+      "55d21e01-08c9-4d43-b828-c0c670e4710c",
+      "6fe5bcfc-af5a-42d7-80c9-bcae028c835f"
+    ],
+    "diagnostic": [
+      "0dd91a3f-ac12-48e3-b4b3-b931738cb80a",
+      "3e477408-f0be-488b-b64b-455c98f01220",
+      "485b39f5-e71b-42b3-931f-219becbee2a3",
+      "96bd487f-c324-41b4-8015-f8234fe31bb4",
+      "983e41c8-805d-4669-9be6-11c1d5938192",
+      "a2731ba7-b002-4c81-ab9c-9ca08675a19d"
+    ]
+  },
+  "roles": {
+    "train": {
+      "n_prefixes": 80,
+      "n_problems": 20,
+      "oracle": {
+        "residual_mean": 53379.08315740557,
+        "zero_residual_mean": 57493.7168327415,
+        "residual_ratio_to_zero": 0.9284333332056778,
+        "mean_gradient_mse": 0.00032794624344253216,
+        "mean_gradient_energy": 6048.939326258414,
+        "metric_weighted_target_energy": 6048.939326258414
+      },
+      "zero": {
+        "residual_mean": 57493.7168327415
+      },
+      "mechanism": {
+        "free": {
+          "residual_mean": 53379.08315740557,
+          "zero_residual_mean": 57493.7168327415,
+          "residual_ratio_to_zero": 0.9284333332056778,
+          "mean_gradient_mse": 0.00032794624344253216,
+          "mean_gradient_energy": 6048.939326258414,
+          "metric_weighted_target_energy": 6048.939326258414
+        },
+        "reward_only": {
+          "residual_mean": 53380.156220139936,
+          "zero_residual_mean": 57493.7168327415,
+          "residual_ratio_to_zero": 0.9284519972057369,
+          "mean_gradient_mse": 0.0003281281727526956,
+          "mean_gradient_energy": 6048.939326258414,
+          "metric_weighted_target_energy": 6048.939326258414
+        },
+        "free_minus_reward_residual": -1.0730627343655215,
+        "reward_only_residual_ratio_to_zero": 0.9284519972057369,
+        "cross_term_residual_ratio": 0.9284519972057369,
+        "orthogonal_energy_fraction": 0.0007884052235089972,
+        "projected_energy_fraction": 0.999211594776491,
+        "cross_mean_target_energy": 4180.033559797068,
+        "cross_orthogonal_energy": 3.2955602929869166,
+        "cross_projected_energy": 4176.737999504081,
+        "cross_orthogonal_energy_fraction": 0.0007884052235089972,
+        "cross_projected_energy_fraction": 0.999211594776491,
+        "b_only_orthogonal_energy_fraction": 0.23908181737069756,
+        "b_only_projected_energy_fraction": 0.7609181826293024,
+        "n_valid_orthogonal_rows": 80,
+        "n_valid_cross_energy": 80
+      },
+      "q_strata": {
+        "observed_q_zero": {
+          "n_prefixes": 37,
+          "mechanism": {
+            "free": {
+              "residual_mean": 19482.5732576297,
+              "zero_residual_mean": 24597.82597789074,
+              "residual_ratio_to_zero": 0.7920445195092126,
+              "mean_gradient_mse": 9.978362520720943e-05,
+              "mean_gradient_energy": 5703.800489803203,
+              "metric_weighted_target_energy": 5703.800489803203
+            },
+            "reward_only": {
+              "residual_mean": 19481.818621952596,
+              "zero_residual_mean": 24597.82597789074,
+              "residual_ratio_to_zero": 0.7920138405509265,
+              "mean_gradient_mse": 9.965568268925305e-05,
+              "mean_gradient_energy": 5703.800489803203,
+              "metric_weighted_target_energy": 5703.800489803203
+            },
+            "free_minus_reward_residual": 0.7546356771053979,
+            "reward_only_residual_ratio_to_zero": 0.7920138405509265,
+            "cross_term_residual_ratio": 0.7920138405509265,
+            "orthogonal_energy_fraction": -0.0006704091741617841,
+            "projected_energy_fraction": 1.0006704091741616,
+            "cross_mean_target_energy": 5063.035751674275,
+            "cross_orthogonal_energy": -3.394305617031539,
+            "cross_projected_energy": 5066.430057291306,
+            "cross_orthogonal_energy_fraction": -0.0006704091741617841,
+            "cross_projected_energy_fraction": 1.0006704091741616,
+            "b_only_orthogonal_energy_fraction": 0.10211073381332947,
+            "b_only_projected_energy_fraction": 0.8978892661866705,
+            "n_valid_orthogonal_rows": 37,
+            "n_valid_cross_energy": 37
+          }
+        },
+        "observed_q_uncertain": {
+          "n_prefixes": 42,
+          "mechanism": {
+            "free": {
+              "residual_mean": 84511.22481095589,
+              "zero_residual_mean": 87842.32822469913,
+              "residual_ratio_to_zero": 0.9620786074200772,
+              "mean_gradient_mse": 0.0005367548891127578,
+              "mean_gradient_energy": 6497.012570903681,
+              "metric_weighted_target_energy": 6497.012570903681
+            },
+            "reward_only": {
+              "residual_mean": 84513.93353807024,
+              "zero_residual_mean": 87842.32822469913,
+              "residual_ratio_to_zero": 0.9621094436600666,
+              "mean_gradient_mse": 0.0005372141323979355,
+              "mean_gradient_energy": 6497.012570903681,
+              "metric_weighted_target_energy": 6497.012570903681
+            },
+            "free_minus_reward_residual": -2.708727114353678,
+            "reward_only_residual_ratio_to_zero": 0.9621094436600666,
+            "cross_term_residual_ratio": 0.9621094436600666,
+            "orthogonal_energy_fraction": 0.0026465844378876836,
+            "projected_energy_fraction": 0.9973534155621124,
+            "cross_mean_target_energy": 3501.6752850432686,
+            "cross_orthogonal_energy": 9.267479315931432,
+            "cross_projected_energy": 3492.4078057273373,
+            "cross_orthogonal_energy_fraction": 0.0026465844378876836,
+            "cross_projected_energy_fraction": 0.9973534155621124,
+            "b_only_orthogonal_energy_fraction": 0.3450149814263065,
+            "b_only_projected_energy_fraction": 0.6549850185736937,
+            "n_valid_orthogonal_rows": 42,
+            "n_valid_cross_energy": 42
+          }
+        },
+        "observed_q_one": {
+          "n_prefixes": 1,
+          "mechanism": {
+            "free": {
+              "residual_mean": 0.0,
+              "zero_residual_mean": 0.0,
+              "residual_ratio_to_zero": null,
+              "mean_gradient_mse": 0.0,
+              "mean_gradient_energy": 0.0,
+              "metric_weighted_target_energy": 0.0
+            },
+            "reward_only": {
+              "residual_mean": 0.0,
+              "zero_residual_mean": 0.0,
+              "residual_ratio_to_zero": null,
+              "mean_gradient_mse": 0.0,
+              "mean_gradient_energy": 0.0,
+              "metric_weighted_target_energy": 0.0
+            },
+            "free_minus_reward_residual": 0.0,
+            "reward_only_residual_ratio_to_zero": null,
+            "cross_term_residual_ratio": null,
+            "orthogonal_energy_fraction": null,
+            "projected_energy_fraction": null,
+            "cross_mean_target_energy": 0.0,
+            "cross_orthogonal_energy": 0.0,
+            "cross_projected_energy": 0.0,
+            "cross_orthogonal_energy_fraction": null,
+            "cross_projected_energy_fraction": null,
+            "b_only_orthogonal_energy_fraction": null,
+            "b_only_projected_energy_fraction": null,
+            "n_valid_orthogonal_rows": 1,
+            "n_valid_cross_energy": 1
+          }
+        }
+      },
+      "difficulty_strata": {
+        "all": {
+          "n_prefixes": 80,
+          "mechanism": {
+            "free": {
+              "residual_mean": 53379.08315740557,
+              "zero_residual_mean": 57493.7168327415,
+              "residual_ratio_to_zero": 0.9284333332056778,
+              "mean_gradient_mse": 0.00032794624344253216,
+              "mean_gradient_energy": 6048.939326258414,
+              "metric_weighted_target_energy": 6048.939326258414
+            },
+            "reward_only": {
+              "residual_mean": 53380.156220139936,
+              "zero_residual_mean": 57493.7168327415,
+              "residual_ratio_to_zero": 0.9284519972057369,
+              "mean_gradient_mse": 0.0003281281727526956,
+              "mean_gradient_energy": 6048.939326258414,
+              "metric_weighted_target_energy": 6048.939326258414
+            },
+            "free_minus_reward_residual": -1.0730627343655215,
+            "reward_only_residual_ratio_to_zero": 0.9284519972057369,
+            "cross_term_residual_ratio": 0.9284519972057369,
+            "orthogonal_energy_fraction": 0.0007884052235089972,
+            "projected_energy_fraction": 0.999211594776491,
+            "cross_mean_target_energy": 4180.033559797068,
+            "cross_orthogonal_energy": 3.2955602929869166,
+            "cross_projected_energy": 4176.737999504081,
+            "cross_orthogonal_energy_fraction": 0.0007884052235089972,
+            "cross_projected_energy_fraction": 0.999211594776491,
+            "b_only_orthogonal_energy_fraction": 0.23908181737069756,
+            "b_only_projected_energy_fraction": 0.7609181826293024,
+            "n_valid_orthogonal_rows": 80,
+            "n_valid_cross_energy": 80
+          }
+        }
+      }
+    },
+    "validation": {
+      "n_prefixes": 24,
+      "n_problems": 6,
+      "oracle": {
+        "residual_mean": 49987.74276337712,
+        "zero_residual_mean": 50409.585313801195,
+        "residual_ratio_to_zero": 0.9916316996500152,
+        "mean_gradient_mse": 0.0003023738864286792,
+        "mean_gradient_energy": 2205.316302313164,
+        "metric_weighted_target_energy": 2205.316302313164
+      },
+      "zero": {
+        "residual_mean": 50409.585313801195
+      },
+      "mechanism": {
+        "free": {
+          "residual_mean": 49987.74276337712,
+          "zero_residual_mean": 50409.585313801195,
+          "residual_ratio_to_zero": 0.9916316996500152,
+          "mean_gradient_mse": 0.0003023738864286792,
+          "mean_gradient_energy": 2205.316302313164,
+          "metric_weighted_target_energy": 2205.316302313164
+        },
+        "reward_only": {
+          "residual_mean": 49971.1170953279,
+          "zero_residual_mean": 50409.585313801195,
+          "residual_ratio_to_zero": 0.9913018880091193,
+          "mean_gradient_mse": 0.000299555135742163,
+          "mean_gradient_energy": 2205.316302313164,
+          "metric_weighted_target_energy": 2205.316302313164
+        },
+        "free_minus_reward_residual": 16.62566804922244,
+        "reward_only_residual_ratio_to_zero": 0.9913018880091193,
+        "cross_term_residual_ratio": 0.9913018880091193,
+        "orthogonal_energy_fraction": 0.01243688621195569,
+        "projected_energy_fraction": 0.9875631137880444,
+        "cross_mean_target_energy": 1135.5009068338165,
+        "cross_orthogonal_energy": 14.122095571864675,
+        "cross_projected_energy": 1121.378811261952,
+        "cross_orthogonal_energy_fraction": 0.01243688621195569,
+        "cross_projected_energy_fraction": 0.9875631137880444,
+        "b_only_orthogonal_energy_fraction": 0.5861712342772919,
+        "b_only_projected_energy_fraction": 0.41382876572270805,
+        "n_valid_orthogonal_rows": 24,
+        "n_valid_cross_energy": 24
+      },
+      "q_strata": {
+        "observed_q_zero": {
+          "n_prefixes": 12,
+          "mechanism": {
+            "free": {
+              "residual_mean": 1697.837798734817,
+              "zero_residual_mean": 1697.837798734817,
+              "residual_ratio_to_zero": 1.0,
+              "mean_gradient_mse": 8.995468344872888e-06,
+              "mean_gradient_energy": 53.05743121046303,
+              "metric_weighted_target_energy": 53.05743121046303
+            },
+            "reward_only": {
+              "residual_mean": 1697.837798734817,
+              "zero_residual_mean": 1697.837798734817,
+              "residual_ratio_to_zero": 1.0,
+              "mean_gradient_mse": 8.995468344872888e-06,
+              "mean_gradient_energy": 53.05743121046303,
+              "metric_weighted_target_energy": 53.05743121046303
+            },
+            "free_minus_reward_residual": 0.0,
+            "reward_only_residual_ratio_to_zero": 1.0,
+            "cross_term_residual_ratio": 1.0,
+            "orthogonal_energy_fraction": null,
+            "projected_energy_fraction": null,
+            "cross_mean_target_energy": 0.0,
+            "cross_orthogonal_energy": 0.0,
+            "cross_projected_energy": 0.0,
+            "cross_orthogonal_energy_fraction": null,
+            "cross_projected_energy_fraction": null,
+            "b_only_orthogonal_energy_fraction": 0.6706038108769614,
+            "b_only_projected_energy_fraction": 0.32939618912303853,
+            "n_valid_orthogonal_rows": 12,
+            "n_valid_cross_energy": 12
+          }
+        },
+        "observed_q_uncertain": {
+          "n_prefixes": 12,
+          "mechanism": {
+            "free": {
+              "residual_mean": 98277.64772801941,
+              "zero_residual_mean": 99121.33282886755,
+              "residual_ratio_to_zero": 0.9914883600051589,
+              "mean_gradient_mse": 0.0005957523045124856,
+              "mean_gradient_energy": 4357.575173415867,
+              "metric_weighted_target_energy": 4357.575173415867
+            },
+            "reward_only": {
+              "residual_mean": 98244.39639192098,
+              "zero_residual_mean": 99121.33282886755,
+              "residual_ratio_to_zero": 0.9911528990589684,
+              "mean_gradient_mse": 0.0005901148031394531,
+              "mean_gradient_energy": 4357.575173415867,
+              "metric_weighted_target_energy": 4357.575173415867
+            },
+            "free_minus_reward_residual": 33.25133609843033,
+            "reward_only_residual_ratio_to_zero": 0.9911528990589684,
+            "cross_term_residual_ratio": 0.9911528990589684,
+            "orthogonal_energy_fraction": 0.012436886211955692,
+            "projected_energy_fraction": 0.9875631137880446,
+            "cross_mean_target_energy": 2271.0018136676326,
+            "cross_orthogonal_energy": 28.24419114372935,
+            "cross_projected_energy": 2242.757622523904,
+            "cross_orthogonal_energy_fraction": 0.012436886211955692,
+            "cross_projected_energy_fraction": 0.9875631137880446,
+            "b_only_orthogonal_energy_fraction": 0.5851431910544946,
+            "b_only_projected_energy_fraction": 0.41485680894550525,
+            "n_valid_orthogonal_rows": 12,
+            "n_valid_cross_energy": 12
+          }
+        }
+      },
+      "difficulty_strata": {
+        "all": {
+          "n_prefixes": 24,
+          "mechanism": {
+            "free": {
+              "residual_mean": 49987.74276337712,
+              "zero_residual_mean": 50409.585313801195,
+              "residual_ratio_to_zero": 0.9916316996500152,
+              "mean_gradient_mse": 0.0003023738864286792,
+              "mean_gradient_energy": 2205.316302313164,
+              "metric_weighted_target_energy": 2205.316302313164
+            },
+            "reward_only": {
+              "residual_mean": 49971.1170953279,
+              "zero_residual_mean": 50409.585313801195,
+              "residual_ratio_to_zero": 0.9913018880091193,
+              "mean_gradient_mse": 0.000299555135742163,
+              "mean_gradient_energy": 2205.316302313164,
+              "metric_weighted_target_energy": 2205.316302313164
+            },
+            "free_minus_reward_residual": 16.62566804922244,
+            "reward_only_residual_ratio_to_zero": 0.9913018880091193,
+            "cross_term_residual_ratio": 0.9913018880091193,
+            "orthogonal_energy_fraction": 0.01243688621195569,
+            "projected_energy_fraction": 0.9875631137880444,
+            "cross_mean_target_energy": 1135.5009068338165,
+            "cross_orthogonal_energy": 14.122095571864675,
+            "cross_projected_energy": 1121.378811261952,
+            "cross_orthogonal_energy_fraction": 0.01243688621195569,
+            "cross_projected_energy_fraction": 0.9875631137880444,
+            "b_only_orthogonal_energy_fraction": 0.5861712342772919,
+            "b_only_projected_energy_fraction": 0.41382876572270805,
+            "n_valid_orthogonal_rows": 24,
+            "n_valid_cross_energy": 24
+          }
+        }
+      }
+    },
+    "diagnostic": {
+      "n_prefixes": 24,
+      "n_problems": 6,
+      "oracle": {
+        "residual_mean": 37157.452425278934,
+        "zero_residual_mean": 37894.49190686262,
+        "residual_ratio_to_zero": 0.9805502212987791,
+        "mean_gradient_mse": 0.00024195479789362528,
+        "mean_gradient_energy": 2164.146948711781,
+        "metric_weighted_target_energy": 2164.146948711781
+      },
+      "zero": {
+        "residual_mean": 37894.49190686262
+      },
+      "mechanism": {
+        "free": {
+          "residual_mean": 37157.452425278934,
+          "zero_residual_mean": 37894.49190686262,
+          "residual_ratio_to_zero": 0.9805502212987791,
+          "mean_gradient_mse": 0.00024195479789362528,
+          "mean_gradient_energy": 2164.146948711781,
+          "metric_weighted_target_energy": 2164.146948711781
+        },
+        "reward_only": {
+          "residual_mean": 37172.34937605059,
+          "zero_residual_mean": 37894.49190686262,
+          "residual_ratio_to_zero": 0.9809433378184113,
+          "mean_gradient_mse": 0.0002444804582213929,
+          "mean_gradient_energy": 2164.146948711781,
+          "metric_weighted_target_energy": 2164.146948711781
+        },
+        "free_minus_reward_residual": -14.896950771653792,
+        "reward_only_residual_ratio_to_zero": 0.9809433378184113,
+        "cross_term_residual_ratio": 0.9809433378184113,
+        "orthogonal_energy_fraction": 0.015391107733880987,
+        "projected_energy_fraction": 0.984608892266119,
+        "cross_mean_target_energy": 992.2365523451987,
+        "cross_orthogonal_energy": 15.271619674639595,
+        "cross_projected_energy": 976.964932670559,
+        "cross_orthogonal_energy_fraction": 0.015391107733880987,
+        "cross_projected_energy_fraction": 0.984608892266119,
+        "b_only_orthogonal_energy_fraction": 0.4243169262595962,
+        "b_only_projected_energy_fraction": 0.5756830737404038,
+        "n_valid_orthogonal_rows": 24,
+        "n_valid_cross_energy": 24
+      },
+      "q_strata": {
+        "observed_q_zero": {
+          "n_prefixes": 12,
+          "mechanism": {
+            "free": {
+              "residual_mean": 4000.4522058326856,
+              "zero_residual_mean": 4000.4522058326856,
+              "residual_ratio_to_zero": 1.0,
+              "mean_gradient_mse": 2.5539818326852974e-05,
+              "mean_gradient_energy": 150.6399780481773,
+              "metric_weighted_target_energy": 150.6399780481773
+            },
+            "reward_only": {
+              "residual_mean": 4000.4522058326856,
+              "zero_residual_mean": 4000.4522058326856,
+              "residual_ratio_to_zero": 1.0,
+              "mean_gradient_mse": 2.5539818326852974e-05,
+              "mean_gradient_energy": 150.6399780481773,
+              "metric_weighted_target_energy": 150.6399780481773
+            },
+            "free_minus_reward_residual": 0.0,
+            "reward_only_residual_ratio_to_zero": 1.0,
+            "cross_term_residual_ratio": 1.0,
+            "orthogonal_energy_fraction": null,
+            "projected_energy_fraction": null,
+            "cross_mean_target_energy": 0.0,
+            "cross_orthogonal_energy": 0.0,
+            "cross_projected_energy": 0.0,
+            "cross_orthogonal_energy_fraction": null,
+            "cross_projected_energy_fraction": null,
+            "b_only_orthogonal_energy_fraction": 0.7077779113903275,
+            "b_only_projected_energy_fraction": 0.2922220886096724,
+            "n_valid_orthogonal_rows": 12,
+            "n_valid_cross_energy": 12
+          }
+        },
+        "observed_q_uncertain": {
+          "n_prefixes": 11,
+          "mechanism": {
+            "free": {
+              "residual_mean": 76289.65423699269,
+              "zero_residual_mean": 77897.74037862982,
+              "residual_ratio_to_zero": 0.9793564468773951,
+              "mean_gradient_mse": 0.0004978302984787217,
+              "mean_gradient_energy": 4544.408721336265,
+              "metric_weighted_target_energy": 4544.408721336265
+            },
+            "reward_only": {
+              "residual_mean": 76322.15667503992,
+              "zero_residual_mean": 77897.74037862982,
+              "residual_ratio_to_zero": 0.9797736918178677,
+              "mean_gradient_mse": 0.0005033408301029417,
+              "mean_gradient_energy": 4544.408721336265,
+              "metric_weighted_target_energy": 4544.408721336265
+            },
+            "free_minus_reward_residual": -32.50243804723141,
+            "reward_only_residual_ratio_to_zero": 0.9797736918178677,
+            "cross_term_residual_ratio": 0.9797736918178677,
+            "orthogonal_energy_fraction": 0.015391107733880987,
+            "projected_energy_fraction": 0.984608892266119,
+            "cross_mean_target_energy": 2164.879750571343,
+            "cross_orthogonal_energy": 33.31989747194093,
+            "cross_projected_energy": 2131.5598530994016,
+            "cross_orthogonal_energy_fraction": 0.015391107733880987,
+            "cross_projected_energy_fraction": 0.984608892266119,
+            "b_only_orthogonal_energy_fraction": 0.414000446862295,
+            "b_only_projected_energy_fraction": 0.5859995531377051,
+            "n_valid_orthogonal_rows": 11,
+            "n_valid_cross_energy": 11
+          }
+        },
+        "observed_q_one": {
+          "n_prefixes": 1,
+          "mechanism": {
+            "free": {
+              "residual_mean": 4587.235129782635,
+              "zero_residual_mean": 4587.235129782635,
+              "residual_ratio_to_zero": 1.0,
+              "mean_gradient_mse": 2.4304046258834372e-05,
+              "mean_gradient_energy": 143.35109780570735,
+              "metric_weighted_target_energy": 143.35109780570735
+            },
+            "reward_only": {
+              "residual_mean": 4587.235129782635,
+              "zero_residual_mean": 4587.235129782635,
+              "residual_ratio_to_zero": 1.0,
+              "mean_gradient_mse": 2.4304046258834372e-05,
+              "mean_gradient_energy": 143.35109780570735,
+              "metric_weighted_target_energy": 143.35109780570735
+            },
+            "free_minus_reward_residual": 0.0,
+            "reward_only_residual_ratio_to_zero": 1.0,
+            "cross_term_residual_ratio": 1.0,
+            "orthogonal_energy_fraction": null,
+            "projected_energy_fraction": null,
+            "cross_mean_target_energy": 0.0,
+            "cross_orthogonal_energy": 0.0,
+            "cross_projected_energy": 0.0,
+            "cross_orthogonal_energy_fraction": null,
+            "cross_projected_energy_fraction": null,
+            "b_only_orthogonal_energy_fraction": 0.44732762887432426,
+            "b_only_projected_energy_fraction": 0.5526723711256757,
+            "n_valid_orthogonal_rows": 1,
+            "n_valid_cross_energy": 1
+          }
+        }
+      },
+      "difficulty_strata": {
+        "all": {
+          "n_prefixes": 24,
+          "mechanism": {
+            "free": {
+              "residual_mean": 37157.452425278934,
+              "zero_residual_mean": 37894.49190686262,
+              "residual_ratio_to_zero": 0.9805502212987791,
+              "mean_gradient_mse": 0.00024195479789362528,
+              "mean_gradient_energy": 2164.146948711781,
+              "metric_weighted_target_energy": 2164.146948711781
+            },
+            "reward_only": {
+              "residual_mean": 37172.34937605059,
+              "zero_residual_mean": 37894.49190686262,
+              "residual_ratio_to_zero": 0.9809433378184113,
+              "mean_gradient_mse": 0.0002444804582213929,
+              "mean_gradient_energy": 2164.146948711781,
+              "metric_weighted_target_energy": 2164.146948711781
+            },
+            "free_minus_reward_residual": -14.896950771653792,
+            "reward_only_residual_ratio_to_zero": 0.9809433378184113,
+            "cross_term_residual_ratio": 0.9809433378184113,
+            "orthogonal_energy_fraction": 0.015391107733880987,
+            "projected_energy_fraction": 0.984608892266119,
+            "cross_mean_target_energy": 992.2365523451987,
+            "cross_orthogonal_energy": 15.271619674639595,
+            "cross_projected_energy": 976.964932670559,
+            "cross_orthogonal_energy_fraction": 0.015391107733880987,
+            "cross_projected_energy_fraction": 0.984608892266119,
+            "b_only_orthogonal_energy_fraction": 0.4243169262595962,
+            "b_only_projected_energy_fraction": 0.5756830737404038,
+            "n_valid_orthogonal_rows": 24,
+            "n_valid_cross_energy": 24
+          }
+        }
+      }
+    }
+  },
+  "wall_seconds": 94.0649135238491
+}

@@ -1,0 +1,92 @@
+[
+  {
+    "text": " 1250",
+    "reward": 0.0,
+    "seed": 1695587499,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1250",
+    "token_ids": [
+      220,
+      16,
+      17,
+      20,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " Let's compute S1 = sum_{i=1}^{50} (-1)^i i. This is an alternating sum of integers. Let's",
+    "reward": 0.0,
+    "seed": 355323773,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: Let's compute S1 = sum_{i=1}^{50} (-1)^i i. This is an alternating sum of integers. Let's",
+    "token_ids": [
+      6771,
+      594,
+      12564,
+      328,
+      16,
+      284,
+      2629,
+      15159,
+      72,
+      28,
+      16,
+      92,
+      47822,
+      20,
+      15,
+      92,
+      10293,
+      16,
+      29776,
+      72,
+      600,
+      13,
+      1096,
+      374,
+      458,
+      72362,
+      2629,
+      315,
+      25780,
+      13,
+      6771,
+      594
+    ]
+  },
+  {
+    "text": " 1250",
+    "reward": 0.0,
+    "seed": 329424588,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1250",
+    "token_ids": [
+      220,
+      16,
+      17,
+      20,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 1275",
+    "reward": 0.0,
+    "seed": 1586682569,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 1275",
+    "token_ids": [
+      220,
+      16,
+      17,
+      22,
+      20,
+      151645
+    ]
+  }
+]

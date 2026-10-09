@@ -1,0 +1,192 @@
+{
+  "selection": "seeded",
+  "selection_seed": 17,
+  "n_problems": 36,
+  "prompt_normalization": "whitespace_v2_case_sensitive",
+  "problems": [
+    {
+      "problem_id": "c597f1c2-071c-4859-aa8a-9cb476ee0c86",
+      "prompt_sha256": "c2cbdde49b1829c26b3d80d30a98913f2131db1631ec5e00ced7c649cf0de833",
+      "gold_sha256": "8527a891e224136950ff32ca212b45bc93f69fbb801c3b1ebedac52775f99e61"
+    },
+    {
+      "problem_id": "8d43a06c-c422-49c9-8f24-7500706d0359",
+      "prompt_sha256": "90685f3707b92f84f2b067a5969247d83a3f5881eec9c390796b2887b545f997",
+      "gold_sha256": "615bdd17c2556f82f384392ea8557f8cc88b03501c759e23093ab0b2a9b5cd48"
+    },
+    {
+      "problem_id": "604f0c0a-772a-48e8-91bf-704ff312135e",
+      "prompt_sha256": "a9ed4408338fb3be665aa9c308821bd4cbce552bf8ef70e2d389c03d3746b1cc",
+      "gold_sha256": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d"
+    },
+    {
+      "problem_id": "41562573-1d15-4205-8275-09c428a27534",
+      "prompt_sha256": "a22626ffefa49fdc2114da8287fa90fd8b0d1f50f09dcc7e0211ca8ceeacfd3b",
+      "gold_sha256": "86e50149658661312a9e0b35558d84f6c6d3da797f552a9657fe0558ca40cdef"
+    },
+    {
+      "problem_id": "44e5d8cb-90e7-4e22-942d-8c60b9672e70",
+      "prompt_sha256": "3844757de4108a70ccc8be4e8fbd6e8e88ca0276fa81beb72d2b0c9a9294604f",
+      "gold_sha256": "35bbce4007c5cd57a4c6dcabbdf5b347c9557ec11898111c280a788f8396e2c5"
+    },
+    {
+      "problem_id": "3ef0bdda-30f2-4663-a52c-e7b2f68dcf0b",
+      "prompt_sha256": "52c1f5b1f5efd7659e2ed6d010d77163a69285b2b499b84a0fc95c9ffd07dc6e",
+      "gold_sha256": "5e74cb2ad4e2c9e2d3f59a1e6c8a5d4999df48e5dd69871d2798e0a146b91ee9"
+    },
+    {
+      "problem_id": "16c14487-8285-41b6-a251-29737c8b70eb",
+      "prompt_sha256": "9036f0fc10b93532f87ec26bdc08350ed369b0f3f717da949015386451a84132",
+      "gold_sha256": "98010bd9270f9b100b6214a21754fd33bdc8d41b2bc9f9dd16ff54d3c34ffd71"
+    },
+    {
+      "problem_id": "507445b0-6883-4a0c-a480-0cf81c82a1c7",
+      "prompt_sha256": "f7be4215e24e5b9ca1dbcf9fb0f996bdb4e48ff86f17eef1fcfc7e346574a908",
+      "gold_sha256": "d86580a57f7bf542e85202283cb845953c9d28f80a8e651db08b2fc0b2d6a731"
+    },
+    {
+      "problem_id": "4efb94b8-a55c-4287-aee3-f99a3a64923e",
+      "prompt_sha256": "c6e294d6f968854a6cf756f3a66926fc67ec8a1e9ea8c2f7518b5f8dd06edef1",
+      "gold_sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a"
+    },
+    {
+      "problem_id": "ceb7b810-f863-44d9-a5b9-a80cffaf4ead",
+      "prompt_sha256": "5f2686470e9c6cefce933e9c701c26a99feed053bbd3aab919a7e37b727fd964",
+      "gold_sha256": "031b4af5197ec30a926f48cf40e11a7dbc470048a21e4003b7a3c07c5dab1baa"
+    },
+    {
+      "problem_id": "7acf992e-ccb8-4759-a1f3-ce1b27102eaa",
+      "prompt_sha256": "2e5ab8783e99849c97157109f0fe07311fd27a903ba8ea06df18fd3c4e115847",
+      "gold_sha256": "c6f3ac57944a531490cd39902d0f777715fd005efac9a30622d5f5205e7f6894"
+    },
+    {
+      "problem_id": "d2dabd82-9385-4125-93c6-7d200c9ae12c",
+      "prompt_sha256": "6b2e6c16df8f48a127e7ce2d0c7e189d2c9298c8465b66c486da9e12887007b8",
+      "gold_sha256": "c2356069e9d1e79ca924378153cfbbfb4d4416b1f99d41a2940bfdb66c5319db"
+    },
+    {
+      "problem_id": "5d85d03c-5764-49ee-af16-19a1a06b62a8",
+      "prompt_sha256": "8d1844b7d4bf875f37443a9471cb0ff835e6d3dbc1f245f1551c1c722e99616e",
+      "gold_sha256": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce"
+    },
+    {
+      "problem_id": "20555fdb-e4a5-4754-bfcd-fdb24d549624",
+      "prompt_sha256": "5af3787501fb3a74a208eba028e2ac152823a63f578780f36b3eb54c81c333d2",
+      "gold_sha256": "5f9c4ab08cac7457e9111a30e4664920607ea2c115a1433d7be98e97e64244ca"
+    },
+    {
+      "problem_id": "146a3264-1711-4af7-9f1e-b14029004841",
+      "prompt_sha256": "822ef130c8eacd252561eac92f433ba7def4d1adb517d6bfe60df9ef08922ddc",
+      "gold_sha256": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35"
+    },
+    {
+      "problem_id": "7056388d-09d3-4856-9b90-8ef9ccb56228",
+      "prompt_sha256": "28c2533768804ca67653e78bad567779c53d4616b352d766b76848e6f57b504f",
+      "gold_sha256": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35"
+    },
+    {
+      "problem_id": "673c5df1-4b47-4afa-b004-f3287025753b",
+      "prompt_sha256": "8f8b5bb09696d63cb8ad368efb59bdfb60cdf1d6d0ed5521e6164688e78089d5",
+      "gold_sha256": "785f3ec7eb32f30b90cd0fcf3657d388b5ff4297f2f9716ff66e9b69c05ddd09"
+    },
+    {
+      "problem_id": "51be1f5c-4d71-46bf-8eaf-60827371317c",
+      "prompt_sha256": "a7884d0f1ecbce455507c2ea90e9d78bae6c69064f95a602716b9972c3e3fca1",
+      "gold_sha256": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d"
+    },
+    {
+      "problem_id": "3636cdb6-d27d-40a2-a0cf-c2886bdf4450",
+      "prompt_sha256": "b68a3ab8d7c417868b7a85cbcef3569048d66ee21ab3e4bfc8d6208b5cd1f5b5",
+      "gold_sha256": "535fa30d7e25dd8a49f1536779734ec8286108d115da5045d77f3b4185d8f790"
+    },
+    {
+      "problem_id": "770b969b-16f0-43f7-8ca1-6bff4975a49d",
+      "prompt_sha256": "2b7b30a7bb48ad20426aaf622a85cb8f2fb9b1bc978d3dab6f8481c61eef798c",
+      "gold_sha256": "6e4001871c0cf27c7634ef1dc478408f642410fd3a444e2a88e301f5c4a35a4d"
+    },
+    {
+      "problem_id": "6c14c1d2-9f57-4c92-bd00-301ec2730bad",
+      "prompt_sha256": "c56c863f3b37cf2f4b9c84b93bc63794702d384d70892882083d77d6de955292",
+      "gold_sha256": "e7f6c011776e8db7cd330b54174fd76f7d0216b612387a5ffcfb81e6f0919683"
+    },
+    {
+      "problem_id": "5f49f482-8631-4779-93a9-b0c5b75e9b04",
+      "prompt_sha256": "b3b79a3fdf5e65b2068f6b0561e64a48b7d382f3780b5b7f1e54d7d083b6e58d",
+      "gold_sha256": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce"
+    },
+    {
+      "problem_id": "77cc2a1b-e5b7-4937-931e-362a8e872bec",
+      "prompt_sha256": "978955b27330a5dcbfbe34013b8a87b8a0885174094aa9ec475a7519563f3a36",
+      "gold_sha256": "e7f6c011776e8db7cd330b54174fd76f7d0216b612387a5ffcfb81e6f0919683"
+    },
+    {
+      "problem_id": "cc2bf022-3660-443e-9660-03851b51fbf2",
+      "prompt_sha256": "7dfa7633244d459cf5b84ae52ee34053c091d679ab7cd52de31ca2f95a7ffec0",
+      "gold_sha256": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d"
+    },
+    {
+      "problem_id": "fbb89c83-e254-4e04-abe2-c4b61a3500b9",
+      "prompt_sha256": "519460b2593900446067af58da55ab73df894ea2c12e463a661442fd76f6576b",
+      "gold_sha256": "ad57366865126e55649ecb23ae1d48887544976efea46a48eb5d85a6eeb4d306"
+    },
+    {
+      "problem_id": "9663e438-8291-4583-8402-f3700788a6e6",
+      "prompt_sha256": "b8e4045a54e8332a46f23a8420ccb5649f5b1a8ec8d6792ba58ecb5d08313649",
+      "gold_sha256": "6f4b6612125fb3a0daecd2799dfd6c9c299424fd920f9b308110a2c1fbd8f443"
+    },
+    {
+      "problem_id": "8a54c02c-dd40-417e-bb77-f1b57574a1c9",
+      "prompt_sha256": "00779be3c178fad3f5ad0cb497ff83aa763485f9192da059f878d017f71f01a9",
+      "gold_sha256": "1a6562590ef19d1045d06c4055742d38288e9e6dcd71ccde5cee80f1d5a774eb"
+    },
+    {
+      "problem_id": "86327a04-e4d1-4094-aba6-99fe6241d287",
+      "prompt_sha256": "afb34a739e1765dd8711c41fcdbb6e9cea3e9112d91551b24afa4c6b0ab8ccba",
+      "gold_sha256": "86e50149658661312a9e0b35558d84f6c6d3da797f552a9657fe0558ca40cdef"
+    },
+    {
+      "problem_id": "3c982955-961b-4020-996d-785e03736223",
+      "prompt_sha256": "352c6efeeb974102b139126b2b021a288d7184e8b4946e7bf2b9527a2aed4093",
+      "gold_sha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451"
+    },
+    {
+      "problem_id": "48971b3b-6bd6-4167-943e-ea19a2c7d6cb",
+      "prompt_sha256": "14c615f0957f61287324c9faffd0f5611798745eaecca8fb8bef221408933d78",
+      "gold_sha256": "501a4e61aa4f7737df0305124a39119b79a6449d2bfcc6f026da0197af2ae60b"
+    },
+    {
+      "problem_id": "6be17eac-7aeb-41a8-83e4-991c2fe5766d",
+      "prompt_sha256": "84f10e960696526123ce641d260e6c753490e1676f07fa1ae59f444eb89f41fa",
+      "gold_sha256": "535fa30d7e25dd8a49f1536779734ec8286108d115da5045d77f3b4185d8f790"
+    },
+    {
+      "problem_id": "0cff3dc6-e51f-4b36-a85b-097181d5272f",
+      "prompt_sha256": "36a6bf318c80cdd5c2eebd675c91a6b9d8f344fc9bb9968717c50cdfc684c0fc",
+      "gold_sha256": "48ff6cf0c4990494487ac38af2e774a4fca7c3baa3f294a7bec11ee0d033fd30"
+    },
+    {
+      "problem_id": "b0183d76-7330-49c0-85a7-b4b3b699ce81",
+      "prompt_sha256": "6b431e75c6bd7f89ad550691f0d34359d1c89b34a5712550f29abd4c3322d032",
+      "gold_sha256": "6b51d431df5d7f141cbececcf79edf3dd861c3b4069f0b11661a3eefacbba918"
+    },
+    {
+      "problem_id": "7f354f7f-3265-43ab-a04a-a90b3b296480",
+      "prompt_sha256": "2e86d982d4ee7226bec161f1a233b8d5298ebe78b61aa8f0f8da46638946cc57",
+      "gold_sha256": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35"
+    },
+    {
+      "problem_id": "181eda05-e1b3-479a-8d81-fc96115e64db",
+      "prompt_sha256": "fa9ae1eb05c8406d10542d701805dfef4d2334c381fe32de47cfb1318fb204ae",
+      "gold_sha256": "226f76b55acb49701e06ded1d95165d179458f6fc37f5c6fc760ae30dec1c378"
+    },
+    {
+      "problem_id": "5f11702d-2c3d-4672-9518-725a18ec52d9",
+      "prompt_sha256": "e80cc24f246737148fb204f63ab66a5e139b8d3d4831210154a9d27594307219",
+      "gold_sha256": "d391410d23c89b354bfb2a3998be1a12611912846c5e9b57ad0f3cdabeb1de87"
+    }
+  ],
+  "ordered_records_sha256": "d598b194a673c878eb2aee6f3357bd184ce2000838014b3547570408deeba25a",
+  "data_path": "/SSD/00/wja/GRACE/data/dapo/data/dapo-math-17k.parquet",
+  "split": "audit",
+  "difficulty_manifest": null
+}

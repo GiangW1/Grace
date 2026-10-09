@@ -1,0 +1,364 @@
+{
+  "source": "/SSD/00/wja/GRACE/data/dapo/data/dapo-math-17k.parquet",
+  "source_sha256": "534375d6bb8630d22ab46a56e11f2ffec1d288d8f7d04099bc82d68948705941",
+  "eval_source": "/SSD/00/wja/GRACE/data/math500/test.jsonl",
+  "eval_sha256": "35dc41080a3680858b27fa7e0533d2d547825316fc5dafe5d316f4ccc5a06132",
+  "shared_actor": "/SSD/00/wja/grace-pr15-suffix-transport-1e4e496-20261006-run/shared-initial-actor.npz",
+  "shared_actor_sha256": "a57086e2fdba2372947a1b735827bd1de7ef6810fcaa7e5019393ae1862119a0",
+  "previous_inputs": [
+    {
+      "path": "/SSD/00/wja/grace-pr13-thinking-v3-8cac23f-c32-20261004-run/inputs/shard-0.jsonl",
+      "sha256": "5f3b49a837b0d5679ae7ba24bc5ab5cdf95e144286998662cbb2ae091e770969"
+    },
+    {
+      "path": "/SSD/00/wja/grace-pr13-thinking-v3-8cac23f-c32-20261004-run/inputs/shard-1.jsonl",
+      "sha256": "170435ad99a1616bc5096834691eea9fd16e6fa08948ccd77bb0b732f88088b7"
+    },
+    {
+      "path": "/SSD/00/wja/grace-pr13-thinking-v3-8cac23f-c32-20261004-run/inputs/shard-2.jsonl",
+      "sha256": "7d694dde20d8b54b863df6bf338ebbdd8f491528f2aa8f9234c4330239e230d8"
+    },
+    {
+      "path": "/SSD/00/wja/grace-pr14-learning-completion-36-20261004-run/input/shard-0.jsonl",
+      "sha256": "c2f71c57baee685c566493ebaf70f14917697ce26369250fa200ba6dd1dd07b5"
+    }
+  ],
+  "audit_candidate_count": 204,
+  "audit": {
+    "selection": "seeded",
+    "selection_seed": 17,
+    "n_problems": 32,
+    "prompt_normalization": "whitespace_v2_case_sensitive",
+    "problems": [
+      {
+        "problem_id": "1d518931-3873-4ea4-b585-a9a482c8590d",
+        "prompt_sha256": "bff9f205af0443e527923326f07c7c8b86f39a5c6c2b76ccaa2746e3312e582d",
+        "gold_sha256": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce"
+      },
+      {
+        "problem_id": "2e7f8872-d8df-489a-95bd-f13a805418c8",
+        "prompt_sha256": "22f6482fca02289609594149609d43162e6eb2776a4b2ceb0ddaf265754318f9",
+        "gold_sha256": "1bad6b8cf97131fceab8543e81f7757195fbb1d36b376ee994ad1cf17699c464"
+      },
+      {
+        "problem_id": "8f61f04c-152c-437d-92fc-ce564e9630f3",
+        "prompt_sha256": "4801fa5af2988a496ce8f4119efdf416649ab4107c8148757dc917e0cadbb975",
+        "gold_sha256": "624b60c58c9d8bfb6ff1886c2fd605d2adeb6ea4da576068201b6c6958ce93f4"
+      },
+      {
+        "problem_id": "902499da-806d-4b59-b003-2115b7cefc58",
+        "prompt_sha256": "1ad2749450db4f8bac685d266c1dfc61503ab58de9a0c9f99b7762622c14888a",
+        "gold_sha256": "d6f0c71ef0c88e45e4b3a2118fcb83b0def392d759c901e9d755d0e879028727"
+      },
+      {
+        "problem_id": "d38d81c7-3bfe-47a1-9e47-2a7bd8bf354d",
+        "prompt_sha256": "7189753bbe7c5a31af601774c50eb31474d4d0064084e580e0ab6b0bb6883d2f",
+        "gold_sha256": "2d1007980f49215311f7f1012e84f99b801eb5daeca04dedea3ada41cc45353b"
+      },
+      {
+        "problem_id": "a8d8ac0a-512c-4a08-82a1-2fa406302092",
+        "prompt_sha256": "4140dd99f0fe036d728189274667589706990bca675e0b865f0d4a3ff84726f6",
+        "gold_sha256": "3fdba35f04dc8c462986c992bcf875546257113072a909c162f7e470e581e278"
+      },
+      {
+        "problem_id": "bab12583-53b0-49e9-960a-b1dc90d56809",
+        "prompt_sha256": "53ce68b07cc9edbc2492285a28fb83b8d554b62b2a675a436732c624af06c687",
+        "gold_sha256": "8e28c5eb829e92abf7a5a921f42364cbb8b255d7c9861a68a3814a9de95d9d67"
+      },
+      {
+        "problem_id": "b59046b6-42da-4571-9461-d9c254f28ba1",
+        "prompt_sha256": "b6f02fbc069596dcf7679cd84cff6532f774fdaf742cddd3044e4ff1f7aee5b5",
+        "gold_sha256": "6af1f692e9496c6d0b668316eccb93276ae6b6774fa728aac31ff40a38318760"
+      },
+      {
+        "problem_id": "2a7effb7-bbfd-4276-8680-9ab0b6d5683b",
+        "prompt_sha256": "cb5c8450c15bacf2a9b48a3dedf25f29662729811eb5763118f9e3d4ae3f7e9c",
+        "gold_sha256": "4a44dc15364204a80fe80e9039455cc1608281820fe2b24f1e5233ade6af1dd5"
+      },
+      {
+        "problem_id": "9f964fbc-a883-4d73-a07c-286f7c939e71",
+        "prompt_sha256": "4d757dafceb05fa3e245196cd90a68f2b482c2d9bfda6159a685375b2eb3bf76",
+        "gold_sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a"
+      },
+      {
+        "problem_id": "8268468a-b6b2-4df2-9d56-e1a020f6dfe7",
+        "prompt_sha256": "e2b823bc650bbd302773112c92d2ded9764cb7ebc48d163dabba3a622fa647a0",
+        "gold_sha256": "b7a56873cd771f2c446d369b649430b65a756ba278ff97ec81bb6f55b2e73569"
+      },
+      {
+        "problem_id": "6e551f34-8688-4c3e-8d4f-9bcd8d8a9be7",
+        "prompt_sha256": "95b9abad82875afee47005eae8d2531ecd50e20767fe384b707b133cb671720f",
+        "gold_sha256": "9537f32ec7599e1ae953af6c9f929fe747ff9dadf79a9beff1f304c550173011"
+      },
+      {
+        "problem_id": "e55b8c91-fc19-4704-8f25-b0a5ea325d35",
+        "prompt_sha256": "ee2288744bc8009faf3b5c2ba8defdb46163fd4087221389620299946d46d7b8",
+        "gold_sha256": "d29d53701d3c859e29e1b90028eec1ca8e2f29439198b6e036c60951fb458aa1"
+      },
+      {
+        "problem_id": "71b9c96e-2e7b-4f98-a03a-9bded9ceabbf",
+        "prompt_sha256": "e7fb1ba11d7b367e477ddcd1a05c746e8dbba07cae244725b729202fc9a1dbba",
+        "gold_sha256": "b1556dea32e9d0cdbfed038fd7787275775ea40939c146a64e205bcb349ad02f"
+      },
+      {
+        "problem_id": "833b68a8-d586-4e67-97c4-f2b26b829382",
+        "prompt_sha256": "5f0c64d0529a12f2c3174a8a16fe8fad34d27d07a15691b01b0b5106ae2d30fc",
+        "gold_sha256": "4523540f1504cd17100c4835e85b7eefd49911580f8efff0599a8f283be6b9e3"
+      },
+      {
+        "problem_id": "2b8eb2a8-098c-4a78-b696-7d6bd2471324",
+        "prompt_sha256": "35615eb77c47429d92917134eaf0f4a6defbb3d80ffd0a1fda9cea79323f9bf5",
+        "gold_sha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451"
+      },
+      {
+        "problem_id": "a9ea42cb-c7f4-4c4b-921d-8bc5e2a306bf",
+        "prompt_sha256": "858d0c518297ad2264a0e9272c3133cde7a65970378e8b6093d8a193250a64f7",
+        "gold_sha256": "6f4b6612125fb3a0daecd2799dfd6c9c299424fd920f9b308110a2c1fbd8f443"
+      },
+      {
+        "problem_id": "8221a386-160e-40d4-b604-b3c0f2fc84b9",
+        "prompt_sha256": "a8768e364447b1d9e0bcc055a4772c4a87739df0deaaebd39cfbb170b7659fee",
+        "gold_sha256": "6208ef0f7750c111548cf90b6ea1d0d0a66f6bff40dbef07cb45ec436263c7d6"
+      },
+      {
+        "problem_id": "14b219ba-dc32-4486-9d01-4c51a5e54cf6",
+        "prompt_sha256": "c68c9d54aa3ad195e41cd118654959af06a1a304c1c8b753684d928af2fc89f3",
+        "gold_sha256": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce"
+      },
+      {
+        "problem_id": "33490cb3-5df6-4837-b40f-912337b71133",
+        "prompt_sha256": "25c7541d2628600dbf9083311ec012d0068ce7b13c18651ccd57af0aac1ad278",
+        "gold_sha256": "72d1b5da6eeaf1789df86487da50ad5e9dadb5ffaecb56b6de592aa286c9c1b8"
+      },
+      {
+        "problem_id": "0ea80d5e-f068-4afa-b701-695865a0c25e",
+        "prompt_sha256": "3c1c34b836f07136912d96988970b176b4c6a70df83c2ee423bef7859fd85dbc",
+        "gold_sha256": "ca166eec5bb7f7509290eb9903cdea15fb52e6046e6ab34e450a008fcaf285a0"
+      },
+      {
+        "problem_id": "0f442dc9-6ef7-4a2b-9d81-49a86b3e2e8b",
+        "prompt_sha256": "088ad24a3a432c52a4f59650548170e20fd57ab22a57cc2e39c4df8e44657d1b",
+        "gold_sha256": "8722616204217eddb39e7df969e0698aed8e599ba62ed2de1ce49b03ade0fede"
+      },
+      {
+        "problem_id": "28d9b609-23c7-46d2-a402-ff8b3c1e55f8",
+        "prompt_sha256": "5cd2c6e2f8106dfb0c499ad3122be8583330cf2682df659f1e4b2c322b53ef9e",
+        "gold_sha256": "8722616204217eddb39e7df969e0698aed8e599ba62ed2de1ce49b03ade0fede"
+      },
+      {
+        "problem_id": "88f545df-8558-42cb-95cc-ab2f6a1a1dc2",
+        "prompt_sha256": "3aeb99107941e440396023fdfde4f038b08b6fe423f5ad731c8369bb20d3d6fc",
+        "gold_sha256": "fe675fe7aaee830b6fed09b64e034f84dcbdaeb429d9cccd4ebb90e15af8dd71"
+      },
+      {
+        "problem_id": "1cdd4375-df81-460c-afe6-151841923762",
+        "prompt_sha256": "09f9a1c7e501d55f87fb0269cf6161757fa351343ae4c8ffedef1294d27d9214",
+        "gold_sha256": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d"
+      },
+      {
+        "problem_id": "3abf39ba-d880-4786-aa9e-043e85a52421",
+        "prompt_sha256": "ee5d1098fa665a9c21c044cf98e215618c8e9a98f047ed5c6a2e7f06e1d499bd",
+        "gold_sha256": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce"
+      },
+      {
+        "problem_id": "c62eeade-4f54-42a0-bfaf-ce9588991185",
+        "prompt_sha256": "3736db6749ae326c30506be96916cb1783f8dbe85620259616ac44f31a71cf6f",
+        "gold_sha256": "26792840bd3b3b04f5d3192a5981e8fc3231adf6853f9d4fd2145ec2c25e46a6"
+      },
+      {
+        "problem_id": "bb838926-ff07-4e04-a18e-cd8b6c773ac1",
+        "prompt_sha256": "12a711e4a6c3923aa04ddf4918df37413a8ef4c33ac6456af7c399681970c12a",
+        "gold_sha256": "16dc368a89b428b2485484313ba67a3912ca03f2b2b42429174a4f8b3dc84e44"
+      },
+      {
+        "problem_id": "eef59bf3-e668-4cb9-9c62-ddf0c0f26a23",
+        "prompt_sha256": "c9b12d3a7c5bd024d8e54dcf01397830af277f17ae24d4aa3142d13eb2dfc921",
+        "gold_sha256": "b17ef6d19c7a5b1ee83b907c595526dcb1eb06db8227d650d5dda0a9f4ce8cd9"
+      },
+      {
+        "problem_id": "a63eca76-43a6-4427-b987-299132f26148",
+        "prompt_sha256": "67509814299b5081e74576787b5478758b4df1a540bbfe3cf05366e06d8f1064",
+        "gold_sha256": "aaf01d71b55e51b1a3051cbb3cdc0646578dcda722b2922072a81f257b1a9821"
+      },
+      {
+        "problem_id": "0cad4bab-11b4-4aab-9df2-71404cfa2235",
+        "prompt_sha256": "af08e25ede0ffdb6875f1a147a290db12b57675804a0527b5b9e182862575bdb",
+        "gold_sha256": "3e1e967e9b793e908f8eae83c74dba9bcccce6a5535b4b462bd9994537bfe15c"
+      },
+      {
+        "problem_id": "ba93c5fa-84ee-406e-9c33-57908038237e",
+        "prompt_sha256": "1aae83d827792d8debe5f2d58c914d141ca1643b5e606ef9a91cc7483779c35b",
+        "gold_sha256": "44cb730c420480a0477b505ae68af508fb90f96cf0ec54c6ad16949dd427f13a"
+      }
+    ],
+    "ordered_records_sha256": "f87851d48a35f0c9ed10100358f3ded9290455a50dd8926c7bcc2fb6b88ac015"
+  },
+  "train_count": 16676,
+  "audit_previous_prompt_overlap": 0,
+  "audit_train_prompt_overlap": 0,
+  "audit_eval_prompt_overlap": 0,
+  "normalization": "whitespace and exact DAPO wrapper; no semantic near-duplicate check",
+  "data_conflicts_and_eval_exclusion": {
+    "prompt_normalization": "whitespace_v2_case_sensitive",
+    "path": "/SSD/00/wja/GRACE/data/dapo/data/dapo-math-17k.parquet",
+    "n_raw": 1791700,
+    "n_kept": 17176,
+    "n_same_answer_dedup": 1773312,
+    "n_conflict_groups": 12,
+    "conflicts": [
+      {
+        "prompt_hash": "1f225674f23d473b324825438b7715434da65d9ed8e5f9bfaa7e5f54df3c4f96",
+        "problem_id": "af9089ec-686b-4471-ae02-8d196030763b",
+        "answers": [
+          "6",
+          "64"
+        ],
+        "first_loc": 36
+      },
+      {
+        "prompt_hash": "597fe677bf86db79882c8ae23096ec19a6f69d8f450627373f087faa9b3589e1",
+        "problem_id": "f09110c9-c0cc-4f50-ba00-07e47208efbf",
+        "answers": [
+          "15",
+          "25"
+        ],
+        "first_loc": 283
+      },
+      {
+        "prompt_hash": "a182560310199f40e1ea757c0eec092a6ac3965d6894f44d4ce973cc417b78c9",
+        "problem_id": "31aeb632-4fb7-47a6-9729-0ead200fca1b",
+        "answers": [
+          "21",
+          "99"
+        ],
+        "first_loc": 2041
+      },
+      {
+        "prompt_hash": "8053f75069d39ce606f65f984413608acfe720c6dcee53ec06e941f8f24e2059",
+        "problem_id": "b3bcfe10-8941-43b4-b0c6-d4885984f6d8",
+        "answers": [
+          "12",
+          "30"
+        ],
+        "first_loc": 2130
+      },
+      {
+        "prompt_hash": "d8bd954dbaf86f437f10e4580ffcbf4f55113a8be8e818af33cacaa5ee90ff47",
+        "problem_id": "8790d8ae-ed1d-4ae3-a5dc-b3bff1d87e35",
+        "answers": [
+          "248",
+          "36"
+        ],
+        "first_loc": 3471
+      },
+      {
+        "prompt_hash": "c433043dbdb2388bfa0a3815440478acdd7afa130cb927183a836ece3d2b943c",
+        "problem_id": "93811b75-3617-48c4-8f68-9ec28b123425",
+        "answers": [
+          "239",
+          "48"
+        ],
+        "first_loc": 4851
+      },
+      {
+        "prompt_hash": "7a8d5b17aaa8edbcefa2752ce04e8688f76ddf416b700647d822e18082219b21",
+        "problem_id": "de2e8f5b-ec62-4229-8880-395cb4bc476a",
+        "answers": [
+          "-1",
+          "554"
+        ],
+        "first_loc": 5786
+      },
+      {
+        "prompt_hash": "e444a0232c688a2809683c3c1f34a1e8b3d4aef5da2b4eb1464deca50e6ebeb0",
+        "problem_id": "22c60adf-1164-43da-82d0-ef9d082fbc38",
+        "answers": [
+          "-1",
+          "230"
+        ],
+        "first_loc": 5886
+      },
+      {
+        "prompt_hash": "9975a05602bdd6d1573e388a51356e48f0c84318c7ba6789d65c68a35fb52c2b",
+        "problem_id": "03eca081-5a68-4f3e-a5aa-ad59e6ddbe33",
+        "answers": [
+          "-1",
+          "683"
+        ],
+        "first_loc": 5916
+      },
+      {
+        "prompt_hash": "69be79cf1b5298b4ec8704bb6d33e533bf67428d63f3e1be38f8cedf1227a9e9",
+        "problem_id": "bac74bb3-d12d-4236-9e9c-08077c44994b",
+        "answers": [
+          "-1",
+          "913"
+        ],
+        "first_loc": 5938
+      },
+      {
+        "prompt_hash": "f3b914530b98e95ace65625328d5c5ba313f1a1056c6bd60cf2a34f80ae934b3",
+        "problem_id": "4b61ebe1-64b0-43ff-a434-0f65dc6e486e",
+        "answers": [
+          "108",
+          "180"
+        ],
+        "first_loc": 7695
+      },
+      {
+        "prompt_hash": "b85a5be9122eea1efd4a1c684f33e6f10f911d0cd9066e13b489ec564d55868d",
+        "problem_id": "cc639dd4-3163-4d29-ab20-66dce003e4c1",
+        "answers": [
+          "-1",
+          "-2"
+        ],
+        "first_loc": 11660
+      }
+    ],
+    "eval_exclusion": {
+      "status": "applied",
+      "eval_source": {
+        "path": "/SSD/00/wja/GRACE/data/math500/test.jsonl",
+        "sha256": "35dc41080a3680858b27fa7e0533d2d547825316fc5dafe5d316f4ccc5a06132",
+        "n_problems": 500
+      },
+      "removed": [
+        {
+          "split": "train",
+          "problem_id": "84501b44-688d-4518-be16-d188f0a0e8d3",
+          "prompt_sha256": "06d5aeabb535b6a990b29e1f5210e010d81f9f767a3bbe9e9b07c62c1ca02c08",
+          "eval_problem_ids": [
+            "06d5aeabb535b6a9"
+          ]
+        },
+        {
+          "split": "train",
+          "problem_id": "5a9ea7d2-faa3-41b9-b097-875f39e7f1b1",
+          "prompt_sha256": "1ea3d389e0493b48d5a8f724aec8c99519fb42585d753edd20ce6251a281d43c",
+          "eval_problem_ids": [
+            "1ea3d389e0493b48"
+          ]
+        },
+        {
+          "split": "train",
+          "problem_id": "a208ad4e-651b-4b75-a619-31bf1314bbed",
+          "prompt_sha256": "07e22408c9d86bf198748e6e0ffd321d2d6b8d605ebab6f9a119cca4c7ce5785",
+          "eval_problem_ids": [
+            "07e22408c9d86bf1"
+          ]
+        },
+        {
+          "split": "train",
+          "problem_id": "c0659f3a-2792-4cc8-b669-9c50d7382147",
+          "prompt_sha256": "a153bf646bb8dfb046d7c75433a9e56cd7c552526ee5ec4085c5b284d4b6813a",
+          "eval_problem_ids": [
+            "a153bf646bb8dfb0"
+          ]
+        }
+      ],
+      "normalization": "whitespace_and_exact_dapo_wrapper_case_sensitive",
+      "scope": "train/calib/audit pools before SFT and sampling; all external eval problems",
+      "note": "No semantic near-duplicate detection; gold does not affect exclusion. This does not certify the exposure history of a reused actor/checkpoint."
+    }
+  }
+}

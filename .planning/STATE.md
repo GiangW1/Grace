@@ -5,6 +5,21 @@ status: in-progress
 
 # Project State
 
+2026-10-07 服务器增量：PR15 请求版本 `1e4e496`，实测优化版本 `4675a34`。
+16384-token、Qwen3-4B thinking、GPU0 actor/GPU2 rollout 的 m=2/4 冻结审计
+各完成 32 题/64 组，无 OOM 或重启，已于 2026-10-06 19:36 HKT 全部结束。
+ST 与 lambda=0 的方差相同，后验 ESS=1；条件方差为 Full-PG 的 1.97/4.65 倍。
+这不是等成本训练结论；多方法、多 seed 训练及 MATH-500 评测仍暂缓。
+代码优化、完整结果汇总、紧凑证据和剔除稠密数组/权重的下载包见
+[本轮结果](../docs/results/suffix_transport_pr15_16384_20261006/README.md)。
+
+2026-10-06 增量：在 PR14 `exp-a-learning-completion` 上加入独立 GRACE-ST 后缀信用传递、
+冻结配对/总体方差审计、Full-PG/高效 donor-only/ST 训练与 CPU/GPU smoke。
+旧 HT 主入口保留。审查后 30 项 ST 合成检查及 187 项相关回归通过；真实 GPU 留给服务器执行。
+修正评测算法身份、预算内 checkpoint、lambda=0 日志；补全后缀概率/NaN smoke 和配对方差区间。
+本机全量旧失败及 PR14 基线复现见 [TEST_STATUS](../docs/TEST_STATUS.md)，
+具体运行命令与未实现边界见 [SUFFIX_TRANSPORT](../docs/SUFFIX_TRANSPORT.md)。
+
 核对日期：2026-09-19。原两阶段的首轮实现和最小证伪已完成；目前按负结果继续修复与再验证，论文效果尚未成立。项目范围见 [PROJECT.md](PROJECT.md)。
 
 ## 代码与发布

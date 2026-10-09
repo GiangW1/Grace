@@ -1,0 +1,30 @@
+{
+  "actor_device": "0",
+  "rollout_devices": [
+    "2"
+  ],
+  "workers": [
+    {
+      "accepted": {
+        "model": "/SSD/00/wja/GRACE/data/Qwen3-4B",
+        "worker_extension_cls": "grace_gc.backends.verl_trainer.VLLMWorkerCleanup",
+        "enable_prefix_caching": true,
+        "enable_lora": true,
+        "max_lora_rank": 16,
+        "max_loras": 4,
+        "tensor_parallel_size": 1,
+        "dtype": "bfloat16",
+        "lora_dtype": "bfloat16",
+        "seed": 17,
+        "trust_remote_code": true,
+        "generation_config": "vllm",
+        "gpu_memory_utilization": 0.65,
+        "max_model_len": 17472,
+        "max_num_seqs": 32,
+        "max_num_batched_tokens": 8192
+      },
+      "dropped": []
+    }
+  ],
+  "n_gpu_reserved": 2
+}

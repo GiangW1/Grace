@@ -1,0 +1,9 @@
+2026-09-30T16:27:22.386540+00:00 phase=waiting_model_download {}
+2026-09-30T16:29:22.480131+00:00 phase=starting_vllm {}
+2026-09-30T16:30:27.514297+00:00 phase=smoke_running {}
+2026-09-30T16:30:27.559123+00:00 launch=smoke gpu=0
+2026-09-30T16:38:20.816260+00:00 phase=collecting_32 {}
+2026-09-30T16:38:20.864584+00:00 launch=worker-1 gpu=2
+2026-09-30T16:38:20.868944+00:00 launch=worker-0 gpu=0
+2026-10-01T13:11:51.012922+00:00 phase=offline_predictor_analysis {}
+2026-10-01T13:21:53.812247+00:00 phase=completed {'summary': '/SSD/01/wja/grace-pr13-thinking-20261001/collection/benefit/predictor_benefit_summary.json'}

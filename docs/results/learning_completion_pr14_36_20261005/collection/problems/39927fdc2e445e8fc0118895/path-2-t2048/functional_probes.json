@@ -1,0 +1,86 @@
+[
+  {
+    "text": " 36",
+    "reward": 0.0,
+    "seed": 264062483,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 36",
+    "token_ids": [
+      220,
+      18,
+      21,
+      151645
+    ]
+  },
+  {
+    "text": " 21",
+    "reward": 0.0,
+    "seed": 498051290,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 21",
+    "token_ids": [
+      220,
+      17,
+      16,
+      151645
+    ]
+  },
+  {
+    "text": " 24\n\nWait, let me actually compute it step by step.\n\nList the coordinates:\n\nG: (19/3, 4) = (",
+    "reward": 0.0,
+    "seed": 640292497,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 24\n\nWait, let me actually compute it step by step.\n\nList the coordinates:\n\nG: (19/3, 4) = (",
+    "token_ids": [
+      220,
+      17,
+      19,
+      271,
+      14190,
+      11,
+      1077,
+      752,
+      3520,
+      12564,
+      432,
+      3019,
+      553,
+      3019,
+      382,
+      852,
+      279,
+      13934,
+      1447,
+      38,
+      25,
+      320,
+      16,
+      24,
+      14,
+      18,
+      11,
+      220,
+      19,
+      8,
+      284,
+      320
+    ]
+  },
+  {
+    "text": " 21",
+    "reward": 0.0,
+    "seed": 326649964,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 21",
+    "token_ids": [
+      220,
+      17,
+      16,
+      151645
+    ]
+  }
+]

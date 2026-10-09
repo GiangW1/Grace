@@ -1,0 +1,7 @@
+# Stack after the unchanged two-GPU execution config.
+max_new_tokens: 16384
+suffix_transport:
+  posterior_score_batch_size: 4
+  fuse_audit_scores: true
+  audit_prefetch: true
+  actor_checkpoint_stride: 2

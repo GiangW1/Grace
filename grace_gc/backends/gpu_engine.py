@@ -126,6 +126,23 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
                                      feature_mode=pcfg.get("feature_mode", "legacy"),
                                      batch_size=int(pcfg.get("feature_batch_size", 1)))
 
+    def continue_grouped(jobs, rng):
+        remaining = {job["max_new"] for job in jobs}
+        if len(remaining) != 1:
+            raise ValueError("grouped prefixes must share the same remaining token limit")
+        prompts = [list(job["prefix"]) for job in jobs for _ in job["seeds"]]
+        seeds = [seed for job in jobs for seed in job["seeds"]]
+        phase = generate_phase(llm, prompts, remaining.pop(), temperature, eos_id, rng,
+                               "continuation", lora_request=extra.get("lora_request"),
+                               request_seeds=seeds)
+        result, offset = {}, 0
+        for job in jobs:
+            end = offset + len(job["seeds"])
+            result[job["index"]] = (phase.token_ids[offset:end],
+                                    phase.finish_reasons[offset:end], seeds[offset:end])
+            offset = end
+        return result
+
     def lp_sums(full_ids, prompt_lens, chosen):
         return logprob_sums(actor, full_ids, prompt_lens, chosen, pad_id, eos_id=eos_id)
 
@@ -152,6 +169,7 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
         eos_id=eos_id,
     )
     box["engines"] = engines
+    engines.continue_grouped = continue_grouped
     extra["pad_id"] = pad_id
     extra["eos_id"] = eos_id
     extra["sync"] = lambda: _sync(actor, adapter_dir, extra)

@@ -1,0 +1,89 @@
+[
+  {
+    "text": " 190",
+    "reward": 0.0,
+    "seed": 674489743,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 190",
+    "token_ids": [
+      220,
+      16,
+      24,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 120",
+    "reward": 0.0,
+    "seed": 627243458,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 120",
+    "token_ids": [
+      220,
+      16,
+      17,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 130",
+    "reward": 0.0,
+    "seed": 1544452086,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 130",
+    "token_ids": [
+      220,
+      16,
+      18,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 140\n</think>\n\nTo solve this problem, we analyze the scenario of 60 points on a circle, each colored either **red (R",
+    "reward": 0.0,
+    "seed": 117142098,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 140\n</think>\n\nTo solve this problem, we analyze the scenario of 60 points on a circle, each colored either **red (R",
+    "token_ids": [
+      220,
+      16,
+      19,
+      15,
+      198,
+      151668,
+      271,
+      1249,
+      11625,
+      419,
+      3491,
+      11,
+      582,
+      23643,
+      279,
+      15048,
+      315,
+      220,
+      21,
+      15,
+      3501,
+      389,
+      264,
+      12671,
+      11,
+      1817,
+      27197,
+      2987,
+      3070,
+      1151,
+      320,
+      49
+    ]
+  }
+]

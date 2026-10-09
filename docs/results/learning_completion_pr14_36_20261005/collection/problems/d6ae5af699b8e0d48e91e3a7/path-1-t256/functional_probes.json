@@ -1,0 +1,86 @@
+[
+  {
+    "text": " 55",
+    "reward": 0.0,
+    "seed": 1463376238,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 55",
+    "token_ids": [
+      220,
+      20,
+      20,
+      151645
+    ]
+  },
+  {
+    "text": " 64 + 16 + 10 = 90? Wait, no, that can't be. Wait, the problem says the answer",
+    "reward": 0.0,
+    "seed": 1775376119,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 64 + 16 + 10 = 90? Wait, no, that can't be. Wait, the problem says the answer",
+    "token_ids": [
+      220,
+      21,
+      19,
+      488,
+      220,
+      16,
+      21,
+      488,
+      220,
+      16,
+      15,
+      284,
+      220,
+      24,
+      15,
+      30,
+      13824,
+      11,
+      902,
+      11,
+      429,
+      646,
+      944,
+      387,
+      13,
+      13824,
+      11,
+      279,
+      3491,
+      2727,
+      279,
+      4226
+    ]
+  },
+  {
+    "text": " 16",
+    "reward": 0.0,
+    "seed": 2114376130,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 16",
+    "token_ids": [
+      220,
+      16,
+      21,
+      151645
+    ]
+  },
+  {
+    "text": " 16",
+    "reward": 0.0,
+    "seed": 1524374233,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 16",
+    "token_ids": [
+      220,
+      16,
+      21,
+      151645
+    ]
+  }
+]

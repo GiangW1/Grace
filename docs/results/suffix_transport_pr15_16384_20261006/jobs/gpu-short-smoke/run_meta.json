@@ -1,0 +1,10 @@
+{
+  "kind": "suffix_transport_smoke",
+  "started": "2026-10-06T03:55:55.048867+00:00",
+  "run_dir": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/jobs/gpu-short-smoke",
+  "requested_run_dir": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/jobs/gpu-short-smoke",
+  "redirected": false,
+  "finished": "2026-10-06T03:56:41.852975+00:00",
+  "status": "completed",
+  "exit_code": 0
+}

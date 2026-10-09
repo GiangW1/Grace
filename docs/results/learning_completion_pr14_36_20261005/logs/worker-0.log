@@ -1,0 +1,690 @@
+Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 3/3 [00:00<00:00, 85.86it/s]
+phase=audit_problem_begin problem=1/1 problem_id=3ef0bdda-30f2-4663-a52c-e7b2f68dcf0b n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=6/36
+phase=audit_problem_begin problem=1/1 problem_id=16c14487-8285-41b6-a251-29737c8b70eb n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=7/36
+phase=audit_problem_begin problem=1/1 problem_id=507445b0-6883-4a0c-a480-0cf81c82a1c7 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=8/36
+phase=audit_problem_begin problem=1/1 problem_id=4efb94b8-a55c-4287-aee3-f99a3a64923e n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=9/36
+phase=audit_problem_begin problem=1/1 problem_id=ceb7b810-f863-44d9-a5b9-a80cffaf4ead n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 3/3 [00:00<00:00, 86.33it/s]
+phase=audit_problem_begin problem=1/1 problem_id=ceb7b810-f863-44d9-a5b9-a80cffaf4ead n_bundles=0
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:0 t=256
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:1 t=256
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:2 t=256
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:3 t=256
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:0 t=512
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:1 t=512
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:2 t=512
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:3 t=512
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:0 t=1024
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:1 t=1024
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:2 t=1024
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:3 t=1024
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:0 t=2048
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:1 t=2048
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:2 t=2048
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:3 t=2048
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:0 t=4096
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:1 t=4096
+phase=resume_prefix pid=ceb7b810-f863-44d9-a5b9-a80cffaf4ead path=ceb7b810-f863-44d9-a5b9-a80cffaf4ead:2 t=4096
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=10/36
+phase=audit_problem_begin problem=1/1 problem_id=7acf992e-ccb8-4759-a1f3-ce1b27102eaa n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=11/36
+phase=audit_problem_begin problem=1/1 problem_id=d2dabd82-9385-4125-93c6-7d200c9ae12c n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=12/36
+phase=audit_problem_begin problem=1/1 problem_id=5d85d03c-5764-49ee-af16-19a1a06b62a8 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=13/36
+phase=audit_problem_begin problem=1/1 problem_id=20555fdb-e4a5-4754-bfcd-fdb24d549624 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=14/36
+phase=audit_problem_begin problem=1/1 problem_id=146a3264-1711-4af7-9f1e-b14029004841 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=15/36
+phase=audit_problem_begin problem=1/1 problem_id=7056388d-09d3-4856-9b90-8ef9ccb56228 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=16/36
+phase=audit_problem_begin problem=1/1 problem_id=673c5df1-4b47-4afa-b004-f3287025753b n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=17/36
+phase=audit_problem_begin problem=1/1 problem_id=51be1f5c-4d71-46bf-8eaf-60827371317c n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=18/36
+phase=audit_problem_begin problem=1/1 problem_id=3636cdb6-d27d-40a2-a0cf-c2886bdf4450 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=problem_completed worker=0 problem=19/36
+phase=audit_problem_begin problem=1/1 problem_id=770b969b-16f0-43f7-8ca1-6bff4975a49d n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=20/36
+phase=audit_problem_begin problem=1/1 problem_id=6c14c1d2-9f57-4c92-bd00-301ec2730bad n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=21/36
+phase=audit_problem_begin problem=1/1 problem_id=5f49f482-8631-4779-93a9-b0c5b75e9b04 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=22/36
+phase=audit_problem_begin problem=1/1 problem_id=77cc2a1b-e5b7-4937-931e-362a8e872bec n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=18
+phase=problem_completed worker=0 problem=23/36
+phase=audit_problem_begin problem=1/1 problem_id=cc2bf022-3660-443e-9660-03851b51fbf2 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=24/36
+phase=audit_problem_begin problem=1/1 problem_id=fbb89c83-e254-4e04-abe2-c4b61a3500b9 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=25/36
+phase=audit_problem_begin problem=1/1 problem_id=9663e438-8291-4583-8402-f3700788a6e6 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=26/36
+phase=audit_problem_begin problem=1/1 problem_id=8a54c02c-dd40-417e-bb77-f1b57574a1c9 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=27/36
+phase=audit_problem_begin problem=1/1 problem_id=86327a04-e4d1-4094-aba6-99fe6241d287 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=28/36
+phase=audit_problem_begin problem=1/1 problem_id=3c982955-961b-4020-996d-785e03736223 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=problem_completed worker=0 problem=29/36
+phase=audit_problem_begin problem=1/1 problem_id=48971b3b-6bd6-4167-943e-ea19a2c7d6cb n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=30/36
+phase=audit_problem_begin problem=1/1 problem_id=6be17eac-7aeb-41a8-83e4-991c2fe5766d n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=31/36
+phase=audit_problem_begin problem=1/1 problem_id=0cff3dc6-e51f-4b36-a85b-097181d5272f n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=19
+phase=problem_completed worker=0 problem=32/36
+phase=audit_problem_begin problem=1/1 problem_id=b0183d76-7330-49c0-85a7-b4b3b699ce81 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=33/36
+phase=audit_problem_begin problem=1/1 problem_id=7f354f7f-3265-43ab-a04a-a90b3b296480 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=1 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=19
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=20
+phase=problem_completed worker=0 problem=34/36
+phase=audit_problem_begin problem=1/1 problem_id=181eda05-e1b3-479a-8d81-fc96115e64db n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=0 n_bundles=17
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=18
+phase=audit_prefix_done problem=1/1 t=4096 path=3 n_bundles=19
+phase=problem_completed worker=0 problem=35/36
+phase=audit_problem_begin problem=1/1 problem_id=5f11702d-2c3d-4672-9518-725a18ec52d9 n_bundles=0
+phase=audit_prefix_done problem=1/1 t=256 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/1 t=256 path=1 n_bundles=2
+phase=audit_prefix_done problem=1/1 t=256 path=2 n_bundles=3
+phase=audit_prefix_done problem=1/1 t=256 path=3 n_bundles=4
+phase=audit_prefix_done problem=1/1 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=1/1 t=512 path=1 n_bundles=6
+phase=audit_prefix_done problem=1/1 t=512 path=2 n_bundles=7
+phase=audit_prefix_done problem=1/1 t=512 path=3 n_bundles=8
+phase=audit_prefix_done problem=1/1 t=1024 path=0 n_bundles=9
+phase=audit_prefix_done problem=1/1 t=1024 path=1 n_bundles=10
+phase=audit_prefix_done problem=1/1 t=1024 path=2 n_bundles=11
+phase=audit_prefix_done problem=1/1 t=1024 path=3 n_bundles=12
+phase=audit_prefix_done problem=1/1 t=2048 path=0 n_bundles=13
+phase=audit_prefix_done problem=1/1 t=2048 path=1 n_bundles=14
+phase=audit_prefix_done problem=1/1 t=2048 path=2 n_bundles=15
+phase=audit_prefix_done problem=1/1 t=2048 path=3 n_bundles=16
+phase=audit_prefix_done problem=1/1 t=4096 path=2 n_bundles=17
+phase=problem_completed worker=0 problem=36/36

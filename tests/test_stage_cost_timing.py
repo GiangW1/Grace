@@ -59,7 +59,9 @@ def test_stage_envelope_includes_setup_and_result_or_failure_persistence(
         spend(11, "generation")
         if stage == "batch_audit":
             return {"fixed_n": 1}
-        return [] if stage in {"eval", "audit_empty"} else [SimpleNamespace(t=1)]
+        return [] if stage in {"eval", "audit_empty"} else [
+            SimpleNamespace(t=1, continuation_records=[], functional_recoverable=None,
+                            answer_emitted=False)]
 
     write_json = RunDirectory.write_json
     append_jsonl = RunDirectory.append_jsonl
@@ -90,7 +92,7 @@ def test_stage_envelope_includes_setup_and_result_or_failure_persistence(
     monkeypatch.setattr(RunDirectory, "append_jsonl", measured_append)
     monkeypatch.setattr(generate, "_generate_eval_items", generation)
     monkeypatch.setattr(run, "generate_bundles_gpu", generation)
-    monkeypatch.setattr(run, "bundle_to_dict", lambda bundle: {"t": bundle.t})
+    monkeypatch.setattr(run, "_serialize_audit_bundles", lambda run, bundles: [{"t": b.t} for b in bundles])
     monkeypatch.setattr(run, "_audit_u", lambda *args: np.zeros((1, 1)))
     monkeypatch.setattr(run, "audit_bundles", lambda *args: {"n_bundles": 1})
     monkeypatch.setattr(batch_audit, "generate_bundles_gpu",

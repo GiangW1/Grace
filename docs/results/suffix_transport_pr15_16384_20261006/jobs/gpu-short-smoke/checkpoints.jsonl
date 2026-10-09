@@ -1,0 +1,1 @@
+{"path": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/jobs/gpu-short-smoke/checkpoints/step-0.npz", "step": 0, "wall_seconds": 43.02980104740709, "reserved_gpu_seconds": 86.05960209481418, "scope": "actor initialization/evaluation; no ST resume entry point"}
