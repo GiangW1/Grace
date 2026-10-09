@@ -258,6 +258,11 @@ def position_grams(rows, sources, metric_file=None, cache_dir=None, block_mb=102
         grams[t] = gram
         if log is not None:
             log(f"gram t={t}: computed from {len(members)} prefixes")
+        del vectors
+    # Close the memmaps: callers keep ``sources``, and an open map blocks the
+    # documented delete-after-each-position workflow on Windows.
+    for source in sources:
+        source["arrays"] = None
     return grams
 
 

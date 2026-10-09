@@ -25,7 +25,7 @@ from grace_gc.trainer.algorithm import TrainState, run_algorithm1_step
 from grace_gc.trainer.grace_step import next_start_count
 from grace_gc.trainer.baseline import baseline_from_config
 from grace_gc.trainer.cpu_tiny import TinyLoRAActor, TinyTrainConfig, run_tiny_batch
-from grace_gc.trainer.methods import apply_method_defaults, method_spec, start_group_size
+from grace_gc.trainer.methods import apply_method_defaults, dynamic_sampling_prompts, method_spec, start_group_size
 from grace_gc.trainer.state_io import restore_train_state
 from grace_gc.trainer.cost_control import cost_start_counts, ensure_cost_control, observe_batch_cost, restore_cost_control, start_cost_control, start_count_mode
 from grace_gc.trainer.tiny_engine import make_tiny_engines
@@ -213,6 +213,7 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
     controller.record(run, "setup_complete", state=state, cfg=cfg)
     last = {}
     completed, allocation_steps = 0, 0
+    clipped_steps = 0
     for _ in range(steps):
         if controller.stop_reason():
             break
@@ -221,7 +222,7 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
         elif start_count_mode(cfg) != "fixed" and last.get("next_n"):
             n_prompts, starts_per, n_start = resolve_start_counts(cfg, spec, n_start=max(1, int(last["next_n"])))
         step_timer = Timer()
-        batch = sample_starts(train_recs, n_prompts, starts_per, state.rng)
+        batch = sample_starts(train_recs, dynamic_sampling_prompts(cfg, spec, n_prompts), starts_per, state.rng)
         prompt_meta: list = []
         prompts, pids, golds = encode_records_tiny(
             batch, actor.vocab, int(cfg.get("prompt_max_tokens", 1024)), prompt_meta=prompt_meta
@@ -247,6 +248,7 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
         controller.record(run, "batch_complete", state=state, cfg=cfg)
         completed += 1
         allocation_steps += int(bool(last.get("allocation_ready")))
+        clipped_steps += int(bool(last.get("clip_triggered")))
         print(
             f"step {state.step} n={last['n']} completed={last['n_completed']} "
             f"audited={last['n_audited']} loss={last['loss']}"
@@ -268,6 +270,8 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
         "cost_control": cost,
         "allocation_ready_last_batch": bool(last.get("allocation_ready", False)),
         "allocation_ready_steps_this_session": allocation_steps,
+        # An always-clipped run is normalized-gradient Adam; report it, do not hide it.
+        "clip_trigger_rate_this_session": (clipped_steps / completed) if completed else None,
         "post_warmup_steps": state.step if state.offline_predictor else max(0, state.step - int((cfg.get("predictor") or {}).get("warmup_steps", 0))),
         "step": state.step,
         "actor_moved": True,

@@ -268,7 +268,7 @@ def _bundles_from_engines(
         explicit = None if baseline_fn is None else baseline_fn(rec.problem_id)
         if explicit is not None:
             b_grad, baseline_source = float(explicit), "explicit_audit_baseline"
-        elif baseline_policy is not None and not baseline_policy.uses_prescan:
+        elif baseline_policy is not None and baseline_policy.mode == "fixed":
             b_grad, baseline_source = baseline_policy.get(rec.problem_id), "configured_fixed_baseline"
         else:
             b_grad = _independent_pass_rate(engines, rec, encode_fn, n_cont if n_baseline is None else n_baseline,

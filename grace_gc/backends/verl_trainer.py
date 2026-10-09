@@ -357,18 +357,20 @@ def _train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None,
     rng = IsolatedRNG.create(int(cfg.get("seed", 17)))
     n_prompts, starts_per, n_start = resolve_start_counts(cfg, spec)
 
+    from grace_gc.trainer.methods import dynamic_sampling_prompts
+
     def _batch_ids(draw_rng):
         meta: list = []
         if packed is not None:
             pr, pi, go = [], [], []
-            for i in sample_prompt_indices(len(packed), n_prompts, draw_rng):
+            for i in sample_prompt_indices(len(packed), dynamic_sampling_prompts(cfg, spec, n_prompts), draw_rng):
                 i = int(i)
                 for _j in range(starts_per):
                     pr.append(packed[i][0])
                     pi.append(packed[i][1])
                     go.append(packed[i][2])
             return pr, pi, go, meta
-        batch = sample_starts(train_recs, n_prompts, starts_per, draw_rng)
+        batch = sample_starts(train_recs, dynamic_sampling_prompts(cfg, spec, n_prompts), starts_per, draw_rng)
         pr, pi, go = encode_records_hf(
             batch, tokenizer, int(cfg.get("prompt_max_tokens", 1024)), prompt_meta=meta,
             enable_thinking=bool(cfg.get("enable_thinking", False)),
@@ -458,6 +460,7 @@ def _train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None,
     controller.record(run, "setup_complete", state=state, cfg=cfg)
     last = {}
     steps, completed, allocation_steps = int(cfg.get("num_steps", 1)), 0, 0
+    clipped_steps = 0
     checkpoint_extra = {"model_path": str(model_path), "lora": dict(cfg.get("lora") or {})}
     for _step in range(steps):
         if controller.stop_reason():
@@ -503,6 +506,7 @@ def _train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None,
         controller.record(run, "batch_complete", state=state, cfg=cfg)
         completed += 1
         allocation_steps += int(bool(last.get("allocation_ready")))
+        clipped_steps += int(bool(last.get("clip_triggered")))
         print(
             f"step {state.step} n={last['n']} completed={last['n_completed']} "
             f"audited={last['n_audited']} loss={last['loss']} "
@@ -526,6 +530,8 @@ def _train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None,
         "cost_control": cost,
         "allocation_ready_last_batch": bool(last.get("allocation_ready", False)),
         "allocation_ready_steps_this_session": allocation_steps,
+        # An always-clipped run is normalized-gradient Adam; report it, do not hide it.
+        "clip_trigger_rate_this_session": (clipped_steps / completed) if completed else None,
         "post_warmup_steps": state.step if state.offline_predictor else max(0, state.step - int((cfg.get("predictor") or {}).get("warmup_steps", 0))),
         "step": state.step,
         "status": "gpu_loop_ran",

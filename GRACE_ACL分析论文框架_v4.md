@@ -89,3 +89,8 @@ python scripts/analyze_synchrony.py --replay-dir runs/analysis-replay-s50-t{128,
 - `grace_gc/audit/run.py`：`audit.tokens_only`、`audit.skip_settled_problems`。
 - `configs/experiments/analysis_snapshot_train.yaml`、`analysis_audit.yaml`。
 - 同轮修复（影响旧训练路径）：截断回答一律 R=0（奖励协议 v4）；HT 基线截断到 [0,1]；token 记账按实际后缀；自锚定墙钟目标不再把 N 压到配置值以下。
+- 第二轮修复：答案抽取只认行首 `Answer:` 与最后一行的 "answer is"（同属协议 v4）；GRPO 动态采样
+  （`dynamic_sampling`，快照训练默认开启）；`baseline.mode: loo` 留一基线，免去 Full-PG/GRACE 的 prescan；
+  快照训练 `grad_clip: 50` 只截尖峰，汇总报告 `clip_trigger_rate_this_session`；单标签题的基底中心化修正。
+- 未在代码里解决：同一 actor 同 seed 的 vLLM 评测仍有约 2pp 波动（批处理/内核不确定性），论文需说明，
+  可用 `scripts/check_eval_repeatability.py` 实测；设显式共享墙钟目标时控制器仍可能缩小 N，分析论文用固定 N 不受影响。

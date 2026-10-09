@@ -698,9 +698,9 @@ def test_lora_and_baseline_health_fields():
 
 def test_reasoning_reward_ignores_open_think_and_truncation():
     assert rule_reward("<think>\\boxed{27}", "27") == 0.0
-    assert rule_reward("<think>\\boxed{27}</think>\\nAnswer: 27", "27") == 1.0
+    assert rule_reward("<think>\\boxed{27}</think>\nAnswer: 27", "27") == 1.0
     assert extract_answer("<think>\\boxed{27}") is None
-    assert extract_answer("<think>\\boxed{27}</think>\\nAnswer: 27") == "27"
+    assert extract_answer("<think>\\boxed{27}</think>\nAnswer: 27") == "27"
     assert rule_reward("Answer: 27", "27", truncated=True, require_complete=True) == 0.0
     assert score_prefilled_answer(" 27", "27") == 1.0
     assert score_prefilled_answer("Answer: 27", "27") == 1.0

@@ -83,7 +83,8 @@ class ExpectedGainExperimentTest(unittest.TestCase):
                         "continuation_records": [{"token_ids": [1, 2], "prompt_len": 1,
                                                   "reward": 1., "baseline": 0.}]})
             summary = replay_means([row], lambda *_: np.array([2.]), 1, tmp)
-            info, _ = load_replay(tmp)
+            info, means = load_replay(tmp)
+            del means  # load_replay returns a memmap; Windows cannot delete a mapped file
             self.assertEqual(info[0]["replay_errors"]["0"]["norm_relative_error"], 3.)
             self.assertEqual(summary["max_norm_relative_error"], 3.)
             self.assertNotIn("replay_numerical_tolerance", summary)

@@ -15,12 +15,19 @@ save_initial_checkpoint: true
 checkpoint_every: 50  # snapshots at steps 0, 50, 100, 150
 cost_control:
   mode: fixed         # a wall-time target would resize N and confound the snapshots
+dynamic_sampling:     # DAPO: Sept training had 50-65% zero-advantage starts
+  enabled: true
+  oversample: 2.0     # draw 32 prompts, keep up to 16 groups with mixed rewards
+optim:
+  log_update_geometry: true
+  # Token-sum loss: pre-clip norms were 15-437 at N=4, so clip 1.0 clipped every
+  # step. 50 is meant to catch spikes only; recalibrate from the smoke run's
+  # grad_norm_preclip and check clip_trigger_rate_this_session in summary.json.
+  grad_clip: 50.0
 lora:
   compute_dtype: bfloat16
 vllm:
   lora_dtype: bfloat16
-optim:
-  log_update_geometry: true
 eval:
   selection: seeded
   selection_seed: 20260918

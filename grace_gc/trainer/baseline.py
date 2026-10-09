@@ -1,4 +1,4 @@
-"""History-only EMA or explicit fixed baseline. Frozen inside a batch."""
+"""History EMA, explicit fixed, or leave-one-out baseline. Frozen inside a batch."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ class HistoricalBaseline:
                  prescan_prior_strength: float = 0.0, prescan_prior_mean: float = 0.5):
         if not (0.0 < alpha <= 1.0):
             raise ValueError(f"alpha must be in (0, 1], got {alpha}")
-        if mode not in {"ema", "fixed"}:
+        if mode not in {"ema", "fixed", "loo"}:
             raise ValueError(f"unknown baseline mode: {mode}")
         if not math.isfinite(fixed_value):
             raise ValueError("fixed baseline must be finite")
@@ -27,6 +27,8 @@ class HistoricalBaseline:
 
     @property
     def uses_prescan(self) -> bool:
+        # "loo" takes b_i from the other starts of the same batch group, so no
+        # discarded prescan samples are paid; get() is only its history fallback.
         return self.mode == "ema"
 
     def get(self, problem_id: str, default: float = 0.5) -> float:

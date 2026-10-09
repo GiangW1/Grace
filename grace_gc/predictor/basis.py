@@ -135,11 +135,21 @@ def refresh_basis(
         if pids.shape[0] != g.shape[0]:
             raise ValueError("problem_ids length does not match grads")
         centered = np.zeros_like(g)
+        singletons = np.zeros(g.shape[0], dtype=bool)
         for pid in np.unique(pids):
             mask = pids == pid
-            if np.any(w[mask] > 0):
+            if int(np.count_nonzero(w[mask] > 0)) < 2:
+                # Subtracting a one-label problem mean zeroes the label; with ~1
+                # audited label per problem most rows vanished. Center these by
+                # the global mean of singleton labels instead.
+                singletons |= mask
+            elif np.any(w[mask] > 0):
                 diffs = g[mask] - g[mask][0]
                 centered[mask] = diffs - np.average(diffs, axis=0, weights=w[mask])
+        if np.any(singletons & (w > 0)):
+            rows = g[singletons]
+            diffs = rows - rows[0]
+            centered[singletons] = diffs - np.average(diffs, axis=0, weights=w[singletons])
     centered *= np.sqrt(w)[:, None]
     if solver == "randomized":
         u, rank = randomized_svd(centered, k=k, oversample=oversample, seed=seed)

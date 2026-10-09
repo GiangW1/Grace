@@ -10,9 +10,24 @@ import subprocess
 import sys
 
 
-FINAL = re.compile(r"(?:final\s+answer|answer)\s*(?:is\s+|[:=]\s*)(?:\n\s*)?([^\n]+)", re.I)
+# "Answer: X" counts only at the start of a line (the DAPO format); "the answer
+# is X" counts only on the last non-empty line. v3 took the last "answer is ..."
+# anywhere, so mid-reasoning text such as "the answer is not 3" became the answer.
+FINAL_LINE = re.compile(r"^[ \t]*(?:\*\*)?(?:final\s+answer|answer)[ \t]*[:=][ \t]*(?:\*\*)?[ \t]*"
+                        r"(?:\n[ \t]*)?([^\n]+)", re.I | re.M)
+FINAL_PHRASE = re.compile(r"(?:final\s+answer|answer)\s+is\s*:?[ \t]*([^\n]+)", re.I)
+
+
+def _final_matches(text: str) -> list:
+    """Final-answer matches in position order (line form anywhere, phrase on the last line)."""
+    last_line = text.rstrip().rfind("\n") + 1
+    matches = list(FINAL_LINE.finditer(text))
+    matches += [m for m in FINAL_PHRASE.finditer(text) if m.start() >= last_line]
+    return sorted(matches, key=lambda m: m.start())
+
+
 # v4: every length-truncated response scores 0, Base included (paper: no complete
-# answer by the cap means R=0). v3 still scored truncated Base text.
+# answer by the cap means R=0), and final-answer lines are matched as above.
 REWARD_PROTOCOL_VERSION = 4
 
 
@@ -73,7 +88,7 @@ def answer_already_emitted(text: str | None) -> bool:
     if not text:
         return False
     s = _answer_text(str(text))
-    finals = list(FINAL.finditer(s))
+    finals = _final_matches(s)
     if finals and not s[finals[-1].end() :].strip():
         return True
     end = _boxed_span_end(s)
@@ -106,8 +121,8 @@ def extract_answer(text: str) -> str | None:
         return None
     text = _answer_text(str(text))
     boxed = extract_boxed(text)
-    finals = list(FINAL.finditer(text))
-    last_final = finals[-1].group(1).strip() if finals else ""
+    finals = _final_matches(text)
+    last_final = finals[-1].group(1).strip().removesuffix(".").strip() if finals else ""
     if not last_final:
         last_final = None
     if boxed and last_final:
@@ -177,12 +192,23 @@ def text_gold_in_response(text: str, gold: str) -> bool:
 
 
 def first_parseable_index(tokens_text: list[str]) -> int | None:
-    acc = ""
-    for i, piece in enumerate(tokens_text):
-        acc += piece
-        if extract_answer(acc) is not None:
-            return i
-    return None
+    """First token index whose prefix text already parses (a logging field).
+
+    Binary search over prefixes: O(log n) parses instead of one per token. If
+    parseability is not monotone (an answer line later followed by text), the
+    result is a parseable index, not necessarily the earliest one.
+    """
+    pieces = list(tokens_text)
+    if not pieces or extract_answer("".join(pieces)) is None:
+        return None
+    lo, hi = 0, len(pieces) - 1
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if extract_answer("".join(pieces[:mid + 1])) is not None:
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo
 
 
 _VERIFY_WORKER = """import json, sys

@@ -2,6 +2,15 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
+## 审查遗留修复（2026-10-09，第二轮）
+
+- 本机全量 `949 tests: 945 passed, 4 skipped, 0 failed`（Windows Python 3.11）。上一轮的 5 个
+  Windows 失败已消除：`position_grams` 返回前释放 memmap；漂移测试在临时目录清理前释放 `load_replay` 的映射。
+- 新增回归（`tests/test_review_20261009.py`）：答案行必须在行首、"answer is" 只认最后一行；
+  `first_parseable_index` 改二分；GRPO 动态采样（多抽题、只保留奖励有差异的组、分母固定为 N_ref）；
+  留一基线在 HT 停止下与本条轨迹独立（精确枚举）且不付 prescan；单标签题不再被题级中心化抹成零；
+  运行汇总报告裁剪触发率。仍全部为合成 CPU 检查，GPU 未运行。
+
 ## 分析论文转向与审查修复（2026-10-09）
 
 - 分支 `integrate/all-open-prs`（master `0621817` + PR #12–#15）。本机全量：

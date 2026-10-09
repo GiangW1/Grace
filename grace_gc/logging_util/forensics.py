@@ -400,6 +400,8 @@ def step_metrics_row(state, last: dict[str, Any], ctx: dict[str, Any], wall_s: f
         "n": last.get("n"),
         "n_completed": last.get("n_completed"),
         "n_stopped": last.get("n_stopped", sum(1 for r in records if r.z < 1.0)),
+        "loss_denominator": last.get("loss_denominator"),
+        "dynamic_sampling": last.get("dynamic_sampling"),
         "n_audited": last.get("n_audited"),
         "audit_gradient_source": last.get("audit_gradient_source"),
         "predictor_frozen": bool(last.get("predictor_frozen", False)),
