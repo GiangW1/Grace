@@ -1,0 +1,24 @@
+{
+  "n_prefixes": 382,
+  "n_problems": 229,
+  "input_prefixes": 382,
+  "finished_input_prefixes": 0,
+  "dimension": 5898240,
+  "n_continuations": 6112,
+  "wall_seconds": 1178.5522708049975,
+  "max_norm_relative_error": 0.0,
+  "max_sketch_relative_error": 0.0,
+  "half_means": true,
+  "metric_name": "euclidean",
+  "metric_weights_sha256": "596ebc77c27e88ebf6449d6923d4dbbe7d12d50e77d29abd1ba9385fe294e7c6",
+  "directional_values": {
+    "path": "directional_values.npy",
+    "shape": [
+      382,
+      16
+    ],
+    "direction_sha256": "87114e957e62666b12c133ad794312ba7ebdf0bdb6a3f630cb8cd27092c4632b",
+    "prefix_keys_sha256": "c42e06d9e0a8c58256bc616e629cbc1105eb5ae579a0c9c3c4ab4f213e8d0132"
+  },
+  "note": "exact frozen-actor ascent gradients; prefix means stored in FP64"
+}

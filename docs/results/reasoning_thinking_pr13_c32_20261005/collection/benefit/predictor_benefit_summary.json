@@ -1,0 +1,4769 @@
+{
+  "status": "completed",
+  "finished_utc": "2026-10-04T23:02:50.691681+00:00",
+  "model": "Qwen/Qwen3-4B",
+  "enable_thinking": true,
+  "n_original_problems": 32,
+  "n_observed_problems": 32,
+  "n_prefixes": 128,
+  "lopo": [
+    {
+      "model": "independent_half_oracle",
+      "metric": "euclidean",
+      "selection": "all",
+      "evaluation": "fit_on_A_evaluate_on_B",
+      "n_prefixes": 128,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 0.9799037549686427,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 134210.1714474103,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 2762.204296875,
+          "token_cost_ratio": 0.36027084344347177,
+          "variance_cost_ratio": 1.7736188776978195,
+          "ratio_ci95": [
+            1.733235124153068,
+            1.8245200653372833
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 33552.54286185258,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 4601.5107421875,
+          "token_cost_ratio": 0.6001692771521698,
+          "variance_cost_ratio": 1.1887875927333795,
+          "ratio_ci95": [
+            1.1756014903878382,
+            1.203954178846015
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 8388.135715463144,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 6440.817187500001,
+          "token_cost_ratio": 0.8400677108608681,
+          "variance_cost_ratio": 1.0460426165105763,
+          "ratio_ci95": [
+            1.0419295745599664,
+            1.0507602254984811
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 0.0,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 7667.021484375,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "independent_half_oracle",
+      "metric": "euclidean",
+      "selection": "t=1024",
+      "evaluation": "fit_on_A_evaluate_on_B",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 0.991397874153929,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 36080.034781279,
+          "extra_variance": 143256.66423899453,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 2354.2058593750003,
+          "token_cost_ratio": 0.3067357489219682,
+          "variance_cost_ratio": 1.5246375735679707,
+          "ratio_ci95": [
+            1.4995907425171495,
+            1.5566497369676344
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 36080.034781279,
+          "extra_variance": 35814.16605974863,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 4349.5146484375,
+          "token_cost_ratio": 0.5667098430762301,
+          "variance_cost_ratio": 1.1292436807142523,
+          "ratio_ci95": [
+            1.119983337453949,
+            1.1404861429774162
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 36080.034781279,
+          "extra_variance": 8953.541514937158,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 6344.823437500001,
+          "token_cost_ratio": 0.8266839372304922,
+          "variance_cost_ratio": 1.0318319920091281,
+          "ratio_ci95": [
+            1.0287048354916397,
+            1.035468213527254
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 36080.034781279,
+          "extra_variance": 0.0,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 7675.029296875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "independent_half_oracle",
+      "metric": "euclidean",
+      "selection": "t=2048",
+      "evaluation": "fit_on_A_evaluate_on_B",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 0.967070921658178,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 125163.67865582611,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 3170.202734375,
+          "token_cost_ratio": 0.4139178842331148,
+          "variance_cost_ratio": 2.017964519580755,
+          "ratio_ci95": [
+            1.9540637572830626,
+            2.09289210727931
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 31290.919663956527,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 4853.5068359375,
+          "token_cost_ratio": 0.6336986776456968,
+          "variance_cost_ratio": 1.2476382236411019,
+          "ratio_ci95": [
+            1.2258957547001386,
+            1.2715999882258366
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 7822.729915989132,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 6536.8109375,
+          "token_cost_ratio": 0.8534794710582787,
+          "variance_cost_ratio": 1.0601963293467538,
+          "ratio_ci95": [
+            1.0533347253380978,
+            1.0675980278407418
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 0.0,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 7659.013671875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "independent_half_oracle",
+      "metric": "euclidean",
+      "selection": "strict_pre_answer_undecided",
+      "evaluation": "fit_on_A_evaluate_on_B",
+      "n_prefixes": 33,
+      "n_problems": 13,
+      "residual_ratio_to_zero": 0.9863333884990859,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 357606.9068065847,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 2494.692803030303,
+          "token_cost_ratio": 0.3495802614743702,
+          "variance_cost_ratio": 1.732082826571126,
+          "ratio_ci95": [
+            1.6506694642555348,
+            1.824915780938088
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 89401.72670164617,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 4235.277462121212,
+          "token_cost_ratio": 0.5934876634214814,
+          "variance_cost_ratio": 1.1802615086988084,
+          "ratio_ci95": [
+            1.1587892583108386,
+            1.2067396962296086
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 22350.431675411543,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 5975.862121212122,
+          "token_cost_ratio": 0.8373950653685927,
+          "variance_cost_ratio": 1.0443755776887087,
+          "ratio_ci95": [
+            1.0381142649801687,
+            1.0518539553061403
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 0.0,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 7136.251893939394,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/zero",
+      "metric": "euclidean",
+      "selection": "all",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 128,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 136962.60552823893,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 2762.204296875,
+          "token_cost_ratio": 0.36027084344347177,
+          "variance_cost_ratio": 1.8026043655755257,
+          "ratio_ci95": [
+            1.7759587094403888,
+            1.842148242958872
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 34240.65138205973,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 4601.5107421875,
+          "token_cost_ratio": 0.6001692771521698,
+          "variance_cost_ratio": 1.2008592047053563,
+          "ratio_ci95": [
+            1.1944240385922005,
+            1.210899023269513
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 8560.162845514933,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 6440.817187500001,
+          "token_cost_ratio": 0.8400677108608681,
+          "variance_cost_ratio": 1.0502668295042081,
+          "ratio_ci95": [
+            1.0486934071995058,
+            1.0528213676400568
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 0.0,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 7667.021484375,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/zero",
+      "metric": "euclidean",
+      "selection": "t=1024",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 36080.034781279,
+          "extra_variance": 144499.66857277305,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 2354.2058593750003,
+          "token_cost_ratio": 0.3067357489219682,
+          "variance_cost_ratio": 1.5352050208430668,
+          "ratio_ci95": [
+            1.5183662813421452,
+            1.5617201308642998
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 36080.034781279,
+          "extra_variance": 36124.91714319326,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 4349.5146484375,
+          "token_cost_ratio": 0.5667098430762301,
+          "variance_cost_ratio": 1.1341246543275607,
+          "ratio_ci95": [
+            1.130139127146683,
+            1.1409759699212068
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 36080.034781279,
+          "extra_variance": 9031.229285798316,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 6344.823437500001,
+          "token_cost_ratio": 0.8266839372304922,
+          "variance_cost_ratio": 1.0336120133610887,
+          "ratio_ci95": [
+            1.0326703271453388,
+            1.035379932245275
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 36080.034781279,
+          "extra_variance": 0.0,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 7675.029296875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/zero",
+      "metric": "euclidean",
+      "selection": "t=2048",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 129425.5424837048,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 3170.202734375,
+          "token_cost_ratio": 0.4139178842331148,
+          "variance_cost_ratio": 2.072582827438395,
+          "ratio_ci95": [
+            2.037500790923194,
+            2.12703776977202
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 32356.3856209262,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 4853.5068359375,
+          "token_cost_ratio": 0.6336986776456968,
+          "variance_cost_ratio": 1.268543064180161,
+          "ratio_ci95": [
+            1.2599574740792456,
+            1.2824531392981824
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 8089.09640523155,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 6536.8109375,
+          "token_cost_ratio": 0.8534794710582787,
+          "variance_cost_ratio": 1.0672351053751807,
+          "ratio_ci95": [
+            1.065141155658678,
+            1.0707652806326848
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 0.0,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 7659.013671875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/zero",
+      "metric": "euclidean",
+      "selection": "strict_pre_answer_undecided",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 33,
+      "n_problems": 13,
+      "residual_ratio_to_zero": 1.0,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 362561.89943114365,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 2494.692803030303,
+          "token_cost_ratio": 0.3495802614743702,
+          "variance_cost_ratio": 1.7512387485712386,
+          "ratio_ci95": [
+            1.6807293374142898,
+            1.832889681370685
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 90640.47485778591,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 4235.277462121212,
+          "token_cost_ratio": 0.5934876634214814,
+          "variance_cost_ratio": 1.1883918328628373,
+          "ratio_ci95": [
+            1.1715323338538395,
+            1.2091325385723366
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 22660.11871444648,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 5975.862121212122,
+          "token_cost_ratio": 0.8373950653685927,
+          "variance_cost_ratio": 1.0472434946457163,
+          "ratio_ci95": [
+            1.0431742872687844,
+            1.0524651536822596
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 0.0,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 7136.251893939394,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/constant",
+      "metric": "euclidean",
+      "selection": "all",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 128,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0017969024096216,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 137208.71396414065,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 2762.204296875,
+          "token_cost_ratio": 0.36027084344347177,
+          "variance_cost_ratio": 1.8051960981569226,
+          "ratio_ci95": [
+            1.7777255927806617,
+            1.8461103261796783
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 34302.17849103516,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 4601.5107421875,
+          "token_cost_ratio": 0.6001692771521698,
+          "variance_cost_ratio": 1.201938585883612,
+          "ratio_ci95": [
+            1.19511922920365,
+            1.212337166454601
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 8575.54462275879,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 6440.817187500001,
+          "token_cost_ratio": 0.8400677108608681,
+          "variance_cost_ratio": 1.0506445368069985,
+          "ratio_ci95": [
+            1.0489646895341234,
+            1.0533157600486112
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 0.0,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 7667.021484375,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/constant",
+      "metric": "euclidean",
+      "selection": "t=1024",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.001276532469255,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 36080.034781279,
+          "extra_variance": 144684.12709150277,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 2354.2058593750003,
+          "token_cost_ratio": 0.3067357489219682,
+          "variance_cost_ratio": 1.5367732017561562,
+          "ratio_ci95": [
+            1.5193742498518255,
+            1.5636598195438098
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 36080.034781279,
+          "extra_variance": 36171.03177287569,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 4349.5146484375,
+          "token_cost_ratio": 0.5667098430762301,
+          "variance_cost_ratio": 1.1348489777576594,
+          "ratio_ci95": [
+            1.1305665597627994,
+            1.1418873091107533
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 36080.034781279,
+          "extra_variance": 9042.757943218923,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 6344.823437500001,
+          "token_cost_ratio": 0.8266839372304922,
+          "variance_cost_ratio": 1.03387616376907,
+          "ratio_ci95": [
+            1.032849796525566,
+            1.035716997976035
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 36080.034781279,
+          "extra_variance": 0.0,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 7675.029296875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/constant",
+      "metric": "euclidean",
+      "selection": "t=2048",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0023778795681886,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 129733.30083677854,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 3170.202734375,
+          "token_cost_ratio": 0.4139178842331148,
+          "variance_cost_ratio": 2.0765269329173135,
+          "ratio_ci95": [
+            2.0401894810520407,
+            2.1331706944223723
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 32433.325209194634,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 4853.5068359375,
+          "token_cost_ratio": 0.6336986776456968,
+          "variance_cost_ratio": 1.2700526476758804,
+          "ratio_ci95": [
+            1.2611816472182842,
+            1.2846715863481777
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 8108.331302298659,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 6536.8109375,
+          "token_cost_ratio": 0.8534794710582787,
+          "variance_cost_ratio": 1.0677433905306082,
+          "ratio_ci95": [
+            1.0655598991626867,
+            1.07152039102192
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 0.0,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 7659.013671875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/constant",
+      "metric": "euclidean",
+      "selection": "strict_pre_answer_undecided",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 33,
+      "n_problems": 13,
+      "residual_ratio_to_zero": 1.0010062468427205,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 362926.726197737,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 2494.692803030303,
+          "token_cost_ratio": 0.3495802614743702,
+          "variance_cost_ratio": 1.752649162998452,
+          "ratio_ci95": [
+            1.6807276320145939,
+            1.8360528453288731
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 90731.68154943424,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 4235.277462121212,
+          "token_cost_ratio": 0.5934876634214814,
+          "variance_cost_ratio": 1.1889904533050588,
+          "ratio_ci95": [
+            1.1715565770638763,
+            1.2103337219073338
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 22682.92038735856,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 5975.862121212122,
+          "token_cost_ratio": 0.8373950653685927,
+          "variance_cost_ratio": 1.0474546539651262,
+          "ratio_ci95": [
+            1.0432198568696167,
+            1.0528694269486525
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 0.0,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 7136.251893939394,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/ridge_l2_1",
+      "metric": "euclidean",
+      "selection": "all",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 128,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0586095500877657,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 144989.92221709713,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 2762.204296875,
+          "token_cost_ratio": 0.36027084344347177,
+          "variance_cost_ratio": 1.8871388843841879,
+          "ratio_ci95": [
+            1.7951324173154355,
+            2.036856806729745
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 36247.48055427428,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 4601.5107421875,
+          "token_cost_ratio": 0.6001692771521698,
+          "variance_cost_ratio": 1.2360653711015013,
+          "ratio_ci95": [
+            1.201373662250743,
+            1.2968935227698286
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 9061.87013856857,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 6440.817187500001,
+          "token_cost_ratio": 0.8400677108608681,
+          "variance_cost_ratio": 1.062586505276739,
+          "ratio_ci95": [
+            1.0508759907580767,
+            1.084068282924907
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 0.0,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 7667.021484375,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/ridge_l2_1",
+      "metric": "euclidean",
+      "selection": "t=1024",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0960274420555356,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 36080.034781279,
+          "extra_variance": 158375.60212368914,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 2354.2058593750003,
+          "token_cost_ratio": 0.3067357489219682,
+          "variance_cost_ratio": 1.6531717826694765,
+          "ratio_ci95": [
+            1.5291982993995585,
+            1.9058232000714876
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 36080.034781279,
+          "extra_variance": 39593.900530922285,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 4349.5146484375,
+          "token_cost_ratio": 0.5667098430762301,
+          "variance_cost_ratio": 1.1886120472364505,
+          "ratio_ci95": [
+            1.134056831625345,
+            1.3046381816098782
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 36080.034781279,
+          "extra_variance": 9898.475132730571,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 6344.823437500001,
+          "token_cost_ratio": 0.8266839372304922,
+          "variance_cost_ratio": 1.0534827872013834,
+          "ratio_ci95": [
+            1.0338991549447234,
+            1.0955564236192465
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 36080.034781279,
+          "extra_variance": 0.0,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 7675.029296875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/ridge_l2_1",
+      "metric": "euclidean",
+      "selection": "t=2048",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0168336155676123,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 131604.24231050516,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 3170.202734375,
+          "token_cost_ratio": 0.4139178842331148,
+          "variance_cost_ratio": 2.100504155447788,
+          "ratio_ci95": [
+            2.0602594373090177,
+            2.161573258846399
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 32901.06057762629,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 4853.5068359375,
+          "token_cost_ratio": 0.6336986776456968,
+          "variance_cost_ratio": 1.2792297905283387,
+          "ratio_ci95": [
+            1.2681251412819206,
+            1.297530227910949
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 8225.265144406572,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 6536.8109375,
+          "token_cost_ratio": 0.8534794710582787,
+          "variance_cost_ratio": 1.0708333855486827,
+          "ratio_ci95": [
+            1.0677720049181028,
+            1.0760716860940438
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 0.0,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 7659.013671875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/ridge_l2_1",
+      "metric": "euclidean",
+      "selection": "strict_pre_answer_undecided",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 33,
+      "n_problems": 13,
+      "residual_ratio_to_zero": 1.0729202140841387,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 388999.99075641454,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 2494.692803030303,
+          "token_cost_ratio": 0.3495802614743702,
+          "variance_cost_ratio": 1.8534479855231918,
+          "ratio_ci95": [
+            1.7014054434761288,
+            2.097043661712143
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 97249.99768910363,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 4235.277462121212,
+          "token_cost_ratio": 0.5934876634214814,
+          "variance_cost_ratio": 1.2317723722580476,
+          "ratio_ci95": [
+            1.1770502694594154,
+            1.3283637056268267
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 24312.49942227591,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 5975.862121212122,
+          "token_cost_ratio": 0.8373950653685927,
+          "variance_cost_ratio": 1.0625456870338243,
+          "ratio_ci95": [
+            1.044695849904965,
+            1.0967981736804746
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 0.0,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 7136.251893939394,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/ridge_l2_10",
+      "metric": "euclidean",
+      "selection": "all",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 128,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0583996357297245,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 144961.17179968202,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 2762.204296875,
+          "token_cost_ratio": 0.36027084344347177,
+          "variance_cost_ratio": 1.8868361178688082,
+          "ratio_ci95": [
+            1.7950826498019539,
+            2.036081645798887
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 36240.292949920506,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 4601.5107421875,
+          "token_cost_ratio": 0.6001692771521698,
+          "variance_cost_ratio": 1.2359392776609774,
+          "ratio_ci95": [
+            1.2013477563181028,
+            1.2965116995802386
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 9060.073237480126,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 6440.817187500001,
+          "token_cost_ratio": 0.8400677108608681,
+          "variance_cost_ratio": 1.062542381463688,
+          "ratio_ci95": [
+            1.0508690277212414,
+            1.0839514355944442
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 0.0,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 7667.021484375,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/ridge_l2_10",
+      "metric": "euclidean",
+      "selection": "t=1024",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.095659104275074,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 36080.034781279,
+          "extra_variance": 158322.37743648962,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 2354.2058593750003,
+          "token_cost_ratio": 0.3067357489219682,
+          "variance_cost_ratio": 1.6527192910244919,
+          "ratio_ci95": [
+            1.5291654427876507,
+            1.9043255712894755
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 36080.034781279,
+          "extra_variance": 39580.594359122406,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 4349.5146484375,
+          "token_cost_ratio": 0.5667098430762301,
+          "variance_cost_ratio": 1.1884030469242735,
+          "ratio_ci95": [
+            1.1340463884655958,
+            1.3039958219861405
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 36080.034781279,
+          "extra_variance": 9895.148589780601,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 6344.823437500001,
+          "token_cost_ratio": 0.8266839372304922,
+          "variance_cost_ratio": 1.0534065677731062,
+          "ratio_ci95": [
+            1.0338968982539352,
+            1.0953154826341658
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 36080.034781279,
+          "extra_variance": 0.0,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 7675.029296875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/ridge_l2_10",
+      "metric": "euclidean",
+      "selection": "t=2048",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0168005761261802,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 131599.96616287445,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 3170.202734375,
+          "token_cost_ratio": 0.4139178842331148,
+          "variance_cost_ratio": 2.1004493540845415,
+          "ratio_ci95": [
+            2.060230922776141,
+            2.1615234386676323
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 32899.99154071861,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 4853.5068359375,
+          "token_cost_ratio": 0.6336986776456968,
+          "variance_cost_ratio": 1.2792088156244112,
+          "ratio_ci95": [
+            1.2681070763942484,
+            1.297512461300973
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 8224.997885179653,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 6536.8109375,
+          "token_cost_ratio": 0.8534794710582787,
+          "variance_cost_ratio": 1.070826323181922,
+          "ratio_ci95": [
+            1.0677663991082793,
+            1.076066033257906
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 0.0,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 7659.013671875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/ridge_l2_10",
+      "metric": "euclidean",
+      "selection": "strict_pre_answer_undecided",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 33,
+      "n_problems": 13,
+      "residual_ratio_to_zero": 1.0726453791508335,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 388900.3460809654,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 2494.692803030303,
+          "token_cost_ratio": 0.3495802614743702,
+          "variance_cost_ratio": 1.853062760806374,
+          "ratio_ci95": [
+            1.7014057004221397,
+            2.0960140396644027
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 97225.08652024136,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 4235.277462121212,
+          "token_cost_ratio": 0.5934876634214814,
+          "variance_cost_ratio": 1.2316088718103162,
+          "ratio_ci95": [
+            1.177047183383715,
+            1.3278636795375558
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 24306.27163006034,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 5975.862121212122,
+          "token_cost_ratio": 0.8373950653685927,
+          "variance_cost_ratio": 1.0624880133547598,
+          "ratio_ci95": [
+            1.0446953651124165,
+            1.0966016529656974
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 0.0,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 7136.251893939394,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/ridge_l2_100",
+      "metric": "euclidean",
+      "selection": "all",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 128,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0563672229134322,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 144682.8072448537,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 2762.204296875,
+          "token_cost_ratio": 0.36027084344347177,
+          "variance_cost_ratio": 1.8839047007330596,
+          "ratio_ci95": [
+            1.7946231264678383,
+            2.0282039684214297
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 36170.701811213425,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 4601.5107421875,
+          "token_cost_ratio": 0.6001692771521698,
+          "variance_cost_ratio": 1.2347184277536005,
+          "ratio_ci95": [
+            1.2010959085277553,
+            1.2928170575201414
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 9042.675452803356,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 6440.817187500001,
+          "token_cost_ratio": 0.8400677108608681,
+          "variance_cost_ratio": 1.0621151700809843,
+          "ratio_ci95": [
+            1.050810425282691,
+            1.0826943394173223
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 0.0,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 7667.021484375,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/ridge_l2_100",
+      "metric": "euclidean",
+      "selection": "t=1024",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0920952471145313,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 36080.034781279,
+          "extra_variance": 157807.40125795046,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 2354.2058593750003,
+          "token_cost_ratio": 0.3067357489219682,
+          "variance_cost_ratio": 1.648341202013249,
+          "ratio_ci95": [
+            1.5289193305098396,
+            1.8898371143198354
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 36080.034781279,
+          "extra_variance": 39451.850314487616,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 4349.5146484375,
+          "token_cost_ratio": 0.5667098430762301,
+          "variance_cost_ratio": 1.186380861586197,
+          "ratio_ci95": [
+            1.1339458277979058,
+            1.2977814934952272
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 36080.034781279,
+          "extra_variance": 9862.962578621904,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 6344.823437500001,
+          "token_cost_ratio": 0.8266839372304922,
+          "variance_cost_ratio": 1.0526691056672708,
+          "ratio_ci95": [
+            1.0338749371434466,
+            1.0929847295076618
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 36080.034781279,
+          "extra_variance": 0.0,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 7675.029296875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/ridge_l2_100",
+      "metric": "euclidean",
+      "selection": "t=2048",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0164779741859735,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 131558.2132317569,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 3170.202734375,
+          "token_cost_ratio": 0.4139178842331148,
+          "variance_cost_ratio": 2.099914265555711,
+          "ratio_ci95": [
+            2.0598934470324273,
+            2.161030048958964
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 32889.553307939226,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 4853.5068359375,
+          "token_cost_ratio": 0.6336986776456968,
+          "variance_cost_ratio": 1.2790040135935858,
+          "ratio_ci95": [
+            1.2679598974835822,
+            1.297258756629773
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 8222.388326984807,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 6536.8109375,
+          "token_cost_ratio": 0.8534794710582787,
+          "variance_cost_ratio": 1.0707573651995612,
+          "ratio_ci95": [
+            1.067712686943111,
+            1.0760099261448908
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 0.0,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 7659.013671875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/ridge_l2_100",
+      "metric": "euclidean",
+      "selection": "strict_pre_answer_undecided",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 33,
+      "n_problems": 13,
+      "residual_ratio_to_zero": 1.0699859233933642,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 387936.1287500842,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 2494.692803030303,
+          "token_cost_ratio": 0.3495802614743702,
+          "variance_cost_ratio": 1.8493351120728583,
+          "ratio_ci95": [
+            1.7014069483068264,
+            2.0852943414722787
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 96984.03218752105,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 4235.277462121212,
+          "token_cost_ratio": 0.5934876634214814,
+          "variance_cost_ratio": 1.2300267504917528,
+          "ratio_ci95": [
+            1.1770171345635692,
+            1.323026326706864
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 24246.008046880263,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 5975.862121212122,
+          "token_cost_ratio": 0.8373950653685927,
+          "variance_cost_ratio": 1.061929930741323,
+          "ratio_ci95": [
+            1.0446906733027927,
+            1.0947007779674731
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 0.0,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 7136.251893939394,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/mlp64",
+      "metric": "euclidean",
+      "selection": "all",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 128,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.105952645838829,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 151474.15596493566,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 2762.204296875,
+          "token_cost_ratio": 0.36027084344347177,
+          "variance_cost_ratio": 1.9554234184274542,
+          "ratio_ci95": [
+            1.816802838327461,
+            2.1979294839694807
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 37868.538991233916,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 4601.5107421875,
+          "token_cost_ratio": 0.6001692771521698,
+          "variance_cost_ratio": 1.264503891858351,
+          "ratio_ci95": [
+            1.20939144568214,
+            1.3659510082663906
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 9467.134747808479,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 6440.817187500001,
+          "token_cost_ratio": 0.8400677108608681,
+          "variance_cost_ratio": 1.0725379822774597,
+          "ratio_ci95": [
+            1.0535346018853755,
+            1.1083335526674976
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 0.0,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 7667.021484375,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/mlp64",
+      "metric": "euclidean",
+      "selection": "t=1024",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.162585326875972,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 36080.034781279,
+          "extra_variance": 167993.19442114697,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 2354.2058593750003,
+          "token_cost_ratio": 0.3067357489219682,
+          "variance_cost_ratio": 1.7349360989754463,
+          "ratio_ci95": [
+            1.5439945137016573,
+            2.1410426074080697
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 36080.034781279,
+          "extra_variance": 41998.29860528674,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 4349.5146484375,
+          "token_cost_ratio": 0.5667098430762301,
+          "variance_cost_ratio": 1.2263779768891263,
+          "ratio_ci95": [
+            1.140383766734755,
+            1.4126770008507608
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 36080.034781279,
+          "extra_variance": 10499.574651321685,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 6344.823437500001,
+          "token_cost_ratio": 0.8266839372304922,
+          "variance_cost_ratio": 1.067255482258598,
+          "ratio_ci95": [
+            1.0360288329152811,
+            1.134942823292586
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 36080.034781279,
+          "extra_variance": 0.0,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 7675.029296875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/mlp64",
+      "metric": "euclidean",
+      "selection": "t=2048",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0427239856901953,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 134955.11750872436,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 3170.202734375,
+          "token_cost_ratio": 0.4139178842331148,
+          "variance_cost_ratio": 2.1434476047367257,
+          "ratio_ci95": [
+            2.091367694590814,
+            2.222139000815568
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 33738.77937718109,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 4853.5068359375,
+          "token_cost_ratio": 0.6336986776456968,
+          "variance_cost_ratio": 1.2956661466659602,
+          "ratio_ci95": [
+            1.2789255333298903,
+            1.3237634458572483
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 8434.694844295273,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 6536.8109375,
+          "token_cost_ratio": 0.8534794710582787,
+          "variance_cost_ratio": 1.076367598036935,
+          "ratio_ci95": [
+            1.0711112099207372,
+            1.085533742540969
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 0.0,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 7659.013671875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/mlp64",
+      "metric": "euclidean",
+      "selection": "strict_pre_answer_undecided",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 33,
+      "n_problems": 13,
+      "residual_ratio_to_zero": 1.1205259233055858,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 406260.00711550907,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 2494.692803030303,
+          "token_cost_ratio": 0.3495802614743702,
+          "variance_cost_ratio": 1.9201749318876984,
+          "ratio_ci95": [
+            1.7133258052888831,
+            2.285287041414696
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 101565.00177887727,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 4235.277462121212,
+          "token_cost_ratio": 0.5934876634214814,
+          "variance_cost_ratio": 1.2600932071630992,
+          "ratio_ci95": [
+            1.182039596421939,
+            1.4157397823981162
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 25391.250444719317,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 5975.862121212122,
+          "token_cost_ratio": 0.8373950653685927,
+          "variance_cost_ratio": 1.0725356703385684,
+          "ratio_ci95": [
+            1.04620327588384,
+            1.127213543565765
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 0.0,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 7136.251893939394,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/mlp256",
+      "metric": "euclidean",
+      "selection": "all",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 128,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.1168075521517258,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 152960.87221631498,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 2762.204296875,
+          "token_cost_ratio": 0.36027084344347177,
+          "variance_cost_ratio": 1.9710798136821486,
+          "ratio_ci95": [
+            1.835505514160572,
+            2.19441546112292
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 38240.218054078745,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 4601.5107421875,
+          "token_cost_ratio": 0.6001692771521698,
+          "variance_cost_ratio": 1.271024324745042,
+          "ratio_ci95": [
+            1.2176047247138027,
+            1.3661951543159365
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 9560.054513519686,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 6440.817187500001,
+          "token_cost_ratio": 0.8400677108608681,
+          "variance_cost_ratio": 1.0748196740173868,
+          "ratio_ci95": [
+            1.0562455335441656,
+            1.1082290670474868
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 0.0,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 7667.021484375,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/mlp256",
+      "metric": "euclidean",
+      "selection": "t=1024",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.164088292843036,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 36080.034781279,
+          "extra_variance": 168210.3725052639,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 2354.2058593750003,
+          "token_cost_ratio": 0.3067357489219682,
+          "variance_cost_ratio": 1.7367824464827277,
+          "ratio_ci95": [
+            1.5570545262396556,
+            2.1083239110516456
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 36080.034781279,
+          "extra_variance": 42052.59312631597,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 4349.5146484375,
+          "token_cost_ratio": 0.5667098430762301,
+          "variance_cost_ratio": 1.2272307820396453,
+          "ratio_ci95": [
+            1.1457614631195685,
+            1.4008005276925326
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 36080.034781279,
+          "extra_variance": 10513.148281578993,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 6344.823437500001,
+          "token_cost_ratio": 0.8266839372304922,
+          "variance_cost_ratio": 1.0675664881146523,
+          "ratio_ci95": [
+            1.0378703461630292,
+            1.131122983372152
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 36080.034781279,
+          "extra_variance": 0.0,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 7675.029296875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/mlp256",
+      "metric": "euclidean",
+      "selection": "t=2048",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.064020048011037,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 137711.37192736607,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 3170.202734375,
+          "token_cost_ratio": 0.4139178842331148,
+          "variance_cost_ratio": 2.178770636736621,
+          "ratio_ci95": [
+            2.1136852181486114,
+            2.2796794843174846
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 34427.84298184152,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 4853.5068359375,
+          "token_cost_ratio": 0.6336986776456968,
+          "variance_cost_ratio": 1.3091858322856347,
+          "ratio_ci95": [
+            1.2871155746189362,
+            1.3440270508728966
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 8606.96074546038,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 6536.8109375,
+          "token_cost_ratio": 0.8534794710582787,
+          "variance_cost_ratio": 1.0809197513467785,
+          "ratio_ci95": [
+            1.0740194496760957,
+            1.0922091486190983
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 0.0,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 7659.013671875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "legacy/mlp256",
+      "metric": "euclidean",
+      "selection": "strict_pre_answer_undecided",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 33,
+      "n_problems": 13,
+      "residual_ratio_to_zero": 1.1106640923684685,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 402684.4829590791,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 2494.692803030303,
+          "token_cost_ratio": 0.3495802614743702,
+          "variance_cost_ratio": 1.906352012856374,
+          "ratio_ci95": [
+            1.7139760759325762,
+            2.245451762290725
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 100671.12073976977,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 4235.277462121212,
+          "token_cost_ratio": 0.5934876634214814,
+          "variance_cost_ratio": 1.2542263628202825,
+          "ratio_ci95": [
+            1.1815817258697001,
+            1.3952846420644627
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 25167.780184942443,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 5975.862121212122,
+          "token_cost_ratio": 0.8373950653685927,
+          "variance_cost_ratio": 1.070466180606618,
+          "ratio_ci95": [
+            1.0461370413206246,
+            1.1199995494738046
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 0.0,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 7136.251893939394,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/zero",
+      "metric": "euclidean",
+      "selection": "all",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 128,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 136962.60552823893,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 2762.204296875,
+          "token_cost_ratio": 0.36027084344347177,
+          "variance_cost_ratio": 1.8026043655755257,
+          "ratio_ci95": [
+            1.7759587094403888,
+            1.842148242958872
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 34240.65138205973,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 4601.5107421875,
+          "token_cost_ratio": 0.6001692771521698,
+          "variance_cost_ratio": 1.2008592047053563,
+          "ratio_ci95": [
+            1.1944240385922005,
+            1.210899023269513
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 8560.162845514933,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 6440.817187500001,
+          "token_cost_ratio": 0.8400677108608681,
+          "variance_cost_ratio": 1.0502668295042081,
+          "ratio_ci95": [
+            1.0486934071995058,
+            1.0528213676400568
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 0.0,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 7667.021484375,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/zero",
+      "metric": "euclidean",
+      "selection": "t=1024",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 36080.034781279,
+          "extra_variance": 144499.66857277305,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 2354.2058593750003,
+          "token_cost_ratio": 0.3067357489219682,
+          "variance_cost_ratio": 1.5352050208430668,
+          "ratio_ci95": [
+            1.5183662813421452,
+            1.5617201308642998
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 36080.034781279,
+          "extra_variance": 36124.91714319326,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 4349.5146484375,
+          "token_cost_ratio": 0.5667098430762301,
+          "variance_cost_ratio": 1.1341246543275607,
+          "ratio_ci95": [
+            1.130139127146683,
+            1.1409759699212068
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 36080.034781279,
+          "extra_variance": 9031.229285798316,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 6344.823437500001,
+          "token_cost_ratio": 0.8266839372304922,
+          "variance_cost_ratio": 1.0336120133610887,
+          "ratio_ci95": [
+            1.0326703271453388,
+            1.035379932245275
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 36080.034781279,
+          "extra_variance": 0.0,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 7675.029296875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/zero",
+      "metric": "euclidean",
+      "selection": "t=2048",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 129425.5424837048,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 3170.202734375,
+          "token_cost_ratio": 0.4139178842331148,
+          "variance_cost_ratio": 2.072582827438395,
+          "ratio_ci95": [
+            2.037500790923194,
+            2.12703776977202
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 32356.3856209262,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 4853.5068359375,
+          "token_cost_ratio": 0.6336986776456968,
+          "variance_cost_ratio": 1.268543064180161,
+          "ratio_ci95": [
+            1.2599574740792456,
+            1.2824531392981824
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 8089.09640523155,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 6536.8109375,
+          "token_cost_ratio": 0.8534794710582787,
+          "variance_cost_ratio": 1.0672351053751807,
+          "ratio_ci95": [
+            1.065141155658678,
+            1.0707652806326848
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 0.0,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 7659.013671875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/zero",
+      "metric": "euclidean",
+      "selection": "strict_pre_answer_undecided",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 33,
+      "n_problems": 13,
+      "residual_ratio_to_zero": 1.0,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 362561.89943114365,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 2494.692803030303,
+          "token_cost_ratio": 0.3495802614743702,
+          "variance_cost_ratio": 1.7512387485712386,
+          "ratio_ci95": [
+            1.6807293374142898,
+            1.832889681370685
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 90640.47485778591,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 4235.277462121212,
+          "token_cost_ratio": 0.5934876634214814,
+          "variance_cost_ratio": 1.1883918328628373,
+          "ratio_ci95": [
+            1.1715323338538395,
+            1.2091325385723366
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 22660.11871444648,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 5975.862121212122,
+          "token_cost_ratio": 0.8373950653685927,
+          "variance_cost_ratio": 1.0472434946457163,
+          "ratio_ci95": [
+            1.0431742872687844,
+            1.0524651536822596
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 0.0,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 7136.251893939394,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/constant",
+      "metric": "euclidean",
+      "selection": "all",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 128,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0017969024096216,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 137208.71396414065,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 2762.204296875,
+          "token_cost_ratio": 0.36027084344347177,
+          "variance_cost_ratio": 1.8051960981569226,
+          "ratio_ci95": [
+            1.7777255927806617,
+            1.8461103261796783
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 34302.17849103516,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 4601.5107421875,
+          "token_cost_ratio": 0.6001692771521698,
+          "variance_cost_ratio": 1.201938585883612,
+          "ratio_ci95": [
+            1.19511922920365,
+            1.212337166454601
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 8575.54462275879,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 6440.817187500001,
+          "token_cost_ratio": 0.8400677108608681,
+          "variance_cost_ratio": 1.0506445368069985,
+          "ratio_ci95": [
+            1.0489646895341234,
+            1.0533157600486112
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 0.0,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 7667.021484375,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/constant",
+      "metric": "euclidean",
+      "selection": "t=1024",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.001276532469255,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 36080.034781279,
+          "extra_variance": 144684.12709150277,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 2354.2058593750003,
+          "token_cost_ratio": 0.3067357489219682,
+          "variance_cost_ratio": 1.5367732017561562,
+          "ratio_ci95": [
+            1.5193742498518255,
+            1.5636598195438098
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 36080.034781279,
+          "extra_variance": 36171.03177287569,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 4349.5146484375,
+          "token_cost_ratio": 0.5667098430762301,
+          "variance_cost_ratio": 1.1348489777576594,
+          "ratio_ci95": [
+            1.1305665597627994,
+            1.1418873091107533
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 36080.034781279,
+          "extra_variance": 9042.757943218923,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 6344.823437500001,
+          "token_cost_ratio": 0.8266839372304922,
+          "variance_cost_ratio": 1.03387616376907,
+          "ratio_ci95": [
+            1.032849796525566,
+            1.035716997976035
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 36080.034781279,
+          "extra_variance": 0.0,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 7675.029296875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/constant",
+      "metric": "euclidean",
+      "selection": "t=2048",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0023778795681886,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 129733.30083677854,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 3170.202734375,
+          "token_cost_ratio": 0.4139178842331148,
+          "variance_cost_ratio": 2.0765269329173135,
+          "ratio_ci95": [
+            2.0401894810520407,
+            2.1331706944223723
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 32433.325209194634,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 4853.5068359375,
+          "token_cost_ratio": 0.6336986776456968,
+          "variance_cost_ratio": 1.2700526476758804,
+          "ratio_ci95": [
+            1.2611816472182842,
+            1.2846715863481777
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 8108.331302298659,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 6536.8109375,
+          "token_cost_ratio": 0.8534794710582787,
+          "variance_cost_ratio": 1.0677433905306082,
+          "ratio_ci95": [
+            1.0655598991626867,
+            1.07152039102192
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 0.0,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 7659.013671875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/constant",
+      "metric": "euclidean",
+      "selection": "strict_pre_answer_undecided",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 33,
+      "n_problems": 13,
+      "residual_ratio_to_zero": 1.0010062468427205,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 362926.726197737,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 2494.692803030303,
+          "token_cost_ratio": 0.3495802614743702,
+          "variance_cost_ratio": 1.752649162998452,
+          "ratio_ci95": [
+            1.6807276320145939,
+            1.8360528453288731
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 90731.68154943424,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 4235.277462121212,
+          "token_cost_ratio": 0.5934876634214814,
+          "variance_cost_ratio": 1.1889904533050588,
+          "ratio_ci95": [
+            1.1715565770638763,
+            1.2103337219073338
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 22682.92038735856,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 5975.862121212122,
+          "token_cost_ratio": 0.8373950653685927,
+          "variance_cost_ratio": 1.0474546539651262,
+          "ratio_ci95": [
+            1.0432198568696167,
+            1.0528694269486525
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 0.0,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 7136.251893939394,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/ridge_l2_1",
+      "metric": "euclidean",
+      "selection": "all",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 128,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0035771282826287,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 137452.5383381365,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 2762.204296875,
+          "token_cost_ratio": 0.36027084344347177,
+          "variance_cost_ratio": 1.8077637776105278,
+          "ratio_ci95": [
+            1.7800528530333601,
+            1.8481140184541889
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 34363.13458453413,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 4601.5107421875,
+          "token_cost_ratio": 0.6001692771521698,
+          "variance_cost_ratio": 1.2030079496342971,
+          "ratio_ci95": [
+            1.1960556018926056,
+            1.2133261790181873
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 8590.783646133532,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 6440.817187500001,
+          "token_cost_ratio": 0.8400677108608681,
+          "variance_cost_ratio": 1.0510187387164909,
+          "ratio_ci95": [
+            1.0492770662468072,
+            1.0536615584161435
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 0.0,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 7667.021484375,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/ridge_l2_1",
+      "metric": "euclidean",
+      "selection": "t=1024",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0032434288079306,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 36080.034781279,
+          "extra_variance": 144968.3429605584,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 2354.2058593750003,
+          "token_cost_ratio": 0.3067357489219682,
+          "variance_cost_ratio": 1.5391894734692735,
+          "ratio_ci95": [
+            1.5210848017938794,
+            1.5663743602164912
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 36080.034781279,
+          "extra_variance": 36242.0857401396,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 4349.5146484375,
+          "token_cost_ratio": 0.5667098430762301,
+          "variance_cost_ratio": 1.13596502387242,
+          "ratio_ci95": [
+            1.1315452800038248,
+            1.1431373555845648
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 36080.034781279,
+          "extra_variance": 9060.5214350349,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 6344.823437500001,
+          "token_cost_ratio": 0.8266839372304922,
+          "variance_cost_ratio": 1.0342831698443806,
+          "ratio_ci95": [
+            1.0331690804588254,
+            1.0362383607305155
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 36080.034781279,
+          "extra_variance": 0.0,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 7675.029296875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/ridge_l2_1",
+      "metric": "euclidean",
+      "selection": "t=2048",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0039496935628,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 129936.7337157146,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 3170.202734375,
+          "token_cost_ratio": 0.4139178842331148,
+          "variance_cost_ratio": 2.079134045687415,
+          "ratio_ci95": [
+            2.042607433659402,
+            2.1351873035703393
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 32484.18342892865,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 4853.5068359375,
+          "token_cost_ratio": 0.6336986776456968,
+          "variance_cost_ratio": 1.271050504967036,
+          "ratio_ci95": [
+            1.262031646611723,
+            1.2854202137492918
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 8121.045857232162,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 6536.8109375,
+          "token_cost_ratio": 0.8534794710582787,
+          "variance_cost_ratio": 1.0680793746280546,
+          "ratio_ci95": [
+            1.0658128388407622,
+            1.071793580342841
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 0.0,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 7659.013671875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/ridge_l2_1",
+      "metric": "euclidean",
+      "selection": "strict_pre_answer_undecided",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 33,
+      "n_problems": 13,
+      "residual_ratio_to_zero": 1.0018591849856762,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 363235.9690709442,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 2494.692803030303,
+          "token_cost_ratio": 0.3495802614743702,
+          "variance_cost_ratio": 1.7538446909854941,
+          "ratio_ci95": [
+            1.6813311511641618,
+            1.838307283732936
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 90808.99226773604,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 4235.277462121212,
+          "token_cost_ratio": 0.5934876634214814,
+          "variance_cost_ratio": 1.1894978697625787,
+          "ratio_ci95": [
+            1.1717666036832755,
+            1.2109819207843215
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 22702.24806693401,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 5975.862121212122,
+          "token_cost_ratio": 0.8373950653685927,
+          "variance_cost_ratio": 1.047633641694696,
+          "ratio_ci95": [
+            1.043226043335404,
+            1.0531613646726465
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 0.0,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 7136.251893939394,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/ridge_l2_10",
+      "metric": "euclidean",
+      "selection": "all",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 128,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0034277010215034,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 137432.07239111583,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 2762.204296875,
+          "token_cost_ratio": 0.36027084344347177,
+          "variance_cost_ratio": 1.8075482536626863,
+          "ratio_ci95": [
+            1.779883341294806,
+            1.8479762953387135
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 34358.01809777896,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 4601.5107421875,
+          "token_cost_ratio": 0.6001692771521698,
+          "variance_cost_ratio": 1.2029181901836372,
+          "ratio_ci95": [
+            1.1960002789162478,
+            1.2132458088489124
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 8589.50452444474,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 6440.817187500001,
+          "token_cost_ratio": 0.8400677108608681,
+          "variance_cost_ratio": 1.0509873292379008,
+          "ratio_ci95": [
+            1.0492479144242912,
+            1.0536155181650624
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 0.0,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 7667.021484375,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/ridge_l2_10",
+      "metric": "euclidean",
+      "selection": "t=1024",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0030911510721132,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 36080.034781279,
+          "extra_variance": 144946.3388782018,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 2354.2058593750003,
+          "token_cost_ratio": 0.3067357489219682,
+          "variance_cost_ratio": 1.539002404950024,
+          "ratio_ci95": [
+            1.5208843590770962,
+            1.5661359533058627
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 36080.034781279,
+          "extra_variance": 36236.58471955045,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 4349.5146484375,
+          "token_cost_ratio": 0.5667098430762301,
+          "variance_cost_ratio": 1.1358786192296932,
+          "ratio_ci95": [
+            1.1314826644954628,
+            1.1430406777340572
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 36080.034781279,
+          "extra_variance": 9059.146179887612,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 6344.823437500001,
+          "token_cost_ratio": 0.8266839372304922,
+          "variance_cost_ratio": 1.0342516593054703,
+          "ratio_ci95": [
+            1.033155901782644,
+            1.0362030229444683
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 36080.034781279,
+          "extra_variance": 0.0,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 7675.029296875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/ridge_l2_10",
+      "metric": "euclidean",
+      "selection": "t=2048",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0038034487696819,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 129917.80590402984,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 3170.202734375,
+          "token_cost_ratio": 0.4139178842331148,
+          "variance_cost_ratio": 2.0788914745759435,
+          "ratio_ci95": [
+            2.0423400967137058,
+            2.134769169779972
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 32479.45147600746,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 4853.5068359375,
+          "token_cost_ratio": 0.6336986776456968,
+          "variance_cost_ratio": 1.2709576622810648,
+          "ratio_ci95": [
+            1.2619912729979634,
+            1.2854424762327026
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 8119.862869001865,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 6536.8109375,
+          "token_cost_ratio": 0.8534794710582787,
+          "variance_cost_ratio": 1.068048113979536,
+          "ratio_ci95": [
+            1.0658063868250853,
+            1.0718041602166393
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 0.0,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 7659.013671875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/ridge_l2_10",
+      "metric": "euclidean",
+      "selection": "strict_pre_answer_undecided",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 33,
+      "n_problems": 13,
+      "residual_ratio_to_zero": 1.0017936411096002,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 363212.205358738,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 2494.692803030303,
+          "token_cost_ratio": 0.3495802614743702,
+          "variance_cost_ratio": 1.7537528208553153,
+          "ratio_ci95": [
+            1.681283672694103,
+            1.8381865949814782
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 90803.0513396845,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 4235.277462121212,
+          "token_cost_ratio": 0.5934876634214814,
+          "variance_cost_ratio": 1.1894588774374197,
+          "ratio_ci95": [
+            1.1717472966807543,
+            1.2109324094124896
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 22700.762834921126,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 5975.862121212122,
+          "token_cost_ratio": 0.8373950653685927,
+          "variance_cost_ratio": 1.0476198874152527,
+          "ratio_ci95": [
+            1.0432293293298922,
+            1.0531544610984582
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 0.0,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 7136.251893939394,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/ridge_l2_100",
+      "metric": "euclidean",
+      "selection": "all",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 128,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0026727761538277,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 137328.6759142609,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 2762.204296875,
+          "token_cost_ratio": 0.36027084344347177,
+          "variance_cost_ratio": 1.8064594002193466,
+          "ratio_ci95": [
+            1.778961131122725,
+            1.8471709445136697
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 34332.16897856523,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 4601.5107421875,
+          "token_cost_ratio": 0.6001692771521698,
+          "variance_cost_ratio": 1.202464714419565,
+          "ratio_ci95": [
+            1.1956819803143028,
+            1.2128476110683857
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 8583.042244641307,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 6440.817187500001,
+          "token_cost_ratio": 0.8400677108608681,
+          "variance_cost_ratio": 1.0508286446960735,
+          "ratio_ci95": [
+            1.0491263647220406,
+            1.0534803284790557
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 0.0,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 7667.021484375,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/ridge_l2_100",
+      "metric": "euclidean",
+      "selection": "t=1024",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.002294768649545,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 36080.034781279,
+          "extra_variance": 144831.2618820835,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 2354.2058593750003,
+          "token_cost_ratio": 0.3067357489219682,
+          "variance_cost_ratio": 1.5380240736152009,
+          "ratio_ci95": [
+            1.5200239758037495,
+            1.5650867007940041
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 36080.034781279,
+          "extra_variance": 36207.81547052087,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 4349.5146484375,
+          "token_cost_ratio": 0.5667098430762301,
+          "variance_cost_ratio": 1.1354267400477076,
+          "ratio_ci95": [
+            1.131092966222123,
+            1.1425487583934955
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 36080.034781279,
+          "extra_variance": 9051.953867630218,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 6344.823437500001,
+          "token_cost_ratio": 0.8266839372304922,
+          "variance_cost_ratio": 1.0340868654229038,
+          "ratio_ci95": [
+            1.0330374159969398,
+            1.035959011356604
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 36080.034781279,
+          "extra_variance": 0.0,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 7675.029296875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/ridge_l2_100",
+      "metric": "euclidean",
+      "selection": "t=2048",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.003094809996906,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 129826.08994643835,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 3170.202734375,
+          "token_cost_ratio": 0.4139178842331148,
+          "variance_cost_ratio": 2.077716080286144,
+          "ratio_ci95": [
+            2.042054609858792,
+            2.1337049601585165
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 32456.52248660959,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 4853.5068359375,
+          "token_cost_ratio": 0.6336986776456968,
+          "variance_cost_ratio": 1.2705077869340873,
+          "ratio_ci95": [
+            1.2616819350860506,
+            1.2848752543722102
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 8114.130621652397,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 6536.8109375,
+          "token_cost_ratio": 0.8534794710582787,
+          "variance_cost_ratio": 1.0678966384491597,
+          "ratio_ci95": [
+            1.0657028065302505,
+            1.071667033705369
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 0.0,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 7659.013671875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/ridge_l2_100",
+      "metric": "euclidean",
+      "selection": "strict_pre_answer_undecided",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 33,
+      "n_problems": 13,
+      "residual_ratio_to_zero": 1.0014495795578093,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 363087.46174899954,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 2494.692803030303,
+          "token_cost_ratio": 0.3495802614743702,
+          "variance_cost_ratio": 1.7532705640611639,
+          "ratio_ci95": [
+            1.6810475922634838,
+            1.8369421727954776
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 90771.86543724989,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 4235.277462121212,
+          "token_cost_ratio": 0.5934876634214814,
+          "variance_cost_ratio": 1.189254193785715,
+          "ratio_ci95": [
+            1.17167037943969,
+            1.210775432582808
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 22692.96635931247,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 5975.862121212122,
+          "token_cost_ratio": 0.8373950653685927,
+          "variance_cost_ratio": 1.047547686639035,
+          "ratio_ci95": [
+            1.0432632950329213,
+            1.053119324890013
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 0.0,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 7136.251893939394,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/mlp64",
+      "metric": "euclidean",
+      "selection": "all",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 128,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0033340743271244,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 137419.24903510674,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 2762.204296875,
+          "token_cost_ratio": 0.36027084344347177,
+          "variance_cost_ratio": 1.8074132127428175,
+          "ratio_ci95": [
+            1.7787540371051067,
+            1.8477358758447726
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 34354.812258776685,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 4601.5107421875,
+          "token_cost_ratio": 0.6001692771521698,
+          "variance_cost_ratio": 1.202861949571374,
+          "ratio_ci95": [
+            1.195504663493029,
+            1.2134208338626364
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 8588.703064694171,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 6440.817187500001,
+          "token_cost_ratio": 0.8400677108608681,
+          "variance_cost_ratio": 1.050967648989261,
+          "ratio_ci95": [
+            1.0490431821579902,
+            1.0537579944238213
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 0.0,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 7667.021484375,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/mlp64",
+      "metric": "euclidean",
+      "selection": "t=1024",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0025211604871598,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 36080.034781279,
+          "extra_variance": 144863.9754275864,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 2354.2058593750003,
+          "token_cost_ratio": 0.3067357489219682,
+          "variance_cost_ratio": 1.5383021890311244,
+          "ratio_ci95": [
+            1.5196987846639165,
+            1.5656017332755727
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 36080.034781279,
+          "extra_variance": 36215.9938568966,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 4349.5146484375,
+          "token_cost_ratio": 0.5667098430762301,
+          "variance_cost_ratio": 1.1355551981295169,
+          "ratio_ci95": [
+            1.1305065590177623,
+            1.1434804623394783
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 36080.034781279,
+          "extra_variance": 9053.99846422415,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 6344.823437500001,
+          "token_cost_ratio": 0.8266839372304922,
+          "variance_cost_ratio": 1.0341337122503134,
+          "ratio_ci95": [
+            1.0327679349489822,
+            1.0362900133856103
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 36080.034781279,
+          "extra_variance": 0.0,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 7675.029296875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/mlp64",
+      "metric": "euclidean",
+      "selection": "t=2048",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.004241667822187,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 129974.52264262702,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 3170.202734375,
+          "token_cost_ratio": 0.4139178842331148,
+          "variance_cost_ratio": 2.079618333155778,
+          "ratio_ci95": [
+            2.0423042730215784,
+            2.134294978279367
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 32493.630660656756,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 4853.5068359375,
+          "token_cost_ratio": 0.6336986776456968,
+          "variance_cost_ratio": 1.2712358631866203,
+          "ratio_ci95": [
+            1.2611947899947917,
+            1.2859083277801244
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 8123.407665164189,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 6536.8109375,
+          "token_cost_ratio": 0.8534794710582787,
+          "variance_cost_ratio": 1.0681417857710742,
+          "ratio_ci95": [
+            1.0654378164216423,
+            1.0721905823926758
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 0.0,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 7659.013671875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/mlp64",
+      "metric": "euclidean",
+      "selection": "strict_pre_answer_undecided",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 33,
+      "n_problems": 13,
+      "residual_ratio_to_zero": 1.001059923796216,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 362946.18741595186,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 2494.692803030303,
+          "token_cost_ratio": 0.3495802614743702,
+          "variance_cost_ratio": 1.75272439975588,
+          "ratio_ci95": [
+            1.679670721404036,
+            1.8361268921202407
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 90736.54685398797,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 4235.277462121212,
+          "token_cost_ratio": 0.5934876634214814,
+          "variance_cost_ratio": 1.189022385948496,
+          "ratio_ci95": [
+            1.1709871874852271,
+            1.210224601908273
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 22684.13671349699,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 5975.862121212122,
+          "token_cost_ratio": 0.8373950653685927,
+          "variance_cost_ratio": 1.0474659179895056,
+          "ratio_ci95": [
+            1.043082586699164,
+            1.0529945846758524
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 0.0,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 7136.251893939394,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/mlp256",
+      "metric": "euclidean",
+      "selection": "all",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 128,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0080307650954616,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 138062.52004009858,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 2762.204296875,
+          "token_cost_ratio": 0.36027084344347177,
+          "variance_cost_ratio": 1.8141874072810782,
+          "ratio_ci95": [
+            1.782831276360602,
+            1.8570255384908456
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 34515.630010024644,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 4601.5107421875,
+          "token_cost_ratio": 0.6001692771521698,
+          "variance_cost_ratio": 1.2056832044087458,
+          "ratio_ci95": [
+            1.1962633509036154,
+            1.217501523460872
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 8628.907502506161,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 6440.817187500001,
+          "token_cost_ratio": 0.8400677108608681,
+          "variance_cost_ratio": 1.0519548892493056,
+          "ratio_ci95": [
+            1.0492836117286664,
+            1.055332778075331
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 34210.973160309346,
+          "extra_variance": 0.0,
+          "full_token_cost": 7667.021484375,
+          "actual_token_cost": 7667.021484375,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/mlp256",
+      "metric": "euclidean",
+      "selection": "t=1024",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.005986085380831,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 36080.034781279,
+          "extra_variance": 145364.65592635144,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 2354.2058593750003,
+          "token_cost_ratio": 0.3067357489219682,
+          "variance_cost_ratio": 1.5425587427925138,
+          "ratio_ci95": [
+            1.5204721257982559,
+            1.5732725836055739
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 36080.034781279,
+          "extra_variance": 36341.16398158786,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 4349.5146484375,
+          "token_cost_ratio": 0.5667098430762301,
+          "variance_cost_ratio": 1.1375212478340593,
+          "ratio_ci95": [
+            1.1306106734466264,
+            1.146781420638621
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 36080.034781279,
+          "extra_variance": 9085.290995396965,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 6344.823437500001,
+          "token_cost_ratio": 0.8266839372304922,
+          "variance_cost_ratio": 1.0348507024924978,
+          "ratio_ci95": [
+            1.032741404667451,
+            1.0375425863447814
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 36080.034781279,
+          "extra_variance": 0.0,
+          "full_token_cost": 7675.029296875,
+          "actual_token_cost": 7675.029296875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/mlp256",
+      "metric": "euclidean",
+      "selection": "t=2048",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "residual_ratio_to_zero": 1.0103135876004457,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 130760.38415384572,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 3170.202734375,
+          "token_cost_ratio": 0.4139178842331148,
+          "variance_cost_ratio": 2.089689613629931,
+          "ratio_ci95": [
+            2.045462197223342,
+            2.148329244761929
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 32690.09603846143,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 4853.5068359375,
+          "token_cost_ratio": 0.6336986776456968,
+          "variance_cost_ratio": 1.2750905873733356,
+          "ratio_ci95": [
+            1.2619852735578487,
+            1.2919188367358694
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 8172.5240096153575,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 6536.8109375,
+          "token_cost_ratio": 0.8534794710582787,
+          "variance_cost_ratio": 1.0694396928347973,
+          "ratio_ci95": [
+            1.0655662975807825,
+            1.0745200914160464
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 32297.99178552246,
+          "extra_variance": 0.0,
+          "full_token_cost": 7659.013671875,
+          "actual_token_cost": 7659.013671875,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 32,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    },
+    {
+      "model": "cheap/mlp256",
+      "metric": "euclidean",
+      "selection": "strict_pre_answer_undecided",
+      "evaluation": "leave_one_problem_out",
+      "n_prefixes": 33,
+      "n_problems": 13,
+      "residual_ratio_to_zero": 1.0030021445403974,
+      "variance_cost": [
+        {
+          "p": 0.2,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 363650.36265807686,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 2494.692803030303,
+          "token_cost_ratio": 0.3495802614743702,
+          "variance_cost_ratio": 1.7554467299457777,
+          "ratio_ci95": [
+            1.681553487084882,
+            1.8383182566177971
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.5,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 90912.59066451922,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 4235.277462121212,
+          "token_cost_ratio": 0.5934876634214814,
+          "variance_cost_ratio": 1.190177821167185,
+          "ratio_ci95": [
+            1.1720221812743887,
+            1.211760085939716
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 0.8,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 22728.147666129804,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 5975.862121212122,
+          "token_cost_ratio": 0.8373950653685927,
+          "variance_cost_ratio": 1.0478734899619815,
+          "ratio_ci95": [
+            1.0434576709141312,
+            1.053551641978076
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        },
+        {
+          "p": 1.0,
+          "full_variance": 90424.6539157325,
+          "extra_variance": 0.0,
+          "full_token_cost": 7136.251893939394,
+          "actual_token_cost": 7136.251893939394,
+          "token_cost_ratio": 1.0,
+          "variance_cost_ratio": 1.0,
+          "ratio_ci95": [
+            1.0,
+            1.0
+          ],
+          "defined": 1000,
+          "undefined": 0,
+          "n_problem_clusters": 13,
+          "unit": "problem_id with all its paths and positions"
+        }
+      ]
+    }
+  ],
+  "no_surviving_prefix_problem_ids": [],
+  "functional_qualification_available": true,
+  "strict_pre_answer_undecided_prefixes": 33,
+  "metric_name": "euclidean",
+  "metric_weights_sha256": "596ebc77c27e88ebf6449d6923d4dbbe7d12d50e77d29abd1ba9385fe294e7c6",
+  "difficulty_stratification": {
+    "available": false,
+    "manifest": null,
+    "definition": "predeclared problem difficulty; no outcome labels used"
+  },
+  "scope": {
+    "cost": "prefix plus probability-weighted suffix tokens; excludes GPU and feature overhead",
+    "variance": "empirical pooled B gradients, conditional on surviving decision-point prefixes",
+    "oracle": "noisy A-fit/B-score reference; not a theoretical bound",
+    "bootstrap": "problem clusters, conditional on fitted predictions",
+    "single_problem_fallback": "cross-problem prediction unavailable; only zero predictions recorded",
+    "policy": "frozen original post-trained model with fresh zero-B LoRA, not old Base policy"
+  }
+}

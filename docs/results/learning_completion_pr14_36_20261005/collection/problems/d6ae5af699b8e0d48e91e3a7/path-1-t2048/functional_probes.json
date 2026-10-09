@@ -1,0 +1,78 @@
+[
+  {
+    "text": " 32 + 2 + 0 = 34",
+    "reward": 1.0,
+    "seed": 1946950335,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 32 + 2 + 0 = 34",
+    "token_ids": [
+      220,
+      18,
+      17,
+      488,
+      220,
+      17,
+      488,
+      220,
+      15,
+      284,
+      220,
+      18,
+      19,
+      151645
+    ]
+  },
+  {
+    "text": " 32",
+    "reward": 0.0,
+    "seed": 711545145,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 32",
+    "token_ids": [
+      220,
+      18,
+      17,
+      151645
+    ]
+  },
+  {
+    "text": " 32 + 2 + 0 = 34",
+    "reward": 1.0,
+    "seed": 1182185604,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 32 + 2 + 0 = 34",
+    "token_ids": [
+      220,
+      18,
+      17,
+      488,
+      220,
+      17,
+      488,
+      220,
+      15,
+      284,
+      220,
+      18,
+      19,
+      151645
+    ]
+  },
+  {
+    "text": " 32",
+    "reward": 0.0,
+    "seed": 2123716816,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 32",
+    "token_ids": [
+      220,
+      18,
+      17,
+      151645
+    ]
+  }
+]

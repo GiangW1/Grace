@@ -1,0 +1,84 @@
+[
+  {
+    "text": " 7",
+    "reward": 0.0,
+    "seed": 214417348,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 7",
+    "token_ids": [
+      220,
+      22,
+      151645
+    ]
+  },
+  {
+    "text": " 7",
+    "reward": 0.0,
+    "seed": 1147898431,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 7",
+    "token_ids": [
+      220,
+      22,
+      151645
+    ]
+  },
+  {
+    "text": " 10",
+    "reward": 0.0,
+    "seed": 1884569680,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 10",
+    "token_ids": [
+      220,
+      16,
+      15,
+      151645
+    ]
+  },
+  {
+    "text": " 10 + 2\u221a3 + 10 = 22 + 2\u221a3\uff1f\u4e0d\u5bf9\uff0c\u53ef\u80fd\u6211\u54ea\u91cc\u7b97\u9519\u4e86\uff0c\u5148\u91cd\u65b0",
+    "reward": 0.0,
+    "seed": 653305839,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 10 + 2\u221a3 + 10 = 22 + 2\u221a3\uff1f\u4e0d\u5bf9\uff0c\u53ef\u80fd\u6211\u54ea\u91cc\u7b97\u9519\u4e86\uff0c\u5148\u91cd\u65b0",
+    "token_ids": [
+      220,
+      16,
+      15,
+      488,
+      220,
+      17,
+      144336,
+      18,
+      488,
+      220,
+      16,
+      15,
+      284,
+      220,
+      17,
+      17,
+      488,
+      220,
+      17,
+      144336,
+      18,
+      11319,
+      105788,
+      3837,
+      87267,
+      35946,
+      101314,
+      69103,
+      106670,
+      3837,
+      60726,
+      70361
+    ]
+  }
+]

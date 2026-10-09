@@ -1,0 +1,14 @@
+{
+  "replay_dir": "/SSD/00/wja/grace-pr12-20260928/replays/merged",
+  "score_gradients": null,
+  "gradient_target": "trajectory",
+  "metric_file": "/SSD/00/wja/grace-pr12-20260928/replays/merged/metric_weights.npy",
+  "run_dir": "/SSD/00/wja/grace-pr12-20260928/analysis/dynamic-predictor",
+  "split_manifest": "/SSD/00/wja/grace-pr12-20260928/analysis/observed_split_pr12.json",
+  "features": "legacy",
+  "models": "zero,constant,ridge",
+  "mlp_epochs": 50,
+  "device": "cpu",
+  "seed": 17,
+  "difficulty_manifest": null
+}

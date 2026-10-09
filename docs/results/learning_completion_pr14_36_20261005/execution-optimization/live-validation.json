@@ -1,0 +1,17 @@
+{
+  "validated_utc": "2026-10-04T13:52:23.629441+00:00",
+  "experiment": "PR14",
+  "status": "passed",
+  "n_problems": 36,
+  "n_continuations": 8,
+  "request_concurrency": 32,
+  "actor_unchanged": true,
+  "checkpoint_unchanged": true,
+  "gradient_checkpointing": true,
+  "grouped_continuations": true,
+  "completed_problems": 10,
+  "new_prefixes_validated": [
+    "collection/problems/d6bd6615af539839aa2c90a0/path-3-t4096/bundle.json"
+  ],
+  "new_prefix_validation_pending": false
+}

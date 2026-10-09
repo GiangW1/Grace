@@ -1,0 +1,61 @@
+[
+  {
+    "text": " 186",
+    "reward": 0.0,
+    "seed": 166467454,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 186",
+    "token_ids": [
+      220,
+      16,
+      23,
+      21,
+      151645
+    ]
+  },
+  {
+    "text": " 96",
+    "reward": 0.0,
+    "seed": 1467065843,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 96",
+    "token_ids": [
+      220,
+      24,
+      21,
+      151645
+    ]
+  },
+  {
+    "text": " 121",
+    "reward": 0.0,
+    "seed": 1286519199,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 121",
+    "token_ids": [
+      220,
+      16,
+      17,
+      16,
+      151645
+    ]
+  },
+  {
+    "text": " 129",
+    "reward": 0.0,
+    "seed": 1706951619,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 129",
+    "token_ids": [
+      220,
+      16,
+      17,
+      24,
+      151645
+    ]
+  }
+]

@@ -1,0 +1,38 @@
+# Analysis paper, step 1: one reliable standard RL run that only supplies frozen
+# snapshots (format-warmup end = step 0, mid, late). This is not a method
+# comparison, so it uses plain Dr. GRPO without prescan or predictor.
+# Stack after configs/default.yaml and a hardware file.
+method: grpo
+backend: gpu_verl
+seed: 17
+split_seed: 17
+num_steps: 150
+n_start: 128          # 16 prompts x 8 starts; the Sept runs collapsed to N=4
+n_prompts: 16
+decision_tokens: 512  # unused by GRPO; kept so the saved config is complete
+max_new_tokens: 2048
+save_initial_checkpoint: true
+checkpoint_every: 50  # snapshots at steps 0, 50, 100, 150
+cost_control:
+  mode: fixed         # a wall-time target would resize N and confound the snapshots
+dynamic_sampling:     # DAPO: Sept training had 50-65% zero-advantage starts
+  enabled: true
+  oversample: 2.0     # draw 32 prompts, keep up to 16 groups with mixed rewards
+optim:
+  log_update_geometry: true
+  # Token-sum loss: pre-clip norms were 15-437 at N=4, so clip 1.0 clipped every
+  # step. 50 is meant to catch spikes only; recalibrate from the smoke run's
+  # grad_norm_preclip and check clip_trigger_rate_this_session in summary.json.
+  grad_clip: 50.0
+lora:
+  compute_dtype: bfloat16
+vllm:
+  lora_dtype: bfloat16
+eval:
+  selection: seeded
+  selection_seed: 20260918
+  n_problems: 500
+  n: 4
+  k: 4
+  max_new_tokens: 4096
+  sample_batch_size: 4

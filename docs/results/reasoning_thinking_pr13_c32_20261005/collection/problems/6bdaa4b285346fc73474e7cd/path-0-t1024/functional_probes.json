@@ -1,0 +1,79 @@
+[
+  {
+    "text": " 2",
+    "reward": 1.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      151645
+    ],
+    "seed": 1903663505
+  },
+  {
+    "text": " 2",
+    "reward": 1.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      151645
+    ],
+    "seed": 191681183
+  },
+  {
+    "text": " 2 (for HH/TT) + 2 (HT and TH) = 2? Wait, no, wait. If n=2, the",
+    "reward": 0.0,
+    "finish_reason": "length",
+    "truncated": true,
+    "token_ids": [
+      220,
+      17,
+      320,
+      1958,
+      24756,
+      14,
+      14903,
+      8,
+      488,
+      220,
+      17,
+      320,
+      2545,
+      323,
+      4434,
+      8,
+      284,
+      220,
+      17,
+      30,
+      13824,
+      11,
+      902,
+      11,
+      3783,
+      13,
+      1416,
+      308,
+      28,
+      17,
+      11,
+      279
+    ],
+    "seed": 1745218042
+  },
+  {
+    "text": " 2",
+    "reward": 1.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      151645
+    ],
+    "seed": 672840770
+  }
+]

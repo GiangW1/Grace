@@ -1,0 +1,19 @@
+# Analysis paper, step 2: frozen-snapshot audit for update/answer synchrony.
+# Stack after default.yaml, analysis_snapshot_train.yaml and a hardware file.
+# Generation records tokens/rewards only; the streaming replay computes each
+# gradient once (replay_expected_gain.py --statistics-only), one run per t.
+method: full_pg
+audit:
+  n_problems: 240        # the whole paper audit split; strata come from b(x) afterwards
+  skip_settled_problems: true   # all 16 baseline samples agree -> no answer variance; logged
+  n_prefixes: 4         # iid on-policy prefixes per problem (cross-prefix terms need >= 2)
+  n_continuations: 16   # A/B halves of 8
+  n_baseline: 16        # independent b(x) from the same snapshot
+  decision_grid: [128, 256, 512, 1024]
+  max_new_tokens: 2048
+  require_complete_answers: true
+  tokens_only: true
+  store_features: false
+  predictor_diagnostic: false
+analysis:
+  require_pre_emit: false   # report all live prefixes; pre-answer subsets are analysis filters

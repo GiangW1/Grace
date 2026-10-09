@@ -1,0 +1,9 @@
+{
+  "prompt_normalization": "whitespace_v2_case_sensitive",
+  "path": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/input/audit.jsonl",
+  "n_raw": 32,
+  "n_kept": 32,
+  "n_same_answer_dedup": 0,
+  "n_conflict_groups": 0,
+  "conflicts": []
+}

@@ -1,0 +1,18 @@
+{
+  "recorded_utc": "2026-10-04T09:48:46Z",
+  "source_run": "/SSD/00/wja/grace-pr14-learning-completion-20261004-run",
+  "source_commit": "9d64990fe5e82cc94c2a9c1cf99707a4b087339e",
+  "continuation_commit": "d2a325d",
+  "source_n_problems": 96,
+  "n_problems": 36,
+  "selection": "First 36 of the original saved seeded-17 input order; verified against fresh selection",
+  "completed_problems_reused": 5,
+  "completed_prefixes_reused": 94,
+  "saved_problem_directories_reused": 7,
+  "gradient_gpu": 1,
+  "rollout_gpu": 3,
+  "storage": "Immutable results and response cache hardlinked; frozen checkpoint copied; original worker metadata archived under resume-source",
+  "reward_protocol_version": 3,
+  "statistical_parameters_changed": ["n_problems"],
+  "unchanged_parameters": ["problem seed", "frozen actor", "temperature", "decision grid", "token limit", "n_prefixes", "n_continuations", "n_baseline", "reward protocol"]
+}

@@ -5,6 +5,30 @@ status: in-progress
 
 # Project State
 
+2026-10-09 转向分析论文（ACL 2027）。审查结论、新主张和运行命令见
+[分析论文框架 v4](../GRACE_ACL分析论文框架_v4.md)。本地分支 `integrate/all-open-prs`
+= master `0621817` + PR #12–#15（无冲突合并）。9 月各轮在线对比因 N 被墙钟控制器压到 4、
+prescan 占约 60% 步时、预测器标签不足等问题作废，不作为论文证据；PR13–15 的零 B LoRA
+thinking 审计也不进主文。已修：截断回答 R=0（奖励协议 v4）、HT 基线截断到 [0,1]、
+token 记账按实际后缀、自锚定墙钟目标不再压 N。新增流式标量审计分析（`grace_gc/audit/synchrony.py`），
+审计 `tokens_only` / `skip_settled_problems`。下一步：服务器冒烟（20 题、1 个快照、t=512）测吞吐与跳题比例，
+再跑快照训练与完整审计。测试见 [TEST_STATUS](../docs/TEST_STATUS.md)。
+
+2026-10-07 服务器增量：PR15 请求版本 `1e4e496`，实测优化版本 `4675a34`。
+16384-token、Qwen3-4B thinking、GPU0 actor/GPU2 rollout 的 m=2/4 冻结审计
+各完成 32 题/64 组，无 OOM 或重启，已于 2026-10-06 19:36 HKT 全部结束。
+ST 与 lambda=0 的方差相同，后验 ESS=1；条件方差为 Full-PG 的 1.97/4.65 倍。
+这不是等成本训练结论；多方法、多 seed 训练及 MATH-500 评测仍暂缓。
+代码优化、完整结果汇总、紧凑证据和剔除稠密数组/权重的下载包见
+[本轮结果](../docs/results/suffix_transport_pr15_16384_20261006/README.md)。
+
+2026-10-06 增量：在 PR14 `exp-a-learning-completion` 上加入独立 GRACE-ST 后缀信用传递、
+冻结配对/总体方差审计、Full-PG/高效 donor-only/ST 训练与 CPU/GPU smoke。
+旧 HT 主入口保留。审查后 30 项 ST 合成检查及 187 项相关回归通过；真实 GPU 留给服务器执行。
+修正评测算法身份、预算内 checkpoint、lambda=0 日志；补全后缀概率/NaN smoke 和配对方差区间。
+本机全量旧失败及 PR14 基线复现见 [TEST_STATUS](../docs/TEST_STATUS.md)，
+具体运行命令与未实现边界见 [SUFFIX_TRANSPORT](../docs/SUFFIX_TRANSPORT.md)。
+
 核对日期：2026-09-19。原两阶段的首轮实现和最小证伪已完成；目前按负结果继续修复与再验证，论文效果尚未成立。项目范围见 [PROJECT.md](PROJECT.md)。
 
 ## 代码与发布

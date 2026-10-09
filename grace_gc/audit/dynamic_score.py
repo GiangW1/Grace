@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from grace_gc.audit.expected_gain import fit_predict, problem_split
+from grace_gc.audit.benefit_replay import prefix_keys_sha256
 from grace_gc.versions import sha256_array, sha256_file
 
 
@@ -23,8 +24,9 @@ def load_diagonal_metric(path: str | Path | None, dimension: int):
     return values
 
 
-def load_dynamic_replay(replay_dir: str | Path, score_gradients: str | Path,
-                        metric_file: str | Path | None = None):
+def load_dynamic_replay(replay_dir: str | Path, score_gradients: str | Path | None,
+                        metric_file: str | Path | None = None,
+                        gradient_target: str = "suffix"):
     """Load the replay rows, A/B labels, and per-prefix score bases.
 
     The A/B arrays are deliberately separate from ``mean_grads.npy``.  A
@@ -33,35 +35,62 @@ def load_dynamic_replay(replay_dir: str | Path, score_gradients: str | Path,
     root = Path(replay_dir)
     rows = [json.loads(line) for line in (root / "prefixes.jsonl").read_text(
         encoding="utf-8").splitlines() if line.strip()]
+    if gradient_target not in {"suffix", "trajectory"}:
+        raise ValueError("gradient_target must be suffix or trajectory")
+    target_prefix = "half_mean_full_grads" if gradient_target == "trajectory" else "half_mean_grads"
     required = {
-        "half_mean_grads_a.npy", "half_mean_grads_b.npy",
-        "half_mean_norm_sq_b.npy",
+        f"{target_prefix}_a.npy", f"{target_prefix}_b.npy",
+        ("half_mean_full_norm_sq_b.npy" if gradient_target == "trajectory"
+         else "half_mean_norm_sq_b.npy"),
     }
+    if gradient_target == "trajectory":
+        required.add("prefix_score_gradients.npy")
     missing = sorted(name for name in required if not (root / name).is_file())
     if missing:
         raise ValueError("replay lacks stage A/B sidecars: " + ", ".join(missing))
-    target_a = np.load(root / "half_mean_grads_a.npy", mmap_mode="r")
-    target_b = np.load(root / "half_mean_grads_b.npy", mmap_mode="r")
-    norm_b = np.load(root / "half_mean_norm_sq_b.npy", mmap_mode="r")
-    basis = np.load(score_gradients, mmap_mode="r")
-    provenance_path = Path(score_gradients).with_name("score_gradient_provenance.json")
-    score_provenance = {}
-    if provenance_path.is_file():
-        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
-        score_provenance = provenance
-        expected_hash = sha256_file(root / "prefixes.jsonl")
-        if provenance.get("replay_prefixes_sha256") != expected_hash:
-            raise ValueError("score-gradient rows do not match replay prefixes")
-        if provenance.get("shape") != list(map(int, basis.shape)):
-            raise ValueError("score-gradient provenance shape does not match the array")
+    target_a = np.load(root / f"{target_prefix}_a.npy", mmap_mode="r")
+    target_b = np.load(root / f"{target_prefix}_b.npy", mmap_mode="r")
+    norm_b = np.load(root / ("half_mean_full_norm_sq_b.npy" if gradient_target == "trajectory"
+                             else "half_mean_norm_sq_b.npy"), mmap_mode="r")
+    stored_basis = np.load(root / "prefix_score_gradients.npy", mmap_mode="r") if gradient_target == "trajectory" else None
+    if score_gradients is None:
+        if stored_basis is None:
+            raise ValueError("suffix target needs score_gradients.npy")
+        basis = stored_basis if stored_basis.ndim == 3 else stored_basis[:, :, None]
+    else:
+        basis = np.load(score_gradients, mmap_mode="r")
+        if stored_basis is not None and gradient_target == "trajectory":
+            stored_basis_3d = stored_basis[:, :, None] if stored_basis.ndim == 2 else stored_basis
+            if stored_basis_3d.shape != basis.shape or not np.allclose(stored_basis_3d, basis):
+                raise ValueError("stored and supplied prefix score gradients differ")
     replay_provenance_path = root / "replay_provenance.json"
     replay_provenance = (json.loads(replay_provenance_path.read_text(encoding="utf-8"))
                          if replay_provenance_path.is_file() else {})
-    for key in ("actor_sha256", "checkpoint_sha256", "layout_dim", "layout_names"):
-        expected = replay_provenance.get(key)
-        observed = score_provenance.get(key)
-        if expected is not None and observed is not None and expected != observed:
-            raise ValueError(f"score-gradient and replay provenance differ in {key}")
+    sources = []
+    if stored_basis is not None:
+        sources.append((root / "score_gradient_provenance.json",
+                        stored_basis[:, :, None] if stored_basis.ndim == 2 else stored_basis, True))
+    if score_gradients is not None:
+        sources.append((Path(score_gradients).with_name("score_gradient_provenance.json"), basis, False))
+    for provenance_path, source_basis, internal in sources:
+        if not provenance_path.is_file():
+            if internal:
+                raise ValueError("internal score basis lacks provenance; regenerate the trajectory replay")
+            continue
+        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+        if provenance.get("replay_prefixes_sha256") != sha256_file(root / "prefixes.jsonl"):
+            raise ValueError("score-gradient rows do not match replay prefixes")
+        if provenance.get("shape") != list(map(int, source_basis.shape)):
+            raise ValueError("score-gradient provenance shape does not match the array")
+        for key, compute in (("prefix_keys_sha256", lambda: prefix_keys_sha256(rows)),
+                             ("score_gradients_sha256", lambda: sha256_array(source_basis))):
+            if (internal or provenance.get(key) is not None) and provenance.get(key) != compute():
+                raise ValueError(f"score-gradient provenance differs in {key}")
+        for key in ("actor_sha256", "checkpoint_sha256", "layout_dim", "layout_names", "layout_sha256"):
+            expected = replay_provenance.get(key)
+            observed = provenance.get(key)
+            if expected is not None and (internal or observed is not None) and expected != observed:
+                raise ValueError(f"score-gradient and replay provenance differ in {key}")
     if (target_a.ndim != 2 or target_b.shape != target_a.shape or
             norm_b.shape != (len(rows),) or basis.ndim != 3 or
             basis.shape[0] != len(rows) or basis.shape[1] != target_a.shape[1]):
@@ -87,7 +116,8 @@ def load_dynamic_replay(replay_dir: str | Path, score_gradients: str | Path,
         raise ValueError("requested metric is not stored by this replay")
     if uses_replay_metric:
         metric_name = str(replay_provenance.get("metric_name") or metric_name)
-    metric_norm_path = root / "half_metric_norm_sq_b.npy"
+    metric_norm_path = root / ("half_full_metric_norm_sq_b.npy" if gradient_target == "trajectory"
+                               else "half_metric_norm_sq_b.npy")
     metric_norm_b = (np.load(metric_norm_path, mmap_mode="r") if uses_replay_metric and
                      metric_norm_path.is_file() else norm_b if np.all(metric == 1.0) else None)
     if metric_norm_b is None:
@@ -110,6 +140,12 @@ def q_strata(rows):
     values = []
     for row in rows:
         value = row.get("half_mean_reward_a")
+        if value is None:
+            pair = row.get("half_mean_reward")
+            if isinstance(pair, (list, tuple)) and pair:
+                value = pair[0]
+        elif isinstance(value, (list, tuple)):
+            value = value[0] if value else None
         values.append(None if value is None else float(value))
     if any(value is None for value in values):
         return {"all": np.arange(len(rows), dtype=np.int64)}, False
@@ -124,6 +160,29 @@ def q_strata(rows):
         else:
             groups["observed_q_uncertain"].append(index)
     return {name: np.asarray(indices, dtype=np.int64) for name, indices in groups.items()}, True
+
+
+def difficulty_strata(rows, manifest: str | Path | None = None):
+    """Return predeclared easy/medium/hard strata without using gradient labels."""
+    mapping = None
+    if manifest is not None:
+        payload = json.loads(Path(manifest).read_text(encoding="utf-8"))
+        mapping = payload.get("difficulty", payload) if isinstance(payload, dict) else None
+        if not isinstance(mapping, dict):
+            raise ValueError("difficulty manifest must be a problem-to-stratum mapping")
+    values = []
+    for row in rows:
+        value = (None if mapping is None else mapping.get(str(row["problem_id"])))
+        if value is None:
+            value = row.get("difficulty")
+        values.append(None if value is None else str(value).lower())
+    if any(value is None for value in values):
+        return {"all": np.arange(len(rows), dtype=np.int64)}, False
+    allowed = {"easy", "medium", "hard"}
+    if any(value not in allowed for value in values):
+        raise ValueError("difficulty labels must be easy, medium, or hard")
+    return {name: np.asarray([i for i, value in enumerate(values) if value == name], dtype=np.int64)
+            for name in ("easy", "medium", "hard")}, True
 
 
 def split_roles(rows, manifest: str | Path | None, seed: int):
@@ -160,8 +219,22 @@ def fit_prefix_coefficients(basis, targets, metric=None):
     if (weights.shape != (targets.shape[1],) or not np.all(np.isfinite(weights)) or
             np.any(weights < 0.0) or not np.any(weights > 0.0)):
         raise ValueError("metric has the wrong shape or invalid weights")
-    root_weights = np.sqrt(weights)
     coefficients = np.empty((len(targets), basis.shape[2]), dtype=np.float64)
+    # The trajectory audit currently has one score-gradient column. Avoid an
+    # SVD over millions of coordinates for each prefix; the weighted one-column
+    # least-squares solution is a scalar projection.
+    if basis.shape[2] == 1:
+        for start in range(0, len(targets), 8):
+            stop = min(start + 8, len(targets))
+            matrix = np.asarray(basis[start:stop, :, 0], dtype=np.float64)
+            target = np.asarray(targets[start:stop], dtype=np.float64)
+            weighted = matrix * weights
+            denominator = np.sum(weighted * matrix, axis=1)
+            numerator = np.sum(weighted * target, axis=1)
+            coefficients[start:stop, 0] = np.divide(
+                numerator, denominator, out=np.zeros_like(numerator), where=denominator > 0.0)
+        return coefficients
+    root_weights = np.sqrt(weights)
     for index, (matrix, target) in enumerate(zip(basis, targets)):
         coefficients[index] = np.linalg.lstsq(matrix * root_weights[:, None],
                                                target * root_weights, rcond=None)[0]
@@ -176,25 +249,39 @@ def reconstruct(basis, coefficients):
     return np.einsum("ndw,nw->nd", basis, coefficients)
 
 
-def _residual_metrics_with_metric(basis, coefficients, target, norm_sq, metric):
-    prediction = reconstruct(basis, coefficients)
-    target = np.asarray(target, dtype=np.float64)
+def _residual_metrics_with_metric(basis, coefficients, target, norm_sq, metric,
+                                  block_size=65536):
+    basis = np.asarray(basis)
+    coefficients = np.asarray(coefficients, dtype=np.float64)
+    target = np.asarray(target)
     norm_sq = np.asarray(norm_sq, dtype=np.float64).reshape(-1)
     metric = np.asarray(metric, dtype=np.float64).reshape(-1)
-    if target.shape != prediction.shape or norm_sq.shape != (len(prediction),):
+    if basis.ndim != 3 or coefficients.shape != (len(basis), basis.shape[2]):
+        raise ValueError("basis and coefficients dimensions disagree")
+    if target.shape != basis.shape[:2] or norm_sq.shape != (len(basis),):
         raise ValueError("residual labels and predictions disagree")
-    if metric.shape != (prediction.shape[1],) or np.any(metric < 0) or not np.all(np.isfinite(metric)):
+    if metric.shape != (basis.shape[1],) or np.any(metric < 0) or not np.all(np.isfinite(metric)):
         raise ValueError("metric has the wrong shape or invalid weights")
-    residual = norm_sq - 2.0 * np.sum(metric * prediction * target, axis=1) + np.sum(
-        metric * prediction * prediction, axis=1)
+    cross = np.zeros(len(basis), dtype=np.float64)
+    prediction_energy = np.zeros(len(basis), dtype=np.float64)
+    unweighted_squared_error = np.zeros(len(basis), dtype=np.float64)
+    for start in range(0, basis.shape[1], block_size):
+        stop = min(start + block_size, basis.shape[1])
+        prediction = np.einsum("ndw,nw->nd", basis[:, start:stop], coefficients,
+                               optimize=True)
+        target_block = target[:, start:stop]
+        metric_block = metric[start:stop]
+        cross += np.sum(metric_block * prediction * target_block, axis=1)
+        prediction_energy += np.sum(metric_block * prediction * prediction, axis=1)
+        unweighted_squared_error += np.sum((prediction - target_block) ** 2, axis=1)
+    residual = norm_sq - 2.0 * cross + prediction_energy
     zero = norm_sq
-    mean_target_mse = np.mean((prediction - target) ** 2, axis=1)
     return {
         "residual_mean": float(np.mean(residual)),
         "zero_residual_mean": float(np.mean(zero)),
         "residual_ratio_to_zero": (None if float(np.mean(zero)) == 0.0
                                     else float(np.mean(residual) / np.mean(zero))),
-        "mean_gradient_mse": float(np.mean(mean_target_mse)),
+        "mean_gradient_mse": float(np.mean(unweighted_squared_error / basis.shape[1])),
         "mean_gradient_energy": float(np.mean(np.sum(target * target, axis=1))),
         "metric_weighted_target_energy": float(np.mean(np.sum(metric * target * target, axis=1))),
     }

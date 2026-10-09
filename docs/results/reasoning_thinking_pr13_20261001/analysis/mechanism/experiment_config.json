@@ -1,0 +1,10 @@
+{
+  "replay_dir": "/SSD/01/wja/grace-pr13-thinking-20261001/collection/replay",
+  "run_dir": "/SSD/01/wja/grace-pr13-thinking-20261001/collection/analysis/mechanism",
+  "metric_file": null,
+  "metric_name": "euclidean",
+  "difficulty_manifest": null,
+  "split_manifest": null,
+  "bootstrap": 1000,
+  "seed": 17
+}

@@ -38,7 +38,8 @@ def test_smoothed_prescan_uses_explicit_prior_only_for_independent_samples():
     assert baseline.initialize_from_prescan("fail", [0.] * 4) == pytest.approx(.1)
     assert baseline.initialize_from_prescan("pass", [1.] * 4) == pytest.approx(.9)
     baseline.update_ht_mean("fail", [1., None], [.2, .8])
-    assert baseline.get("fail") == 2.5  # No smoothing/clipping of the HT history.
+    # No smoothing of the HT history; the 1/.2 HT mean of 2.5 is clipped to 1.
+    assert baseline.get("fail") == 1.0
 
 
 def test_fixed_raw_pg_preserves_reward_minus_b_and_stopper_null():

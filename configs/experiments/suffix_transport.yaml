@@ -1,0 +1,24 @@
+# Stack after the model/hardware config. No predictor, basis or router.
+enable_thinking: true
+temperature: 1.0
+decision_tokens: 512
+max_new_tokens: 8192
+lora:
+  targets: [q_proj, v_proj]
+  dropout: 0.0
+  compute_dtype: bfloat16
+suffix_transport:
+  method: suffix_transport
+  group_size: 4
+  strength: 1.0
+  baseline: 0.5              # Fixed before the batch; not an outcome-fitted baseline.
+  n_problems: 32             # 0 means all records in the selected split.
+  selection_seed: 17
+  split: audit
+  groups_per_problem: 2
+  audit_draws: 8
+  full_rb: true              # Expensive, audit only.
+  bootstrap: 1000
+  prompts_per_step: 1
+  train_steps: 100
+  checkpoint_every: 10

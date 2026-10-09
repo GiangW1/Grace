@@ -1,0 +1,52 @@
+[
+  {
+    "text": " 6\troot3",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      21,
+      33698,
+      18,
+      151645
+    ],
+    "seed": 1278278027
+  },
+  {
+    "text": " 6",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      21,
+      151645
+    ],
+    "seed": 1923201772
+  },
+  {
+    "text": " 6",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      21,
+      151645
+    ],
+    "seed": 541880560
+  },
+  {
+    "text": " 6",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      21,
+      151645
+    ],
+    "seed": 766394076
+  }
+]

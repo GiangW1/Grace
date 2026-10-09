@@ -1,0 +1,89 @@
+[
+  {
+    "text": " Let me start by calculating the number of integers \u22642015 divisible by 5, which is floor(2015/5). Let me",
+    "reward": 0.0,
+    "seed": 1078855590,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: Let me start by calculating the number of integers \u22642015 divisible by 5, which is floor(2015/5). Let me",
+    "token_ids": [
+      6771,
+      752,
+      1191,
+      553,
+      37614,
+      279,
+      1372,
+      315,
+      25780,
+      37294,
+      17,
+      15,
+      16,
+      20,
+      74916,
+      553,
+      220,
+      20,
+      11,
+      892,
+      374,
+      6422,
+      7,
+      17,
+      15,
+      16,
+      20,
+      14,
+      20,
+      568,
+      6771,
+      752
+    ]
+  },
+  {
+    "text": " 324",
+    "reward": 0.0,
+    "seed": 288044302,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 324",
+    "token_ids": [
+      220,
+      18,
+      17,
+      19,
+      151645
+    ]
+  },
+  {
+    "text": " 403",
+    "reward": 0.0,
+    "seed": 134415449,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 403",
+    "token_ids": [
+      220,
+      19,
+      15,
+      18,
+      151645
+    ]
+  },
+  {
+    "text": " 374",
+    "reward": 0.0,
+    "seed": 1936715727,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 374",
+    "token_ids": [
+      220,
+      18,
+      22,
+      19,
+      151645
+    ]
+  }
+]

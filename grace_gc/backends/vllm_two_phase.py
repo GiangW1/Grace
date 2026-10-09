@@ -304,6 +304,10 @@ def generate_with_params(llm, prompts, param_list, kwargs, execution):
     return outputs
 
 
+def draw_request_seeds(rng, stream, count):
+    return [int(rng.integers(stream, 0, 2**31 - 1)) for _ in range(count)]
+
+
 def generate_phase(
     llm,
     prompt_token_ids: list[list[int]],
@@ -322,7 +326,7 @@ def generate_phase(
     _LLM, _SP = _require_vllm()
     prompts = _vllm_prompts(prompt_token_ids)
     if request_seeds is None:
-        seeds = [int(rng.integers(stream, 0, 2**31 - 1)) for _ in prompt_token_ids]
+        seeds = draw_request_seeds(rng, stream, len(prompt_token_ids))
     else:
         seeds = [int(value) for value in request_seeds]
         if len(seeds) != len(prompt_token_ids):

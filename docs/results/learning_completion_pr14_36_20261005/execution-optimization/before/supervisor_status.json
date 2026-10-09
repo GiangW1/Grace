@@ -1,0 +1,9 @@
+{
+  "status": "collecting",
+  "updated_utc": "2026-10-04T09:50:42.958353+00:00",
+  "n_problems": 36,
+  "gradient_gpus": [
+    1
+  ],
+  "rollout_gpu": 3
+}

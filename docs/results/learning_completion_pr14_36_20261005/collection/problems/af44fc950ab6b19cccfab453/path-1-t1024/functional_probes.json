@@ -1,0 +1,76 @@
+[
+  {
+    "text": " 2^{n+1} - 2 Answer: 4",
+    "reward": 0.0,
+    "seed": 245938960,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 2^{n+1} - 2 Answer: 4",
+    "token_ids": [
+      220,
+      17,
+      47822,
+      77,
+      10,
+      16,
+      92,
+      481,
+      220,
+      17,
+      21806,
+      25,
+      220,
+      19,
+      151645
+    ]
+  },
+  {
+    "text": " 3^n + 2^n",
+    "reward": 0.0,
+    "seed": 1960485447,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 3^n + 2^n",
+    "token_ids": [
+      220,
+      18,
+      86167,
+      488,
+      220,
+      17,
+      86167,
+      151645
+    ]
+  },
+  {
+    "text": " 36",
+    "reward": 0.0,
+    "seed": 906214190,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 36",
+    "token_ids": [
+      220,
+      18,
+      21,
+      151645
+    ]
+  },
+  {
+    "text": " 3^n + 1",
+    "reward": 0.0,
+    "seed": 1658608694,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 3^n + 1",
+    "token_ids": [
+      220,
+      18,
+      86167,
+      488,
+      220,
+      16,
+      151645
+    ]
+  }
+]

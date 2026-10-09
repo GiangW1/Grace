@@ -1,0 +1,79 @@
+[
+  {
+    "text": " 1",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      16,
+      151645
+    ],
+    "seed": 821190485
+  },
+  {
+    "text": " 3\n\nWait, let me check again:\n\nFirst term: ab -2a -2b +4  \nSecond term: bc -2b -2",
+    "reward": 0.0,
+    "finish_reason": "length",
+    "truncated": true,
+    "token_ids": [
+      220,
+      18,
+      271,
+      14190,
+      11,
+      1077,
+      752,
+      1779,
+      1549,
+      1447,
+      5338,
+      4647,
+      25,
+      668,
+      481,
+      17,
+      64,
+      481,
+      17,
+      65,
+      488,
+      19,
+      2303,
+      15666,
+      4647,
+      25,
+      17916,
+      481,
+      17,
+      65,
+      481,
+      17
+    ],
+    "seed": 1861111155
+  },
+  {
+    "text": " 1",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      16,
+      151645
+    ],
+    "seed": 2135574221
+  },
+  {
+    "text": " 1",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      16,
+      151645
+    ],
+    "seed": 614470096
+  }
+]

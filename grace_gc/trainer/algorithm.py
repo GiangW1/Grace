@@ -510,6 +510,13 @@ def run_algorithm1_step(
     _gpu_progress(cfg, f"phase=continue_done n_rewards={len(rewards)} wall_s={timings['continue']:.1f}")
 
     adv = advantages_for_method(state.spec.objective, rewards, problem_ids, state.baseline)
+    loss_n, dynamic_sampling = n, None
+    if (cfg.get("dynamic_sampling") or {}).get("enabled", False) and state.spec.objective == "grpo":
+        from grace_gc.trainer.advantages import informative_groups
+
+        loss_n = int(state.n_ref or n)
+        keep, dynamic_sampling = informative_groups(rewards, problem_ids, loss_n)
+        adv = np.where(keep, adv, 0.0)
     named = engines.named_lora()
     optimizer.zero_grad()
     chosen = z >= 1.0
@@ -528,6 +535,7 @@ def run_algorithm1_step(
         named,
         state.layout,
         audit_draw >= 1.0,
+        denominator=loss_n,
     )
     timings["backward"] = timer.lap()
 
@@ -561,7 +569,9 @@ def run_algorithm1_step(
             gold=golds[i],
             extracted=extracted_list[i],
             answer_first_token=first_tokens[i],
-            baseline_b=state.baseline.get(problem_ids[i]),
+            # Record the b actually used (leave-one-out varies per start).
+            baseline_b=(rewards[i] - float(adv[i]) if rewards[i] is not None and state.baseline.mode == "loo"
+                        else state.baseline.get(problem_ids[i])),
             q_hat=None if q_hat_out is None else float(q_hat_out[i]),
             prompt_token_ids=[int(x) for x in prompt_ids[i]],
             prefix_token_ids=[int(x) for x in prefixes[i]],
@@ -748,7 +758,7 @@ def run_algorithm1_step(
     pred_metrics["fresh_supervision"] = fresh_metrics
 
     timings["predictor"] = timer.lap()
-    used, full = batch_token_costs(prompt_lens, prefixes, finished, z, max_new)
+    used, full = batch_token_costs(prompt_lens, prefixes, finished, z, max_new, full_ids=full_ids)
     ratio = 1.0 if full <= 0.0 else used / full
     actual_response = [
         float(rec.response_tokens) for rec in records if float(rec.z) >= 1.0
@@ -779,6 +789,8 @@ def run_algorithm1_step(
         "n": n,
         "n_completed": int(z.sum()),
         "n_stopped": int((z < 1.0).sum()),
+        "loss_denominator": int(loss_n),
+        "dynamic_sampling": dynamic_sampling,
         "n_prefix_finished": int(prefix_done.sum()),
         "n_eligible": int(((~prefix_done) & (remainings > 0)).sum()),
         "n_continued": n_continued,

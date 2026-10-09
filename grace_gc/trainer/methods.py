@@ -82,3 +82,16 @@ def apply_method_defaults(cfg: dict) -> dict:
 def uniform_p(n: int, beta: float, p_min: float) -> float:
     """Same expected continuation rate as β, still clipped to p_min."""
     return float(min(1.0, max(p_min, beta)))
+
+
+def dynamic_sampling_prompts(cfg: dict, spec: MethodSpec, n_prompts: int) -> int:
+    """Prompts to draw: GRPO dynamic sampling oversamples, then keeps n_prompts informative groups."""
+    options = cfg.get("dynamic_sampling") or {}
+    if not options.get("enabled", False) or spec.objective != "grpo":
+        return int(n_prompts)
+    oversample = float(options.get("oversample", 2.0))
+    if not oversample >= 1.0:
+        raise ValueError("dynamic_sampling.oversample must be >= 1")
+    import math
+
+    return int(math.ceil(int(n_prompts) * oversample))

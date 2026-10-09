@@ -279,7 +279,8 @@ def audit_fixed_batches(records, engines, layout, encode, payload, predictor, u,
             baseline[rec.problem_id] = history.get(rec.problem_id)
         elif mode == "prescan":
             count = int(audit.get("prescan_samples", (cfg.get("baseline") or {}).get("prescan", 4)))
-            if prescan_policy.uses_prescan:
+            # Frozen audits need an explicit b; only a fixed training baseline skips prescan.
+            if prescan_policy.mode != "fixed":
                 if count <= 0:
                     raise ValueError("independent prescan requires a positive sample count")
                 _independent_pass_rate(engines, rec, encode, count, horizon, prescan_rng, engines.eos_id, samples)
@@ -290,7 +291,7 @@ def audit_fixed_batches(records, engines, layout, encode, payload, predictor, u,
             raise ValueError("baseline_mode must be checkpoint, fixed, or prescan")
         baseline_raw.append({"problem_id": rec.problem_id, "baseline": baseline[rec.problem_id], "samples": samples,
                              "checkpoint_default_used": mode == "checkpoint" and history.uses_prescan and rec.problem_id not in history.values,
-                             "prescan_skipped_fixed_training_baseline": mode == "prescan" and not prescan_policy.uses_prescan})
+                             "prescan_skipped_fixed_training_baseline": mode == "prescan" and prescan_policy.mode == "fixed"})
     run.write_json("batch_audit_baselines.json", {"mode": mode, "frozen_for_all_replicates": True,
                    "configuration": (history.configuration() if mode == "checkpoint" else prescan_policy.configuration())
                                     if mode != "fixed" else {"mode": "fixed", "fixed_value": float(audit.get("baseline", .5))},

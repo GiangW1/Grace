@@ -1,0 +1,74 @@
+[
+  {
+    "text": " 2^{n - 1}",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      47822,
+      77,
+      481,
+      220,
+      16,
+      92,
+      151645
+    ],
+    "seed": 1387098674
+  },
+  {
+    "text": " 2^{n - 1}",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      47822,
+      77,
+      481,
+      220,
+      16,
+      92,
+      151645
+    ],
+    "seed": 1616803452
+  },
+  {
+    "text": " 2^{n - 1}",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      47822,
+      77,
+      481,
+      220,
+      16,
+      92,
+      151645
+    ],
+    "seed": 1689470120
+  },
+  {
+    "text": " 2^{n - 1}",
+    "reward": 0.0,
+    "finish_reason": "stop",
+    "truncated": false,
+    "token_ids": [
+      220,
+      17,
+      47822,
+      77,
+      481,
+      220,
+      16,
+      92,
+      151645
+    ],
+    "seed": 1866000555
+  }
+]

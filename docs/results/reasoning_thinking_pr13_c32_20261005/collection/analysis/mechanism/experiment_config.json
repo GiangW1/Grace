@@ -1,0 +1,10 @@
+{
+  "replay_dir": "/SSD/00/wja/grace-pr13-thinking-v3-8cac23f-c32-20261004-run/collection/replay",
+  "run_dir": "/SSD/00/wja/grace-pr13-thinking-v3-8cac23f-c32-20261004-run/collection/analysis/mechanism",
+  "metric_file": "/SSD/00/wja/grace-pr13-thinking-v3-8cac23f-c32-20261004-run/collection/replay/metric_weights.npy",
+  "metric_name": "euclidean",
+  "difficulty_manifest": null,
+  "split_manifest": null,
+  "bootstrap": 1000,
+  "seed": 17
+}

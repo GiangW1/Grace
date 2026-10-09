@@ -1,0 +1,86 @@
+[
+  {
+    "text": " 13",
+    "reward": 0.0,
+    "seed": 1115728990,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 13",
+    "token_ids": [
+      220,
+      16,
+      18,
+      151645
+    ]
+  },
+  {
+    "text": " 13",
+    "reward": 0.0,
+    "seed": 1104047321,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 13",
+    "token_ids": [
+      220,
+      16,
+      18,
+      151645
+    ]
+  },
+  {
+    "text": " 4.4 / 1.2 = 11/3. So the inradius r is 1 / (11/3) =",
+    "reward": 0.0,
+    "seed": 1430197319,
+    "finish_reason": "length",
+    "truncated": true,
+    "scored_text": "Answer: 4.4 / 1.2 = 11/3. So the inradius r is 1 / (11/3) =",
+    "token_ids": [
+      220,
+      19,
+      13,
+      19,
+      608,
+      220,
+      16,
+      13,
+      17,
+      284,
+      220,
+      16,
+      16,
+      14,
+      18,
+      13,
+      2055,
+      279,
+      304,
+      26715,
+      435,
+      374,
+      220,
+      16,
+      608,
+      320,
+      16,
+      16,
+      14,
+      18,
+      8,
+      284
+    ]
+  },
+  {
+    "text": " 10",
+    "reward": 0.0,
+    "seed": 111550406,
+    "finish_reason": "stop",
+    "truncated": false,
+    "scored_text": "Answer: 10",
+    "token_ids": [
+      220,
+      16,
+      15,
+      151645
+    ]
+  }
+]

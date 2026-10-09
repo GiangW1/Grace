@@ -1,0 +1,147 @@
+{
+  "q_strata": "independent qualification where available; legacy half-A q is exploratory",
+  "difficulty_manifest": null,
+  "groups": {
+    "all": {
+      "n_prefixes": 128,
+      "n_problems": 32,
+      "weighting": "equal prefix within the reported problem cluster",
+      "gamma": 14.177230309245973,
+      "v_null": 47939.89905448789,
+      "lambda": 0.0002957292482642133,
+      "lambda_ci95": [
+        -0.0008277160164700465,
+        0.001540820062337118
+      ],
+      "bootstrap_requested": 1000,
+      "bootstrap_defined": 1000,
+      "bootstrap_unit": "problem; all prefixes for a sampled problem move together",
+      "zero_prefix_gradient_rows": 0,
+      "means": {
+        "gamma": 14.177230309245973,
+        "variance": 47925.72182417864,
+        "v_null": 47939.89905448789,
+        "c_energy": 7.750389568099266,
+        "g_dot_c": -5.668945668659505,
+        "c_parallel_energy": 0.1793427762629514,
+        "c_orthogonal_energy": 7.571046791836312,
+        "mean_energy": 3011.471748469232
+      },
+      "precision_pilot": {
+        "target_ci_half_width": 0.05,
+        "problem_influence_sd": 0.0032764563219271525,
+        "approx_problems": 1,
+        "scope": "normal approximation on this population; not a suffix-count power analysis"
+      }
+    },
+    "strict_pre_answer_undecided": {
+      "n_prefixes": 0,
+      "n_problems": 0,
+      "lambda": null,
+      "lambda_ci95": null,
+      "bootstrap_defined": 0
+    },
+    "observed_q_zero": {
+      "n_prefixes": 128,
+      "n_problems": 32,
+      "weighting": "equal prefix within the reported problem cluster",
+      "gamma": 14.177230309245973,
+      "v_null": 47939.89905448789,
+      "lambda": 0.0002957292482642133,
+      "lambda_ci95": [
+        -0.0008277160164700465,
+        0.001540820062337118
+      ],
+      "bootstrap_requested": 1000,
+      "bootstrap_defined": 1000,
+      "bootstrap_unit": "problem; all prefixes for a sampled problem move together",
+      "zero_prefix_gradient_rows": 0,
+      "means": {
+        "gamma": 14.177230309245973,
+        "variance": 47925.72182417864,
+        "v_null": 47939.89905448789,
+        "c_energy": 7.750389568099266,
+        "g_dot_c": -5.668945668659505,
+        "c_parallel_energy": 0.1793427762629514,
+        "c_orthogonal_energy": 7.571046791836312,
+        "mean_energy": 3011.471748469232
+      },
+      "precision_pilot": {
+        "target_ci_half_width": 0.05,
+        "problem_influence_sd": 0.0032764563219271525,
+        "approx_problems": 1,
+        "scope": "normal approximation on this population; not a suffix-count power analysis"
+      }
+    },
+    "position/True/1024": {
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "weighting": "equal prefix within the reported problem cluster",
+      "gamma": -47.330033311685824,
+      "v_null": 51332.117516577026,
+      "lambda": -0.0009220354741142564,
+      "lambda_ci95": [
+        -0.002377595945717059,
+        0.0004696207000026428
+      ],
+      "bootstrap_requested": 1000,
+      "bootstrap_defined": 1000,
+      "bootstrap_unit": "problem; all prefixes for a sampled problem move together",
+      "zero_prefix_gradient_rows": 0,
+      "means": {
+        "gamma": -47.330033311685824,
+        "variance": 51379.44754988872,
+        "v_null": 51332.117516577026,
+        "c_energy": -4.228404599546847,
+        "g_dot_c": -45.377305341904126,
+        "c_parallel_energy": 0.142121359534862,
+        "c_orthogonal_energy": -4.370525959081709,
+        "mean_energy": 1610.0765547522385
+      },
+      "precision_pilot": {
+        "target_ci_half_width": 0.05,
+        "problem_influence_sd": 0.00428676044492315,
+        "approx_problems": 1,
+        "scope": "normal approximation on this population; not a suffix-count power analysis"
+      }
+    },
+    "position/True/2048": {
+      "n_prefixes": 64,
+      "n_problems": 32,
+      "weighting": "equal prefix within the reported problem cluster",
+      "gamma": 75.68449393017777,
+      "v_null": 44547.680592398756,
+      "lambda": 0.00169895475867024,
+      "lambda_ci95": [
+        -0.000637293253583829,
+        0.0038694977144952294
+      ],
+      "bootstrap_requested": 1000,
+      "bootstrap_defined": 1000,
+      "bootstrap_unit": "problem; all prefixes for a sampled problem move together",
+      "zero_prefix_gradient_rows": 0,
+      "means": {
+        "gamma": 75.68449393017777,
+        "variance": 44471.996098468575,
+        "v_null": 44547.680592398756,
+        "c_energy": 19.72918373574538,
+        "g_dot_c": 34.03941400458511,
+        "c_parallel_energy": 0.21656419299104082,
+        "c_orthogonal_energy": 19.512619542754337,
+        "mean_energy": 4412.866942186226
+      },
+      "precision_pilot": {
+        "target_ci_half_width": 0.05,
+        "problem_influence_sd": 0.00611247772247052,
+        "approx_problems": 1,
+        "scope": "normal approximation on this population; not a suffix-count power analysis"
+      }
+    }
+  },
+  "metric_name": "euclidean",
+  "source_format": "PR12_trajectory_arrays",
+  "assumptions": "binary rewards, fixed b and metric, matching full-softmax sampling/score policy",
+  "null_definition": "observed suffix second moment with mean coupling removed; not independently permuted reward",
+  "strict_claim": "rho_L < rho_A before answer emission and reliable functional recovery",
+  "difficulty_manifest_sha256": null
+}

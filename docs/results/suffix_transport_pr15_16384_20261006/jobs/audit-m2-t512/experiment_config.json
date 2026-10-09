@@ -1,0 +1,149 @@
+{
+  "args": {
+    "mode": "audit",
+    "cpu": false,
+    "config": [
+      "configs/hardware/a100_1.yaml",
+      "configs/experiments/suffix_transport.yaml",
+      "configs/experiments/suffix_transport_execution_a100_2.yaml",
+      "configs/experiments/suffix_transport_optimized_16384.yaml"
+    ],
+    "run_dir": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/jobs/audit-m2-t512",
+    "model_path": "/SSD/00/wja/GRACE/data/Qwen3-4B",
+    "data_path": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/input/audit.jsonl",
+    "eval_data_path": "/SSD/00/wja/GRACE/data/math500/test.jsonl",
+    "init_checkpoint": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/shared-initial-actor.npz",
+    "gpus": "0,2",
+    "seed": null,
+    "method": null,
+    "group_size": 2,
+    "decision_tokens": 512,
+    "max_new_tokens": 16384,
+    "n_problems": 32,
+    "groups_per_problem": 2,
+    "audit_draws": 8,
+    "steps": null,
+    "strength": null,
+    "budget_seconds": null,
+    "no_full_rb": false
+  },
+  "config": {
+    "method": "suffix_transport",
+    "seed": 17,
+    "split_seed": 17,
+    "n_start": 2,
+    "n_prompts": 1,
+    "num_steps": 1,
+    "prompt_max_tokens": 1024,
+    "decision_tokens": 512,
+    "max_new_tokens": 16384,
+    "temperature": 1.0,
+    "enable_thinking": true,
+    "eval_temperature": 0.6,
+    "eval_top_p": 0.95,
+    "allocation": {
+      "p_min": 0.2,
+      "beta": 0.5,
+      "bisection_iters": 20
+    },
+    "predictor": {
+      "k": 8,
+      "hidden_coord": 256,
+      "hidden_risk": 64,
+      "lr": 0.001,
+      "epochs": 2,
+      "warmup_steps": 0,
+      "audit_s": 0.125,
+      "reservoir_size": 512,
+      "refresh_every": 32,
+      "constant_cost": true,
+      "coord_kind": "mlp",
+      "ridge_l2": 1.0,
+      "use_affine": true,
+      "shrink_m": true,
+      "align_basis": true
+    },
+    "lora": {
+      "rank": 16,
+      "alpha": 32.0,
+      "dropout": 0.0,
+      "gradient_checkpointing": true,
+      "targets": [
+        "q_proj",
+        "v_proj"
+      ],
+      "compute_dtype": "bfloat16"
+    },
+    "optim": {
+      "lr": 0.0001,
+      "betas": [
+        0.9,
+        0.99
+      ],
+      "weight_decay": 0.0,
+      "grad_clip": 1.0
+    },
+    "colocated_vllm_memory_utilization": 0.3,
+    "colocated_vllm_max_num_seqs": 2,
+    "format_warmup": {
+      "steps": 0,
+      "batch_size": 4
+    },
+    "baseline": {
+      "mode": "fixed",
+      "fixed_value": 0.5,
+      "prescan_n": 0
+    },
+    "hardware": {
+      "name": "a100",
+      "n_gpu": 2,
+      "gpu_memory_gb": 80
+    },
+    "analysis": {
+      "answer_undecided": 0.15,
+      "nonzero_signal_kappa": 0.05,
+      "delta_answer": 0.05,
+      "epsilon_learn": 0.2,
+      "wilson_lo": 0.05,
+      "wilson_hi": 0.95,
+      "require_pre_emit": true
+    },
+    "suffix_transport": {
+      "method": "suffix_transport",
+      "group_size": 2,
+      "strength": 1.0,
+      "baseline": 0.5,
+      "n_problems": 32,
+      "selection_seed": 17,
+      "groups_per_problem": 2,
+      "audit_draws": 8,
+      "full_rb": true,
+      "bootstrap": 1000,
+      "train_steps": 100,
+      "prompts_per_step": 1,
+      "checkpoint_every": 10,
+      "split": "audit",
+      "audit_draw_batch_size": 8,
+      "posterior_score_batch_size": 4,
+      "fuse_audit_scores": true,
+      "audit_prefetch": true,
+      "actor_checkpoint_stride": 2
+    },
+    "rollout": {
+      "workers": 1
+    },
+    "vllm": {
+      "tensor_parallel": 1,
+      "dtype": "bfloat16",
+      "gpu_memory_utilization": 0.65,
+      "max_num_seqs": 32,
+      "max_num_batched_tokens": 8192
+    },
+    "backend": "gpu_verl",
+    "model_path": "/SSD/00/wja/GRACE/data/Qwen3-4B",
+    "data_path": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/input/audit.jsonl",
+    "eval_data_path": "/SSD/00/wja/GRACE/data/math500/test.jsonl",
+    "init_checkpoint": "/SSD/00/wja/grace-pr15-st-16384-optimized-20261006-run/shared-initial-actor.npz",
+    "experiment_variant": "suffix_transport"
+  }
+}

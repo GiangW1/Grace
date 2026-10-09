@@ -1,0 +1,10 @@
+{
+  "status": "completed",
+  "problem_id": "8a54c02c-dd40-417e-bb77-f1b57574a1c9",
+  "n_bundles": 20,
+  "seed": 1239419265,
+  "finished_utc": "2026-10-04T20:04:10.089837+00:00",
+  "enable_thinking": true,
+  "reward_protocol_version": 3,
+  "require_complete_answers": true
+}

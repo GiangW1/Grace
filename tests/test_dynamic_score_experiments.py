@@ -7,11 +7,11 @@ import tempfile
 import numpy as np
 import pytest
 
-from grace_gc.audit.benefit_replay import replay_means
+from grace_gc.audit.benefit_replay import replay_means, prefix_keys_sha256
 from grace_gc.audit.dynamic_score import (feature_matrix, fit_prefix_coefficients,
                                            load_dynamic_replay, residual_metrics)
 from grace_gc.versions import sha256_array, sha256_file
-from scripts.expected_gain_dynamic_oracle import main as oracle_main
+from scripts.expected_gain_dynamic_oracle import _mechanism_report, main as oracle_main
 from scripts.expected_gain_dynamic_predictor import main as predictor_main
 from scripts.replay_expected_gain import _apply_problem_baselines, _load_problem_baselines
 
@@ -36,11 +36,10 @@ def _write_replay(root: Path):
     with (replay / "prefixes.jsonl").open("w", encoding="utf-8") as handle:
         for index in range(n):
             handle.write(json.dumps({
-                "problem_id": f"p{index}", "features": [float(index), 1.],
+                "problem_id": f"p{index}", "t": 512, "features": [float(index), 1.],
                 "prompt_features": [float(index), 1.], "prefix_token_ids": [1, index + 2],
                 "mean_cost": 1., "mean_reward": .5, "baseline": .5,
-                "half_mean_reward_a": [0., .5, 1.][index % 3],
-                "half_mean_reward_b": .5,
+                "half_mean_reward": [[0., .5, 1.][index % 3], .5],
                 "half_mean_advantage": [[-.5, -.5], [0., 0.], [.5, .5]][index % 3],
             }) + "\n")
     split = {"train": ["p0", "p1", "p2"], "validation": ["p3"],
@@ -66,6 +65,147 @@ def test_replay_can_store_independent_half_means():
         assert metadata["half_counts"] == [2, 2]
         assert len(metadata["half_mean_norm_sq"]) == 2
         assert len(metadata["half_mean_advantage"]) == 2
+        assert metadata["half_mean_reward_a"] == metadata["half_mean_reward"][0]
+        assert metadata["half_mean_reward_b"] == metadata["half_mean_reward"][1]
+
+
+def test_replay_stores_full_trajectory_decomposition():
+    rows = [{"problem_id": "p", "path_id": "p:0", "t": 1,
+             "prompt_token_ids": [1], "prefix_token_ids": [1, 2],
+             "continuation_records": [
+                 {"token_ids": [1, 2, i + 3], "prompt_len": 1,
+                  "reward": float(i % 2), "baseline": .25,
+                  "generated_suffix_tokens": 1}
+                 for i in range(4)]}]
+    with tempfile.TemporaryDirectory() as tmp:
+        replay_means(
+            rows,
+            lambda tokens, *_: np.asarray([float(tokens[-1]), 0.]),
+            2, tmp, max_continuations=4, seed=7, store_half_means=True,
+            store_trajectory_decomposition=True,
+            prefix_grad_fn=lambda row: np.asarray([10., 20.]),
+        )
+        full_a = np.load(Path(tmp) / "half_mean_full_grads_a.npy")
+        full_b = np.load(Path(tmp) / "half_mean_full_grads_b.npy")
+        suffix_a = np.load(Path(tmp) / "half_mean_grads_a.npy")
+        suffix_b = np.load(Path(tmp) / "half_mean_grads_b.npy")
+        rows_out = [json.loads(line) for line in (Path(tmp) / "prefixes.jsonl").read_text().splitlines()]
+        assert np.load(Path(tmp) / "prefix_score_gradients.npy").shape == (1, 2)
+        # The policy-gradient callback already returns the full trajectory
+        # target. The prefix score gradient is stored as a separate basis and
+        # must not be added a second time.
+        np.testing.assert_allclose(full_a, suffix_a)
+        np.testing.assert_allclose(full_b, suffix_b)
+        np.testing.assert_allclose(
+            np.load(Path(tmp) / "prefix_score_gradients.npy"), [[10., 20.]])
+        assert rows_out[0]["trajectory_decomposition"]["target"] == "full_trajectory"
+
+
+def test_q_strata_accepts_legacy_half_reward_pair():
+    from grace_gc.audit.dynamic_score import q_strata
+
+    rows = [{"half_mean_reward": [0., .5]}, {"half_mean_reward": [1., .5]}]
+    strata, available = q_strata(rows)
+    assert available is True
+    np.testing.assert_array_equal(strata["observed_q_zero"], [0])
+    np.testing.assert_array_equal(strata["observed_q_one"], [1])
+
+
+def test_cross_fitted_orthogonal_energy_removes_b_half_noise():
+    basis = np.asarray([[[1.], [0.]]])
+    target_a = np.asarray([[1., 0.]])
+    target_b = np.asarray([[1., 10.]])
+    report = _mechanism_report(
+        [{"half_mean_advantage": [1., 1.]}], basis, target_a, target_b,
+        np.asarray([101.]), np.ones(2), np.asarray([0]), np.asarray([[1.]]))
+    assert report["orthogonal_energy_fraction"] == pytest.approx(0.0)
+    assert report["b_only_orthogonal_energy_fraction"] > .9
+
+
+def _trajectory_replay(root):
+    rows = [{"problem_id": f"p{i}", "path_id": f"path{i}", "t": 1,
+             "answer_emitted": False, "continuation_records": [
+                 {"token_ids": [1, 2, 3 + j], "prompt_len": 1,
+                  "reward": 1., "baseline": 0.} for j in range(4)]}
+            for i in range(2)]
+    replay_means(rows, lambda *args: np.array([1., 2.]), 2, root,
+                 store_half_means=True, store_trajectory_decomposition=True,
+                 prefix_grad_fn=lambda row: np.array([1., float(row["t"])]))
+    return rows
+
+
+@pytest.mark.parametrize("corruption", ["missing", "array", "rows", "keys",
+                                      "actor_sha256", "checkpoint_sha256", "layout_sha256"])
+def test_internal_basis_rejects_wrong_provenance(tmp_path, corruption):
+    _trajectory_replay(tmp_path)
+    sidecar = tmp_path / "score_gradient_provenance.json"
+    metadata = json.loads(sidecar.read_text())
+    if corruption == "missing":
+        sidecar.unlink()
+    elif corruption == "array":
+        np.save(tmp_path / "prefix_score_gradients.npy", np.zeros((2, 2)))
+    elif corruption == "rows":
+        path = tmp_path / "prefixes.jsonl"
+        path.write_text("\n".join(reversed(path.read_text().splitlines())) + "\n")
+    elif corruption == "keys":
+        metadata["prefix_keys_sha256"] = "wrong"
+        sidecar.write_text(json.dumps(metadata))
+    else:
+        metadata[corruption] = "old"
+        sidecar.write_text(json.dumps(metadata))
+        (tmp_path / "replay_provenance.json").write_text(json.dumps({corruption: "new"}))
+    with pytest.raises(ValueError, match="provenance|rows"):
+        load_dynamic_replay(tmp_path, None, gradient_target="trajectory")
+
+
+def test_replay_filters_emitted_answers_and_records_unknowns(tmp_path):
+    source = _trajectory_replay(tmp_path / "source")
+    rows = [source[0], {**source[1], "answer_emitted": True},
+            {**source[1], "finished": True}, {**source[1], "answer_emitted": None}]
+    summary = replay_means(rows, lambda *args: np.array([1., 2.]), 2,
+                           tmp_path / "filtered", store_half_means=True)
+    assert summary["n_prefixes"] == 2
+    assert summary["excluded_prefixes"] == 2
+    assert summary["finished_input_prefixes"] == 1
+    assert summary["answer_emitted_input_prefixes"] == 1
+    assert summary["answer_emitted_unknown_prefixes"] == 1
+    saved = [json.loads(line) for line in
+             (tmp_path / "filtered" / "prefixes.jsonl").read_text().splitlines()]
+    assert all(not row["answer_emitted"] for row in saved)
+
+
+def test_internal_basis_writer_and_loader_agree(tmp_path):
+    _trajectory_replay(tmp_path)
+    loaded = load_dynamic_replay(tmp_path, None, gradient_target="trajectory")
+    np.testing.assert_array_equal(loaded[4][:, :, 0], np.ones((2, 2)))
+    del loaded
+
+
+def test_dynamic_loader_reads_full_trajectory_target_from_replay():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        replay, _score, split = _write_replay(root)
+        full_a = np.load(replay / "half_mean_grads_a.npy") + 1.
+        full_b = np.load(replay / "half_mean_grads_b.npy") + 1.
+        np.save(replay / "half_mean_full_grads_a.npy", full_a)
+        np.save(replay / "half_mean_full_grads_b.npy", full_b)
+        np.save(replay / "half_mean_full_norm_sq_b.npy", np.sum(full_b * full_b, axis=1))
+        np.save(replay / "prefix_score_gradients.npy", np.load(_score)[:, :, 0])
+        np.save(replay / "half_full_metric_norm_sq_b.npy", np.sum(full_b * full_b, axis=1))
+        saved_rows = [json.loads(line) for line in (replay / "prefixes.jsonl").read_text().splitlines()]
+        (replay / "score_gradient_provenance.json").write_text(json.dumps({
+            "shape": [6, 3, 1],
+            "replay_prefixes_sha256": sha256_file(replay / "prefixes.jsonl"),
+            "prefix_keys_sha256": prefix_keys_sha256(saved_rows),
+            "score_gradients_sha256": sha256_array(np.load(_score)),
+        }), encoding="utf-8")
+        rows, target_a, target_b, _norm, basis, _metric, _name = load_dynamic_replay(
+            replay, None, gradient_target="trajectory")
+        assert len(rows) == 6
+        np.testing.assert_allclose(target_a, full_a)
+        np.testing.assert_allclose(target_b, full_b)
+        assert basis.shape == (6, 3, 1)
+        del rows, target_a, target_b, _norm, basis, _metric, _name
 
 
 def test_dynamic_oracle_and_predictor_use_a_b_split_without_torch():
@@ -78,6 +218,8 @@ def test_dynamic_oracle_and_predictor_use_a_b_split_without_torch():
         assert oracle["stage"] == "A"
         assert oracle["roles"]["diagnostic"]["oracle"]["residual_ratio_to_zero"] < 0.1
         assert oracle["q_stratification"]["available"] is True
+        assert sum(row["n_prefixes"] for row in
+                   oracle["roles"]["diagnostic"]["q_strata"].values()) == 2
         assert "reward_only" in oracle["roles"]["diagnostic"]["mechanism"]
         predictor_main(["--replay-dir", str(replay), "--score-gradients", str(score),
                         "--split-manifest", str(split), "--run-dir", str(root / "predictor"),
@@ -157,3 +299,15 @@ def test_calibrated_baseline_rewrites_each_continuation_and_checks_checkpoint():
         assert updated[0]["continuation_records"][0]["baseline"] == .75
         with pytest.raises(ValueError, match="checkpoint"):
             _load_problem_baselines(calibration, "checkpoint-b")
+
+
+def test_calibrated_baseline_metadata_catches_decision_mismatch():
+    with tempfile.TemporaryDirectory() as tmp:
+        calibration = Path(tmp) / "baseline.json"
+        calibration.write_text(json.dumps({
+            "checkpoint_sha256": "checkpoint-a",
+            "calibration": {"decision_tokens": 0},
+            "problems": {"p": .75},
+        }), encoding="utf-8")
+        with pytest.raises(ValueError, match="decision_tokens"):
+            _load_problem_baselines(calibration, "checkpoint-a", {"decision_tokens": 512})

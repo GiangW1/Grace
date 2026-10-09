@@ -63,15 +63,19 @@ def real_stream_backward_each(logprob_fn, advantages: np.ndarray, p: np.ndarray,
 
 
 def real_stream_backward_and_audit(logprob_fn, advantages, p, z, n, chosen,
-                                   named_params, layout, audit_mask):
+                                   named_params, layout, audit_mask, denominator=None):
     """Accumulate -Z*G/(N*p) and retain sampled, unweighted G in one pass.
+
+    ``n`` is the number of starts in this call; ``denominator`` (default n)
+    is the fixed loss normalizer, e.g. N_ref when dynamic sampling drew more.
 
     Every completed nonzero-advantage trajectory has the same gradient path,
     regardless of whether it is audited. Only audited G is copied to the host;
     extra label storage and fitting still cost time. No suffix is bought here.
     """
     torch = _torch()
-    scales = real_stream_loss_scale(advantages, p, z, n)
+    denominator = int(n if denominator is None else denominator)
+    scales = real_stream_loss_scale(advantages, p, z, denominator)
     chosen = np.asarray(chosen, dtype=bool).reshape(-1)
     audit_mask = np.asarray(audit_mask, dtype=bool).reshape(-1)
     if chosen.size != n or audit_mask.size != n:
@@ -91,7 +95,7 @@ def real_stream_backward_and_audit(logprob_fn, advantages, p, z, n, chosen,
         scalar = lp * float(advantages[i])
         grads = (torch.autograd.grad(scalar, params, allow_unused=True)
                  if scalar.requires_grad else [None] * len(params))
-        weight = -float(z[i]) / (n * float(p[i]))
+        weight = -float(z[i]) / (denominator * float(p[i]))
         for param, grad in zip(params, grads):
             if grad is not None:
                 if param.grad is None:

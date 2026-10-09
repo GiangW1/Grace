@@ -143,16 +143,16 @@ def test_ledger_only_excludes_nested_rows_in_their_own_session():
 
 
 def test_history_baseline_ht_updates_target_all_starts_not_completions():
-    # Enumerate selection of a reward-1 trajectory with p=.25 and a reward-0
-    # trajectory with p=1. Expectation must equal the complete-data mean .5.
-    estimates = []
-    for selected, probability in ((False, .75), (True, .25)):
-        baseline = HistoricalBaseline(alpha=1.)
-        rewards = [1. if selected else None, 0.]
-        baseline.update_ht_mean("p", rewards, [.25, 1.])
-        assert rewards == [1. if selected else None, 0.]
-        estimates.append(probability * baseline.get("p"))
-    assert sum(estimates) == .5
+    # Denominator is all starts. Unclipped HT means stay exact; values above 1
+    # are clipped, since G only needs b to be history-only, not unbiased.
+    baseline = HistoricalBaseline(alpha=1.)
+    rewards = [1., None, 0., 0.]
+    baseline.update_ht_mean("p", rewards, [.5, .5, 1., 1.])
+    assert rewards == [1., None, 0., 0.]
+    assert baseline.get("p") == .5
+    spike = HistoricalBaseline(alpha=1.)
+    spike.update_ht_mean("p", [1., 0.], [.25, 1.])
+    assert spike.get("p") == 1.
     full = HistoricalBaseline(alpha=.7)
     full.update_ht_mean("p", [1., 0.], [1., 1.])
     assert full.get("p") == .5
