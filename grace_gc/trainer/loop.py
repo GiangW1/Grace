@@ -8,6 +8,7 @@ import json
 import shutil
 
 import numpy as np
+from grace_gc.core.coordinates import IdentityBasis, prediction_basis
 
 from grace_gc.config import default_config, load_config, merge_configs, validate_config
 from grace_gc.core.layout import collect_lora_layout
@@ -159,7 +160,8 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
         prefixes, _ = engines.generate_prefix(prompt_ids, 2, probe_rng, "token")
         feat = engines.prefix_features(prefixes, np.array([len(prompt_ids[0])]), [0.5])["features"]
         in_dim = int(feat.shape[1])
-    k = min(int(cfg.get("predictor", {}).get("k", 2)), layout.dim)
+    u = prediction_basis(layout.dim, cfg.get("predictor") or {})
+    k = u.shape[1]
     predictor = None
     if spec.use_predictor:
         predictor = predictor_from_spec(
@@ -177,7 +179,8 @@ def run_tiny_training(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLed
         baseline=baseline_from_config(cfg.get("baseline")),
         rng=rng,
         layout=layout,
-        u=np.eye(layout.dim, k, dtype=np.float64),
+        u=u,
+        basis_id=1 if isinstance(u, IdentityBasis) else 0,
         predictor=predictor,
         reservoir=GradientReservoir(capacity=int(cfg.get("predictor", {}).get("reservoir_size", 64))),
         n_ref=n_start,

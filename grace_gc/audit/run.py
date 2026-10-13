@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from grace_gc.core.coordinates import as_basis, basis_pinv, IdentityBasis
 
 from grace_gc.audit.prefix_audit import PrefixBundle, audit_bundles, bundle_to_dict, jl_project
 from grace_gc.core.layout import collect_lora_layout, pack_grads
@@ -255,8 +256,8 @@ def _bundles_from_engines(
     eos_id = getattr(engines, "eos_id", None)
     bundles = []
     _bundles_from_engines.last = []
-    gram = None if u is None else np.asarray(u).T @ np.asarray(u)
-    gram_inverse = None if gram is None else np.linalg.pinv(gram)
+    gram = None if u is None else as_basis(u).T @ as_basis(u)
+    gram_inverse = None if gram is None else basis_pinv(gram)
     for record_index, rec in enumerate(records, start=1):
         print(
             f"phase=audit_problem_begin problem={record_index}/{len(records)} "
@@ -359,7 +360,7 @@ def _bundles_from_engines(
                     pred = predictor.forward_numpy(feat_in, feat_bundle.get("cost_feat"))
                     effective_f = control_variate_coordinates(pred.f, enabled=control_variate).copy()
                     effective_f[np.asarray(finished, dtype=bool)] = 0.
-                    mapped = effective_f @ np.asarray(u, dtype=np.float64).T
+                    mapped = effective_f @ as_basis(u).T
                     if mapped.shape[1] != layout.dim:
                         raise ValueError("checkpoint predictor maps to a different G dimension than the audit actor")
                     m_list = [mapped[i] for i in range(len(prefixes))]
@@ -621,7 +622,7 @@ def _audit_u(bundles: list[PrefixBundle], cfg: dict[str, Any]) -> np.ndarray:
     stored = (payload.get("basis") or {}).get("u")
     if stored is None:
         return u
-    arr = np.asarray(stored, dtype=np.float64)
+    arr = as_basis(stored)
     if arr.ndim != 2:
         raise ValueError("checkpoint basis U does not match audit G dimension")
     if arr.shape[0] == gdim:
@@ -629,6 +630,8 @@ def _audit_u(bundles: list[PrefixBundle], cfg: dict[str, Any]) -> np.ndarray:
     jl_dim = int((cfg.get("audit") or {}).get("jl_dim") or 0)
     seed = int((cfg.get("audit") or {}).get("jl_seed", cfg.get("seed", 0)))
     if jl_dim and gdim == jl_dim and arr.shape[0] > gdim:
+        if isinstance(arr, IdentityBasis):
+            raise ValueError("direct-coordinate audit requires jl_dim=0 (no sketch)")
         return jl_project(arr.T, gdim, seed).T
     raise ValueError("checkpoint basis U does not match audit G dimension")
 
@@ -663,7 +666,7 @@ def _frozen_predictor(cfg: dict[str, Any] | None, payload=None):
 
     heads = predictor_from_spec(int(raw.get("in_dim")), int(raw.get("k")), raw)
     heads.load_state_dict(raw)
-    return heads, np.asarray(stored, dtype=np.float64)
+    return heads, as_basis(stored)
 
 
 def _frozen_basis(cfg: dict[str, Any] | None, payload=None):
@@ -675,7 +678,7 @@ def _frozen_basis(cfg: dict[str, Any] | None, payload=None):
         return None
     payload = load_checkpoint(ckpt) if payload is None else payload
     stored = (payload.get("basis") or {}).get("u")
-    return None if stored is None else np.asarray(stored, dtype=np.float64)
+    return None if stored is None else as_basis(stored)
 
 
 def generate_bundles_tiny(
@@ -749,7 +752,33 @@ def generate_bundles_tiny(
     )
 
 
+def close_gpu_audit_cache(cache):
+    """Call after the last use of externally cached audit engines, even on failure."""
+    pool = cache.pop("rollout_pool", None)
+    if pool is not None:
+        pool.close()
+
+
 def generate_bundles_gpu(
+    records, n_prefixes, n_cont, decision, max_new, seed, cfg,
+    work_dir=None, engines=None, layout=None, cache=None, payload=None,
+    store_features=False, store_trajectory_gradients=False, trajectory_dir=None,
+):
+    # An external cache owns its pool. Standalone calls always release theirs.
+    owned = cache is None
+    cache = {} if owned else cache
+    try:
+        return _generate_bundles_gpu(
+            records, n_prefixes, n_cont, decision, max_new, seed, cfg,
+            work_dir, engines, layout, cache, payload, store_features,
+            store_trajectory_gradients, trajectory_dir,
+        )
+    finally:
+        if owned:
+            close_gpu_audit_cache(cache)
+
+
+def _generate_bundles_gpu(
     records: list[MathRecord],
     n_prefixes: int,
     n_cont: int,
@@ -785,6 +814,12 @@ def generate_bundles_gpu(
         from grace_gc.data.reward import require_math_verify
         from grace_gc.data.tokenize import encode_records_hf, load_hf_tokenizer, tokenizer_inventory
         from grace_gc.trainer.state_io import check_snapshot_identity
+        from grace_gc.backends.rollout_pool import RolloutPool, validate_layout
+
+        workers = validate_layout(cfg)
+        if workers:
+            import torch
+            torch.cuda.set_device(0)
 
         ckpt = cfg.get("checkpoint") or cfg.get("resume")
         if not ckpt:
@@ -798,6 +833,8 @@ def generate_bundles_gpu(
         actor = load_lora_actor(str(model_path), cfg.get("lora", {}))
         payload = load_checkpoint(ckpt) if payload is None else payload
         check_snapshot_identity(payload, cfg)
+        from grace_gc.backends.small_core import restore_fixed_bases
+        restore_fixed_bases(actor, payload)
         load_numpy_module_state(named_lora_params(actor), payload.get("actor") or {})
         if work_dir is not None:
             from grace_gc.versions import sha256_named
@@ -810,12 +847,20 @@ def generate_bundles_gpu(
         vllm_cfg = dict(cfg.get("vllm") or {})
         vllm_cfg.setdefault("seed", int(cfg.get("seed", 17)))
         vllm_cfg["max_model_len"] = vllm_needed_max_model_len(cfg, _audit_max_new(cfg))
-        vllm_cfg = cap_colocated_vllm_config(cfg, vllm_cfg)
-        llm = build_vllm_engine(str(model_path), vllm_cfg, int(cfg.get("lora", {}).get("rank", 16)))
-        if work_dir is not None and getattr(build_vllm_engine, "last", None):
+        rank = int(cfg.get("lora", {}).get("rank", 16))
+        if workers:
+            llm = RolloutPool.launch(str(model_path), vllm_cfg, rank,
+                                     int(cfg["hardware"]["n_gpu"]))
+            cache["rollout_pool"] = llm
+            engine_metadata = llm.metadata
+        else:
+            vllm_cfg = cap_colocated_vllm_config(cfg, vllm_cfg)
+            llm = build_vllm_engine(str(model_path), vllm_cfg, rank)
+            engine_metadata = getattr(build_vllm_engine, "last", None)
+        if work_dir is not None and engine_metadata:
             from grace_gc.logging_util.run_dir import RunDirectory
 
-            RunDirectory(Path(work_dir).parent).write_json("vllm_engine.json", build_vllm_engine.last)
+            RunDirectory(Path(work_dir).parent).write_json("vllm_engine.json", engine_metadata)
         adapter = Path(work_dir or "runs/audit-lora")
         engines, extra = make_gpu_engines(actor, llm, tokenizer, cfg, adapter)
         extra["sync"]()

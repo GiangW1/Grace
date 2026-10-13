@@ -25,6 +25,9 @@ def _require_finished(ok, what: str) -> None:
 
 
 def save_lora_adapter(actor, path: str | Path) -> Path:
+    if hasattr(actor, "_grace_small_core_config"):
+        from grace_gc.backends.small_core import export_small_core_adapter
+        return export_small_core_adapter(actor, path)
     path = Path(path)
     path.mkdir(parents=True, exist_ok=True)
     if not hasattr(actor, "save_pretrained"):

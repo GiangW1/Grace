@@ -1,0 +1,8 @@
+# Overlay small_core_audit.yaml for a wiring test, not statistical evidence.
+audit:
+  n_problems: 2
+  n_prefixes: 1
+  n_continuations: 4
+  n_baseline: 4
+  decision_grid: [512]
+  max_new_tokens: 8192

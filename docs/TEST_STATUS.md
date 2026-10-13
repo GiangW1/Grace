@@ -2,6 +2,15 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
+## 2026-10-13 小核心实验切换为非Thinking
+
+- 默认权重仍为用户显式提供的Qwen3-4B（非Base）；共享实验配置改为
+  `enable_thinking: false`，训练、评测和审计继承相同模式。
+- 保留rank8 / 8192输出token的5090显存短测，以及1张actor+3张生成卡的审计布局。
+  非Thinking实际回答可能更短，合成满长度探针仍强制计算1024+8192 tokens。
+- 本机全量回归：952 passed, 18 skipped，49.96s；新增模式继承断言覆盖
+  对照runner生成的配置和显存/审计配置合并。没有执行真实GPU测试。
+
 ## 审查遗留修复（2026-10-09，第二轮）
 
 - 本机全量 `949 tests: 945 passed, 4 skipped, 0 failed`（Windows Python 3.11）。上一轮的 5 个
@@ -245,6 +254,19 @@ Git Bash分别对 `run_minimal_gpu.sh`、`run_mechanism_gpu.sh`、`run_matched_c
 
 ## 如何跑
 
+### 2026-10-13 小参数 GRACE（本机 CPU，无 CUDA）
+
+- 基于 PR #16 `6656fb53af616c8d3f5285f6678e9498b80c4a66` 的可选实验，见 `SMALL_CORE_GRACE.md`。
+- `python -m pytest tests -q -rs -o addopts=''`：**944 passed, 18 skipped**（49.37 秒）。
+- 跳过：16 项缺少可选 `math_verify`、1 项需 GPU stack、1 项缺少不随源码发布的旧本机归档。
+- 新增 13 项测试全部通过：零初始化与非零核心梯度、冻结基底、RNG 隔离、
+  标准 LoRA 导出、小型随机 Qwen3→PEFT 输出一致性、当前核心状态特征、保存基底恢复、
+  18,432 维隐式单位映射、精确枚举 HT/p=1、梯度符号、direct 训练/续训/审计、零遗漏能量、实验命令生成。
+- 本机环境：Python 3.12.14、torch 2.14.1、numpy 2.5.4、transformers 5.19.0、peft 0.21.2。
+  这些不是建议升级服务器栈的版本约束。
+- **未运行**真实 Qwen3-4B RL、CUDA/vLLM adapter 加载和 BF16 行为一致性、GPU 性能或任务准确率。
+  CPU tiny 与小型随机 Qwen3 都是正确性测试，不能作为论文实验效果。
+
 ```bash
 python -m pytest tests -q -o addopts=''
 python scripts/train.py --config configs/experiments/minimal.yaml --run-dir runs/cpu-smoke
@@ -252,7 +274,24 @@ python scripts/train.py --config configs/experiments/minimal.yaml --run-dir runs
 
 当前工作树的 GPU 比较：`bash scripts/run_minimal_gpu.sh`。论文规模仍按 README：先 smoke Full-PG，再 Pilot。不把 tiny / 2026-09-16 两次 smoke / 那次 16 题链写成现役实测。
 
-## 2026-10-04 Learning completion execution optimization
+## 2026-10-13 RTX5090 four-card capacity-test extension
+
+- Added `rtx5090_rollout_4.yaml`: 1 HF actor + 3 independent TP=1 vLLM workers,
+  32GB/card, conservative generation concurrency and explicit chunked prefill.
+- Prefix and batch audits now use the same pool layout, sync exported adapters to all
+  workers, and close owned/cached pools on success and failure respectively.
+- Added rank8 / 8192-output-token Full-PG capacity config: one synthetic 1024+8192
+  full-gradient probe without an optimizer update, followed by 4 real training steps.
+  Optional actor allocator peaks and 500ms board-memory samples are saved separately.
+- Full local suite: **952 passed, 18 skipped** in 43.56s. Skips: 16 unavailable math-verify,
+  1 unavailable real GPU stack, 1 historical local archive not shipped with source.
+- Eight new CPU tests cover layout/config, audit pool ownership/failure cleanup,
+  full-length probe preservation of parameters/gradients/RNG, and profile/OOM reporting.
+  Batch audit regression now checks four-card wiring and rejects inconsistent layouts.
+- **Not run:** RTX5090, real 4B full-length backward, actual vLLM workers, GPU memory
+  consumption, or training quality. Synthetic CPU tests are not GPU results.
+
+## 2026-10-04 Learning completion execution optimization (historical results)
 
 - PR14 targeted validation: 107 passed, including learning completion analysis and grouped-generation partial resume. Request seeds and saved per-prefix RNG states match sequential execution.
 - Grouping four prefixes with eight continuations each submits up to 32 requests while retaining the original 36 problems, five observation positions, and completed-answer scoring.

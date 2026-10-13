@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import numpy as np
+from grace_gc.core.coordinates import as_basis, basis_pinv
 
 
 def full_space_decomposition(norm_sq, true_coords, gram, predicted_coords):
@@ -14,12 +15,12 @@ def full_space_decomposition(norm_sq, true_coords, gram, predicted_coords):
                                        ("basis_gram", gram)) if value is None]
     if missing:
         return {"status": "unavailable", "missing": missing, "n_labels": 0}
-    energy, coords, gram = np.asarray(norm_sq, float).reshape(-1), np.asarray(true_coords, float), np.asarray(gram, float)
+    energy, coords, gram = np.asarray(norm_sq, float).reshape(-1), np.asarray(true_coords, float), as_basis(gram)
     if energy.size == 0 or gram.size == 0:
         return {"status": "unavailable", "missing": ["full_space_labels_or_basis"], "n_labels": 0}
     if coords.ndim != 2 or coords.shape[0] != len(energy) or gram.shape != (coords.shape[1], coords.shape[1]):
         raise ValueError("full-space norm/coordinate/Gram dimensions disagree")
-    projected_coefficients = coords @ np.linalg.pinv(gram)
+    projected_coefficients = coords @ basis_pinv(gram)
     captured = np.maximum(np.sum(projected_coefficients * coords, axis=1), 0.)
     omitted = np.maximum(energy-captured, 0.)
     coordinate_error = residual = None

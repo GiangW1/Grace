@@ -8,6 +8,7 @@ import copy
 import time
 
 import numpy as np
+from grace_gc.core.coordinates import IdentityBasis
 
 from grace_gc.core.layout import ParamLayout, collect_lora_layout
 from grace_gc.core.rng import IsolatedRNG
@@ -689,7 +690,7 @@ def run_algorithm1_step(
         basis_mask = split["fit"] if crossfit_basis else split["basis"]
         basis_items = [it for it, keep in zip(state.reservoir.items, basis_mask) if keep]
         basis_metrics = {"variant": variant, "refreshed": False}
-        if state.reservoir.fixed_basis_id is None and should_refresh_basis(
+        if not isinstance(state.u, IdentityBasis) and state.reservoir.fixed_basis_id is None and should_refresh_basis(
             len(basis_items),
             min(k, len(basis_items)) if crossfit_basis else k,
             state.step,

@@ -1,0 +1,12 @@
+lora:
+  parameterization: small_core
+  rank: 8
+  alpha: 16.0
+  basis: svd
+  basis_seed: 17
+predictor:
+  target_space: direct
+  include_actor_state: true
+  # All C coordinates, not k=8 PCA. No gradient basis fitting/refresh.
+  fixed_basis: true
+  refresh_every: 0

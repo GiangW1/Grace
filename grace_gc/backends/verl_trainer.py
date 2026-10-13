@@ -14,6 +14,7 @@ from grace_gc.backends.fsdp_actor import maybe_wrap_fsdp
 from grace_gc.backends.gpu_engine import make_gpu_engines
 from grace_gc.backends.hf_actor import actor_numerics, named_lora_params
 from grace_gc.core.layout import collect_lora_layout
+from grace_gc.core.coordinates import IdentityBasis, prediction_basis
 from grace_gc.core.rng import IsolatedRNG, seed_all
 from grace_gc.data.math_data import load_training_data
 from grace_gc.data.tokenize import encode_records_hf, load_hf_tokenizer, tokenizer_inventory
@@ -57,19 +58,26 @@ def load_lora_actor(model_path: str, lora_cfg: dict[str, Any]):
             model_path, torch_dtype=torch.bfloat16, trust_remote_code=True
         )
     model = _ensure_bf16(model)
-    try:
-        from peft import LoraConfig, get_peft_model
-    except Exception as exc:
-        raise ImportError("peft is required to attach q/v LoRA on the actor") from exc
-    cfg = LoraConfig(
-        r=int(lora_cfg.get("rank", 16)),
-        lora_alpha=float(lora_cfg.get("alpha", 32)),
-        lora_dropout=float(lora_cfg.get("dropout", 0.0)),
-        target_modules=list(lora_cfg.get("targets", ["q_proj", "v_proj"])),
-        bias="none",
-        task_type="CAUSAL_LM",
-    )
-    model = get_peft_model(model, cfg)
+    parameterization = lora_cfg.get("parameterization", "lora")
+    if parameterization == "small_core":
+        from grace_gc.backends.small_core import attach_small_core
+        model = attach_small_core(model, lora_cfg)
+    elif parameterization == "lora":
+        try:
+            from peft import LoraConfig, get_peft_model
+        except Exception as exc:
+            raise ImportError("peft is required to attach q/v LoRA on the actor") from exc
+        cfg = LoraConfig(
+            r=int(lora_cfg.get("rank", 16)),
+            lora_alpha=float(lora_cfg.get("alpha", 32)),
+            lora_dropout=float(lora_cfg.get("dropout", 0.0)),
+            target_modules=list(lora_cfg.get("targets", ["q_proj", "v_proj"])),
+            bias="none",
+            task_type="CAUSAL_LM",
+        )
+        model = get_peft_model(model, cfg)
+    else:
+        raise ValueError("lora.parameterization must be lora or small_core")
     model._grace_compute_dtype = str(lora_cfg.get("compute_dtype", "native"))
     model.config.use_cache = False
     checkpointing = bool(lora_cfg.get("gradient_checkpointing", True))
@@ -172,6 +180,8 @@ def build_vllm_engine(model_path: str, cfg: dict[str, Any], lora_rank: int):
     for key in ("max_num_seqs", "max_num_batched_tokens"):
         if cfg.get(key) is not None:
             kwargs[key] = int(cfg[key])
+    if cfg.get("enable_chunked_prefill") is not None:
+        kwargs["enable_chunked_prefill"] = bool(cfg["enable_chunked_prefill"])
     dropped: list[str] = []
     try:
         llm = LLM(**kwargs)
@@ -206,12 +216,24 @@ def build_vllm_engine(model_path: str, cfg: dict[str, Any], lora_rank: int):
 
 def train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None = None) -> dict[str, Any]:
     resources = {}
+    profile = None
+    status = "failed"
     try:
-        return _train(cfg, run, ledger, resources)
+        if (cfg.get("memory_profile") or {}).get("enabled", False):
+            from grace_gc.backends.memory_profile import ActorMemoryProfile
+            profile = ActorMemoryProfile(run)
+            resources["memory_profile"] = profile
+        result = _train(cfg, run, ledger, resources)
+        status = "completed"
+        return result
     finally:
-        pool = resources.get("pool")
-        if pool is not None:
-            pool.close()
+        try:
+            pool = resources.get("pool")
+            if pool is not None:
+                pool.close()
+        finally:
+            if profile is not None:
+                profile.close(status)
 
 
 def _train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None, resources) -> dict[str, Any]:
@@ -296,10 +318,20 @@ def _train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None,
     if not workers and getattr(build_vllm_engine, "last", None):
         run.write_json("vllm_engine.json", build_vllm_engine.last)
     engines, extra = make_gpu_engines(actor, llm, tokenizer, cfg, Path(run.root) / "lora")
+    profile = resources.get("memory_profile")
+    if profile is not None:
+        logprob_one = engines.logprob_one
+        def measured_logprob(ids, prompt_len):
+            profile.observe_sequence(ids, prompt_len)
+            return logprob_one(ids, prompt_len)
+        engines.logprob_one = measured_logprob
     def observed_call(phase, step, action):
         timer = Timer()
         try:
-            return action()
+            if profile is None:
+                return action()
+            with profile.phase(phase, step=int(step)):
+                return action()
         except Exception as exc:
             roll = engines.last_rollout or {}
             failed_attempt = None
@@ -378,13 +410,16 @@ def _train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None,
         return pr, pi, go, meta
 
     pcfg = cfg.get("predictor") or {}
-    k = min(int(pcfg.get("k", 8)), layout.dim)
+    u = prediction_basis(layout.dim, pcfg)
+    k = u.shape[1]
     in_dim = 1
     predictor = None
     if spec.use_predictor:
         # The feature schema is 3 hidden vectors + 3 entropy + length + b.
         # Avoid a method-specific generation request before the common start.
         in_dim = 3 * int(actor.config.hidden_size) + 5
+        if pcfg.get("include_actor_state", False):
+            in_dim += layout.dim
         predictor = predictor_from_spec(in_dim, k, {**pcfg, "train_auxiliary": spec.risk_mode == "reward"})
     opt = torch.optim.AdamW(
         [p for _, p in named],
@@ -392,12 +427,21 @@ def _train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None,
         betas=tuple(cfg.get("optim", {}).get("betas", [0.9, 0.99])),
         weight_decay=float(cfg.get("optim", {}).get("weight_decay", 0.0)),
     )
+    if (cfg.get("memory_profile") or {}).get("full_length_probe", False):
+        if profile is None:
+            raise ValueError("full_length_probe requires memory_profile.enabled")
+        from grace_gc.backends.memory_profile import full_length_pg_probe
+        with profile.phase("synthetic_full_length_pg", synthetic=True,
+                           prompt_tokens=int(cfg.get("prompt_max_tokens", 1024)),
+                           response_tokens=int(cfg["max_new_tokens"])) as row:
+            row.update(full_length_pg_probe(actor, tokenizer, cfg))
     state = TrainState(
         spec=spec,
         baseline=baseline_from_config(cfg.get("baseline")),
         rng=rng,
         layout=layout,
-        u=np.eye(layout.dim, k, dtype=np.float64),
+        u=u,
+        basis_id=1 if isinstance(u, IdentityBasis) else 0,
         predictor=predictor,
         reservoir=GradientReservoir(capacity=int(cfg.get("predictor", {}).get("reservoir_size", 512))),
         n_ref=n_start,
@@ -438,6 +482,10 @@ def _train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None,
             "format_warmup_steps": 0 if cfg.get("resume") or initial_actor else format_warmup_steps(cfg),
             "initial_actor": initial_actor,
             "actor_numerics": actor_numerics(actor),
+            "trainable_dim": layout.dim,
+            "prediction_dim": k,
+            "target_space": pcfg.get("target_space", "projected"),
+            "parameterization": (cfg.get("lora") or {}).get("parameterization", "lora"),
             "has_predictor": predictor is not None,
             "grpo_advantage": "group_mean_no_std",
         },
@@ -449,19 +497,21 @@ def _train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None,
     )
 
     controller = ensure_cost_control(cfg, state)
+    from grace_gc.backends.small_core import fixed_basis_state
+    checkpoint_extra = {"model_path": str(model_path), "lora": dict(cfg.get("lora") or {}),
+                        "small_core_bases": fixed_basis_state(actor)}
     persist_initial_checkpoint(
         run,
         cfg,
         state,
         named,
         opt,
-        extra={"model_path": str(model_path), "lora": dict(cfg.get("lora") or {})},
+        extra=checkpoint_extra,
     )
     controller.record(run, "setup_complete", state=state, cfg=cfg)
     last = {}
     steps, completed, allocation_steps = int(cfg.get("num_steps", 1)), 0, 0
     clipped_steps = 0
-    checkpoint_extra = {"model_path": str(model_path), "lora": dict(cfg.get("lora") or {})}
     for _step in range(steps):
         if controller.stop_reason():
             break
@@ -491,6 +541,7 @@ def _train(cfg: dict[str, Any], run: RunDirectory, ledger: ComputeLedger | None,
             actor_named=named,
             optimizer=opt,
             extra={
+                **checkpoint_extra,
                 "model_path": str(model_path),
                 "lora": dict(cfg.get("lora") or {}),
                 "adapter_path": None if extra.get("adapter_path") is None else str(extra.get("adapter_path")),

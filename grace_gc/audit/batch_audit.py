@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+from grace_gc.core.coordinates import as_basis
 from grace_gc.audit.mechanism import paired_geometry, summarize_geometries
 
 from grace_gc.audit.run import (
@@ -255,7 +256,7 @@ def audit_fixed_batches(records, engines, layout, encode, payload, predictor, u,
     decision, horizon, seed = int(cfg.get("decision_tokens", 512)), int(cfg.get("max_new_tokens", 2048)), int(cfg.get("seed", 17))
     if repeats <= 0 or starts <= 0 or not records or not 0 <= decision <= horizon or horizon <= 0:
         raise ValueError("positive replicate/start/horizon counts and 0 <= decision <= horizon are required")
-    u = np.zeros((layout.dim, 0)) if u is None else np.asarray(u, dtype=np.float64)
+    u = np.zeros((layout.dim, 0)) if u is None else as_basis(u)
     if u.ndim != 2 or u.shape[0] != layout.dim:
         raise ValueError("batch audit U and actor dimensions disagree")
     if payload.get("layout_names") and payload["layout_names"] != layout.names():
@@ -489,14 +490,16 @@ def run_batch_audit(records, cfg, run_dir):
     run = RunDirectory(resolve_run_dir(run_dir))
     ledger = ComputeLedger(n_gpu=n_gpu if backend == "gpu_verl" else 0, hardware=hardware)
     versions, status = {}, "failed"
+    cache = {}
     try:
         cfg.setdefault("max_new_tokens", 2048 if backend == "gpu_verl" else 8)
         cfg.setdefault("decision_tokens", min(512, int(cfg["max_new_tokens"])))
         ckpt = cfg.get("checkpoint") or cfg.get("resume")
         if not ckpt:
             raise ValueError("batch audit requires a frozen training checkpoint")
-        if backend == "gpu_verl" and n_gpu != 1:
-            raise ValueError("batch audit GPU backend currently supports exactly one GPU")
+        if backend == "gpu_verl":
+            from grace_gc.backends.rollout_pool import validate_layout
+            validate_layout(cfg)
         audit = cfg.setdefault("batch_audit", {})
         run.write_run_meta(kind="batch_audit", started=started, requested=run_dir)
         run.write_yaml("config.yaml", cfg)
@@ -556,6 +559,8 @@ def run_batch_audit(records, cfg, run_dir):
         write_failed(run, exc, versions, started)
         raise
     finally:
+        from grace_gc.audit.run import close_gpu_audit_cache
+        close_gpu_audit_cache(cache)
         ledger.add("batch_audit", timer.elapsed(), cpu_s=timer.cpu_elapsed(), status=status,
                    timing_scope="Function entry through setup, computation and result/failure persistence; excludes final ledger publication and caller-side CLI/data loading.")
         run.write_json("compute_ledger.json", ledger.summary())

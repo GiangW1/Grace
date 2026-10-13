@@ -42,7 +42,7 @@ def pad_token_ids(seqs: list[list[int]], pad_id: int):
 def named_lora_params(model):
     out = []
     for name, param in model.named_parameters():
-        if param.requires_grad and ("lora_A" in name or "lora_B" in name or "lora_a" in name or "lora_b" in name):
+        if param.requires_grad and ("lora_A" in name or "lora_B" in name or "lora_a" in name or "lora_b" in name or "lora_core" in name):
             if "q_proj" in name or "v_proj" in name:
                 out.append((name, param))
     if not out:
@@ -67,6 +67,8 @@ def actor_compute_context(model):
 
 def actor_numerics(model):
     return {
+        "parameterization": "small_core" if hasattr(model, "_grace_small_core_config") else "lora",
+        "trainable_dim": sum(p.numel() for _, p in named_lora_params(model)),
         "compute_dtype": getattr(model, "_grace_compute_dtype", "native"),
         "gradient_checkpointing": bool(getattr(model, "_grace_gradient_checkpointing", False)),
         "lora_parameter_dtypes": {name: str(p.dtype) for name, p in named_lora_params(model)},

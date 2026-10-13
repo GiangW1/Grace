@@ -6,6 +6,7 @@ G is the ascent direction. A standard optimizer `.grad` must be `-Ghat`.
 from __future__ import annotations
 
 import numpy as np
+from grace_gc.core.coordinates import as_basis
 
 
 def _as_2d(x: np.ndarray) -> np.ndarray:
@@ -82,7 +83,7 @@ def two_checkpoint_ht_estimate(
 
 def prediction_correction(u: np.ndarray, f: np.ndarray, z: np.ndarray, p: np.ndarray, n: int) -> np.ndarray:
     """`(U/N) sum_i (1 - Z_i/p_i) f_i`. Includes completed starts."""
-    u = np.asarray(u, dtype=np.float64)
+    u = as_basis(u)
     f = _as_2d(f)
     z = np.asarray(z, dtype=np.float64).reshape(-1)
     p = np.asarray(p, dtype=np.float64).reshape(-1)

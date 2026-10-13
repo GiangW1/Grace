@@ -1,0 +1,11 @@
+lora:
+  parameterization: small_core
+  rank: 16
+  alpha: 32.0
+  basis: svd
+  basis_seed: 17
+predictor:
+  target_space: direct
+  include_actor_state: true
+  fixed_basis: true
+  refresh_every: 0

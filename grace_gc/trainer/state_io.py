@@ -8,6 +8,7 @@ import random
 import time
 
 import numpy as np
+from grace_gc.core.coordinates import as_basis
 
 from grace_gc.core.layout import ParamLayout, collect_lora_layout
 from grace_gc.core.rng import IsolatedRNG
@@ -72,7 +73,9 @@ def check_snapshot_identity(payload: dict[str, Any], cfg: dict[str, Any]) -> Non
         raise ValueError(f"checkpoint model_path {stored_model} != {live_model}")
     stored_lora = payload.get("lora") or {}
     live_lora = cfg.get("lora") or {}
-    for key in ("rank", "alpha", "targets"):
+    if stored_lora.get("parameterization", "lora") != live_lora.get("parameterization", "lora"):
+        raise ValueError("checkpoint adapter parameterization does not match")
+    for key in ("rank", "alpha", "targets", "basis", "basis_seed"):
         if key in stored_lora and key in live_lora and stored_lora[key] != live_lora[key]:
             raise ValueError(f"checkpoint lora.{key} {stored_lora[key]!r} != {live_lora[key]!r}")
 
@@ -164,6 +167,8 @@ def dump_train_state(path, state: TrainState, actor_named, optimizer, actor_full
 
 def restore_train_state(path, actor, optimizer, in_dim: int, k: int, spec_name: str, payload=None) -> TrainState:
     payload = load_checkpoint(path) if payload is None else payload
+    from grace_gc.backends.small_core import restore_fixed_bases
+    restore_fixed_bases(actor, payload)
     if hasattr(actor, "named_all_params"):
         if not payload.get("actor_full"):
             raise ValueError("this checkpoint has no actor_full; CPU tiny resume would change the frozen base")
@@ -214,7 +219,7 @@ def restore_train_state(path, actor, optimizer, in_dim: int, k: int, spec_name: 
     reservoir = GradientReservoir.from_state_dict(payload["reservoir"])
     baseline = HistoricalBaseline()
     baseline.load_state_dict(payload["baseline"])
-    u = np.asarray(payload["basis"]["u"], dtype=np.float64)
+    u = as_basis(payload["basis"]["u"])
     if u.ndim != 2 or u.shape[0] != layout.dim:
         raise ValueError(f"checkpoint basis U shape {u.shape} does not match LoRA dim {layout.dim}")
     if predictor is not None and u.shape[1] != predictor.k:

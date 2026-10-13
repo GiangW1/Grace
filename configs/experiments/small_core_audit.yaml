@@ -1,0 +1,18 @@
+# Use the same checkpoint and full trajectory PG definition as training.
+audit:
+  n_problems: 16
+  n_prefixes: 2
+  n_continuations: 16
+  n_baseline: 16
+  baseline: 0.5
+  decision_grid: [512, 1024]
+  max_new_tokens: 8192
+  jl_dim: 0
+  skip_settled_problems: false
+  tokens_only: false
+  store_features: true
+  store_trajectory_gradients: true
+  predictor_diagnostic: true
+analysis:
+  gradient_target: trajectory
+  require_pre_emit: false

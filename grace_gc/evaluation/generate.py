@@ -314,6 +314,8 @@ def _generate_eval_items(records, cfg, backend, n, max_new, temperature, top_p, 
         actor = load_lora_actor(str(cfg["model_path"]), cfg.get("lora", {}))
         payload = load_checkpoint(ckpt)
         check_snapshot_identity(payload, cfg)
+        from grace_gc.backends.small_core import restore_fixed_bases
+        restore_fixed_bases(actor, payload)
         load_numpy_module_state(named_lora_params(actor), payload.get("actor") or {})
         from grace_gc.versions import sha256_named, sha256_file
 

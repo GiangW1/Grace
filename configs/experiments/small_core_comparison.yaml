@@ -1,0 +1,65 @@
+# Shared protocol: compare parameterizations, then CV within parameterization.
+backend: gpu_verl
+# Qwen3-4B (non-Base), non-thinking chat mode for the first mechanism study.
+enable_thinking: false
+num_steps: 100
+n_start: 32
+n_prompts: 8
+decision_tokens: 512
+max_new_tokens: 8192
+temperature: 1.0
+format_warmup:
+  steps: 0
+baseline:
+  mode: fixed
+  fixed_value: 0.5
+  prescan: 0
+cost_control:
+  mode: fixed
+dynamic_sampling:
+  enabled: false
+save_initial_checkpoint: true
+checkpoint_every: 25
+lora:
+  parameterization: lora
+  rank: 16
+  alpha: 32.0
+  dropout: 0.0
+  compute_dtype: bfloat16
+  gradient_checkpointing: true
+  targets: [q_proj, v_proj]
+predictor:
+  target_space: projected
+  include_actor_state: false
+  k: 8
+  warmup_steps: 10
+  audit_s: 1.0
+  reservoir_size: 512
+  feature_mode: decision
+  feature_batch_size: 1
+  coord_kind: mlp
+  hidden_coord: 128
+  hidden_risk: 64
+  epochs: 2
+  fixed_basis: false
+  shrink_calibration: holdout
+  feature_scaler: fixed
+  train_auxiliary: false
+  fresh_samples_per_problem: 0
+allocation:
+  beta: 0.5
+  p_min: 0.2
+optim:
+  lr: 0.0001
+  grad_clip: 50.0
+  log_update_geometry: true
+vllm:
+  lora_dtype: bfloat16
+eval:
+  selection: seeded
+  selection_seed: 20261013
+  n_problems: 128
+  n: 4
+  k: 4
+  max_new_tokens: 8192
+  sample_batch_size: 4

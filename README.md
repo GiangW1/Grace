@@ -1,5 +1,7 @@
 # GRACE-GC
 
+小参数梯度预测实验（固定 L/R、只训练 C，rank 8/16，沿用原 Full-PG/GRACE/审计框架）见 [运行说明](docs/SMALL_CORE_GRACE.md)。这是待 GPU 验证的新实验，不是已有正结果。
+
 Qwen3-4B-Base 上的 GRACE 训练、评测和前缀审计。本机先做 CPU 检查；服务器按下面全流程做。
 
 显示名用 **GRACE-GC**，避免和另外两篇同名工作混淆。主流程先单卡；另有“一张 actor 卡＋多张 rollout 卡”的离线对照，见 [实现与用法](docs/OFFLINE_PARALLEL_CONTROL_20260919.md)。actor allreduce 尚未接入。

@@ -1,0 +1,15 @@
+# First visible GPU: HF actor. Other three: independent vLLM workers.
+hardware:
+  name: rtx5090
+  n_gpu: 4
+  gpu_memory_gb: 32
+rollout:
+  workers: 3
+vllm:
+  tensor_parallel: 1
+  dtype: bfloat16
+  gpu_memory_utilization: 0.75
+  max_num_seqs: 2
+  max_num_batched_tokens: 2048
+  enable_chunked_prefill: true
+backend: gpu_verl
