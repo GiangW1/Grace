@@ -1,0 +1,42 @@
+{
+  "latest": "checkpoint.npz",
+  "latest_sha256": "11ee57c8eeac310adb7c2ca60fe75eafa8c62372fe0ab647aebf38253eb34443",
+  "steps": [
+    {
+      "step": 0,
+      "path": "checkpoints/step_0.npz",
+      "sha256": "040450a0eead07d08df3e90fb5edeba0fd4bd7eda24a95ee22721a9d3c1c601c",
+      "available_at": "2026-10-14T12:34:18.633669+00:00",
+      "available_global_wall_seconds": 167.18385504186153,
+      "available_command_wall_seconds": null,
+      "availability_scope": "Checkpoint published, copied and hashed; excludes index publication and subsequent work. Command clock includes launch/setup, is unavailable on resume without complete prior command history."
+    },
+    {
+      "step": 20,
+      "path": "checkpoints/step_20.npz",
+      "sha256": "759e5c49d8176f5955cc8e04f2e27fcfb9033b5b2a847bb13d7c344852ce2039",
+      "available_at": "2026-10-14T13:11:59.106727+00:00",
+      "available_global_wall_seconds": 2427.656898639165,
+      "available_command_wall_seconds": null,
+      "availability_scope": "Checkpoint published, copied and hashed; excludes index publication and subsequent work. Command clock includes launch/setup, is unavailable on resume without complete prior command history."
+    },
+    {
+      "step": 40,
+      "path": "checkpoints/step_40.npz",
+      "sha256": "c964b0f2f35a93a16d6b277b8af60582f1c042292f9c1e137ba1eea59c2428f5",
+      "available_at": "2026-10-14T13:41:00.320666+00:00",
+      "available_global_wall_seconds": 4168.870839879848,
+      "available_command_wall_seconds": null,
+      "availability_scope": "Checkpoint published, copied and hashed; excludes index publication and subsequent work. Command clock includes launch/setup, is unavailable on resume without complete prior command history."
+    },
+    {
+      "step": 50,
+      "path": "checkpoints/step_50.npz",
+      "sha256": "11ee57c8eeac310adb7c2ca60fe75eafa8c62372fe0ab647aebf38253eb34443",
+      "available_at": "2026-10-14T13:57:17.893782+00:00",
+      "available_global_wall_seconds": 5146.4439544938505,
+      "available_command_wall_seconds": null,
+      "availability_scope": "Checkpoint published, copied and hashed; excludes index publication and subsequent work. Command clock includes launch/setup, is unavailable on resume without complete prior command history."
+    }
+  ]
+}

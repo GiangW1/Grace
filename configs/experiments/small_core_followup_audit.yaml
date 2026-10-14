@@ -1,0 +1,17 @@
+# Unlike label-collection audits, evaluate the FROZEN trained predictor.
+# Generate fresh continuations on the held-out audit split; never refit here.
+audit:
+  predictor_diagnostic: false
+  n_problems: 4
+  n_prefixes: 2
+  n_continuations: 8
+  decision_grid: [512]
+  baseline: null  # Clear earlier study overrides; use the shared training baseline by default.
+  jl_dim: 0
+  tokens_only: false
+  skip_settled_problems: false
+  store_features: true
+  store_trajectory_gradients: true
+analysis:
+  gradient_target: trajectory
+  require_pre_emit: false

@@ -1,0 +1,8 @@
+{
+  "checkpoint": "/mnt/mydata/wja/grace/runs/pr18-20261014/followup-fast-3gpu/core8_grace-seed17/checkpoint.npz",
+  "checkpoint_step": 50,
+  "method": "grace",
+  "actor_sha256": "dab528a3c3078a1ff2df7942cd104a9f9fdfac23aa35b0824f90802a486acd25",
+  "hash_stage": "loaded_checkpoint_before_audit",
+  "layout": "all_qv_lora_A_B"
+}

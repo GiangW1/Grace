@@ -1,0 +1,17 @@
+# Fast single-seed diagnostic; not a substitute for multi-seed validation.
+num_steps: 50
+checkpoint_every: 50
+save_initial_checkpoint: true
+enable_thinking: false
+max_new_tokens: 8192
+predictor:
+  warmup_steps: 10
+eval:
+  n_problems: 128
+  selection: seeded
+  selection_seed: 20261013
+  n: 4
+  k: 4
+  max_new_tokens: 8192
+  temperature: 0.6
+  top_p: 0.95

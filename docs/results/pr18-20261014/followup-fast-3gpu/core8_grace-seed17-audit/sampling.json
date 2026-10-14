@@ -1,0 +1,19 @@
+{
+  "used": {
+    "max_tokens": 7680,
+    "temperature": 1.0,
+    "top_p": 1.0,
+    "top_k": -1,
+    "n": 1,
+    "stop": [],
+    "repetition_penalty": 1.0,
+    "min_p": 0.0,
+    "logprobs": 1,
+    "seed": 1885662859,
+    "stop_token_ids": [
+      151645,
+      151643
+    ]
+  },
+  "dropped": []
+}

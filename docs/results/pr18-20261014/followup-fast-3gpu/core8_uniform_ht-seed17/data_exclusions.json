@@ -1,0 +1,45 @@
+{
+  "status": "applied",
+  "eval_source": {
+    "path": "/mnt/mydata/wja/grace/assets/datasets/math500.jsonl",
+    "sha256": "35dc41080a3680858b27fa7e0533d2d547825316fc5dafe5d316f4ccc5a06132",
+    "n_problems": 500
+  },
+  "removed": [
+    {
+      "split": "train",
+      "problem_id": "84501b44-688d-4518-be16-d188f0a0e8d3",
+      "prompt_sha256": "06d5aeabb535b6a990b29e1f5210e010d81f9f767a3bbe9e9b07c62c1ca02c08",
+      "eval_problem_ids": [
+        "06d5aeabb535b6a9"
+      ]
+    },
+    {
+      "split": "train",
+      "problem_id": "5a9ea7d2-faa3-41b9-b097-875f39e7f1b1",
+      "prompt_sha256": "1ea3d389e0493b48d5a8f724aec8c99519fb42585d753edd20ce6251a281d43c",
+      "eval_problem_ids": [
+        "1ea3d389e0493b48"
+      ]
+    },
+    {
+      "split": "train",
+      "problem_id": "a208ad4e-651b-4b75-a619-31bf1314bbed",
+      "prompt_sha256": "07e22408c9d86bf198748e6e0ffd321d2d6b8d605ebab6f9a119cca4c7ce5785",
+      "eval_problem_ids": [
+        "07e22408c9d86bf1"
+      ]
+    },
+    {
+      "split": "train",
+      "problem_id": "c0659f3a-2792-4cc8-b669-9c50d7382147",
+      "prompt_sha256": "a153bf646bb8dfb046d7c75433a9e56cd7c552526ee5ec4085c5b284d4b6813a",
+      "eval_problem_ids": [
+        "a153bf646bb8dfb0"
+      ]
+    }
+  ],
+  "normalization": "whitespace_and_exact_dapo_wrapper_case_sensitive",
+  "scope": "train/calib/audit pools before SFT and sampling; all external eval problems",
+  "note": "No semantic near-duplicate detection; gold does not affect exclusion. This does not certify the exposure history of a reused actor/checkpoint."
+}

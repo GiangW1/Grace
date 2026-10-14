@@ -102,7 +102,8 @@ def test_missing_worker_outputs_abort_without_partial_batch():
         pool.close()
 
 
-@pytest.mark.parametrize('n,workers,valid', [(1,0,True),(4,3,True),(2,1,True),(4,0,False),(4,4,False),(1,1,False)])
+@pytest.mark.parametrize('n,workers,valid', [(1,0,True),(4,3,True),(3,2,True),(2,1,True),
+                                           (3,3,False),(4,0,False),(4,4,False),(1,1,False)])
 def test_rollout_layout_reserves_one_actor_card(n,workers,valid):
     from grace_gc.backends.rollout_pool import validate_layout
     cfg={'hardware':{'n_gpu':n},'rollout':{'workers':workers}}
@@ -112,25 +113,29 @@ def test_rollout_layout_reserves_one_actor_card(n,workers,valid):
             validate_layout(cfg)
 
 
-def test_gpu_entry_uses_pool_and_closes_on_failed_initial_sync(simulated_gpu_train, monkeypatch):
+@pytest.mark.parametrize('n_gpu', [3, 4])
+def test_gpu_entry_uses_pool_and_closes_on_failed_initial_sync(simulated_gpu_train, monkeypatch, n_gpu):
     import torch
     from grace_gc.backends.rollout_pool import RolloutPool
     trainer, run, cfg = simulated_gpu_train
     events = []
     pool = SimpleNamespace(metadata={'synthetic':True}, close=lambda:events.append('closed'))
     monkeypatch.setattr(torch.cuda, 'set_device', lambda device:events.append(('actor',device)))
-    monkeypatch.setattr(RolloutPool, 'launch', lambda *args:pool)
+    def launch(model, config, rank, gpu_count):
+        assert gpu_count == n_gpu
+        return pool
+    monkeypatch.setattr(RolloutPool, 'launch', launch)
     def engines(actor, llm, *args):
         assert llm is pool
         def sync(): raise RuntimeError('synthetic sync failure')
         return SimpleNamespace(last_rollout={}), {'sync':sync}
     monkeypatch.setattr(trainer, 'make_gpu_engines', engines)
     with pytest.raises(RuntimeError, match='synthetic sync'):
-        trainer.train({**cfg,'hardware':{'n_gpu':4}, 'rollout':{'workers':3}}, run)
+        trainer.train({**cfg,'hardware':{'n_gpu':n_gpu}, 'rollout':{'workers':n_gpu-1}}, run)
     assert events == [('actor',0), 'closed']
 
 
-@pytest.mark.parametrize('n,workers', [(1,0),(4,3)])
+@pytest.mark.parametrize('n,workers', [(1,0),(3,2),(4,3)])
 def test_tensor_parallel_cannot_use_unaccounted_devices(n, workers):
     from grace_gc.backends.rollout_pool import validate_layout
     with pytest.raises(ValueError, match='tensor_parallel=1'):

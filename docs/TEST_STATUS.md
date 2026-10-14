@@ -2,6 +2,59 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
+## 2026-10-15 PR18 三卡实测结果归档
+
+- 实测源文件与 PR18 `332b816c8385d4cbd0105aaa0ea2e7c9cec078af` 的 blob 哈希一致；训练时保存的源文件也逐项一致。旧本地 Git 元数据不作为本次版本证据。
+- 2026-10-14 北京时间 15:24:57–22:46:59，9/9 命令退出码 0。Full-PG / Uniform-HT / GRACE 各 50 步、seed 17；128 道 MATH-500 × 4 回答，含共享初始评测及三臂最终评测；冻结 GRACE 审计 4 题 × 2 前缀 × 8 续写。
+- 物理卡 7 为 actor，2、3 为 TP=1 rollout worker。实际耗时见 `suite.json`；单次顺序运行不能证明可重复的加速。
+- 初始 / Full-PG / Uniform-HT / GRACE 平均正确率分别为 74.8047% / 75.0000% / 73.4375% / 72.4609%。冻结预测对零预测 MSE 比值 1.0，8 个前缀有效预测向量范数均为 0；本轮没有证明预测收益，原因尚待定位。
+- 本次上传前 CPU 回归：`tests/test_small_core_followup.py tests/test_small_core.py tests/test_5090_memory.py tests/test_rollout_pool.py`，**68 passed in 46.59s**；`git diff --check` 通过。没有重跑全量 CPU suite 或 GPU 训练。
+- [完整报告和精简结果](results/pr18-20261014/followup-fast-3gpu/README.md)包含配置、版本/数据/源文件哈希、按题分数、50 步记录、审计及导出校验和；不提交权重、检查点或完整轨迹。下面的“未运行”是各历史代码开发阶段当时的状态。
+
+## 2026-10-14 PR18 快速诊断与三卡5090
+
+- `--followup` 默认改为 core8 Full-PG / Uniform-HT / GRACE、seed 17、每臂 50 步，
+  128 题 × 4 回答，仅共享 step-0 与三臂最终评测；GRACE 审计 4 题 × 2 前缀 × 8 续写。
+  普通计划共 9 条命令，不再默认添加 LoRA16、多种子或中间评测。
+- 新增 `rtx5090_rollout_3.yaml`：1 actor + 2 TP=1 vLLM workers；训练、评测和审计共享。
+  仍用 Qwen3-4B 非 Thinking、rank8、8192 输出上限、32 starts / 8 prompts 与 10 步 warmup。
+- 回归覆盖默认计划的精确作业数、真实执行分派的初始/最终 checkpoint 路径、三臂协议一致、
+  显式多种子/四卡/中间快照覆盖、非 followup 原有默认值、三卡显存配置与分卡审计/训练
+  pool 接线及成功/失败资源清理。设备调用使用 CPU 替身，不是实际 GPU 检查。
+- 全量 `python -m pytest tests -q -rs -o addopts=''`：
+  **986 passed, 18 skipped in 44.06s**；runner `--help` 与 `git diff --check` 通过。
+- 跳过项仍为 16 项可选 math_verify、1 项真实 GPU 栈、1 项历史本地归档。
+  没有运行新的三卡 RTX5090 / Qwen3-4B 实验；减少任务量不等于已经测得墙钟加速。
+
+## 2026-10-14 后续审计的两项审查修复
+
+- small-core 审计默认继承配置中的固定训练 baseline，不再覆盖为 0.5；显式研究覆盖
+  仍可用，manifest 标记覆盖值与是否改变配置中的 fixed 目标，非 fixed 比较留 null。
+- 停止附加方差逐前缀计算：已结束前缀 p_i=1、贡献为零，仍保留其梯度能量与平均分母。
+- 新增 7 项参数化回归，并强化混合前缀的端到端报告检查：baseline 0/0.3、显式相同/不同
+  覆盖，真实 CPU autograd 标签与输入特征一致、无固定模式预扫，以及非零结束梯度、p=1。
+  修复前相关测试为 7 failed / 1 passed；修复后相关三文件 **48 passed in 6.00s**。
+- 全量 `python -m pytest tests -q -rs -o addopts=''`：
+  **974 passed, 18 skipped in 44.31s**；分析 CLI `--help` 与 `git diff --check` 通过。
+- 跳过项仍为 16 项可选 math_verify、1 项真实 GPU 栈、1 项历史本地归档。
+  没有运行新的 RTX5090 / Qwen3-4B GPU 实验；这些是 CPU 正确性回归，不是效果或速度结果。
+
+## 2026-10-14 PR17 后续对照与预测机制审计
+
+- 新增 `--followup`：共享零适配器 step-0 评测、core8 Uniform-HT、三种子 100 步、
+  25/50/75/最终检查点评测；保持 Qwen3-4B 非Thinking、8192 上限、四卡分工。
+- 付费审计使用冻结检查点预测器，不再把 `predictor_diagnostic: true` 的纯标签收集
+  当作预测器验证。新增 direct 坐标 MSE/零预测对照、续写噪声及未截零的条件均值去噪估计，
+  同固定 p 的停止附加方差仅为离线诊断，不宣称在线收益。
+- CPU 回归覆盖：共享初始只评一次、评测 seed 独立于训练 seed、对照协议一致、
+  四卡配置、禁止共享非零/SFT/续训初始、计划目录不覆盖、缺失墙钟快照记录、
+  检查点时钟/hash 验证、配对清单一致性、warmup 后健康统计、小样本与缺失预测。
+  实际 tiny checkpoint → 冻结 predictor audit → direct report 接线通过。
+- 全量命令：`python -m pytest tests -q -rs -o addopts=''`，
+  **967 passed, 18 skipped in 45.42s**。三个新增/扩展 CLI 的 `--help` 与 `git diff --check` 通过。
+- 跳过项：16 项缺可选 math_verify；1 项需要真实 GPU 栈；1 项缺历史本地归档。
+  本轮未执行新增 GPU 训练/审计，也未宣称新的显存、预测精度或加速结果。
+
 ## 2026-10-13 小核心实验切换为非Thinking
 
 - 默认权重仍为用户显式提供的Qwen3-4B（非Base）；共享实验配置改为

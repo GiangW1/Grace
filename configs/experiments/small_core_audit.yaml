@@ -4,7 +4,7 @@ audit:
   n_prefixes: 2
   n_continuations: 16
   n_baseline: 16
-  baseline: 0.5
+  baseline: null  # Inherit the configured fixed training baseline for labels and features.
   decision_grid: [512, 1024]
   max_new_tokens: 8192
   jl_dim: 0

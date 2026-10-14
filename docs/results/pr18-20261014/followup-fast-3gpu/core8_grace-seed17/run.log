@@ -1,0 +1,207 @@
+run start 2026-10-14T12:31:31.449840+00:00 method=grace backend=gpu_verl dir=/mnt/mydata/wja/grace/runs/pr18-20261014/followup-fast-3gpu/core8_grace-seed17
+implementation=gpu_vllm_hf (HF actor + vLLM two-phase; config alias gpu_verl is not verl PPO)
+dropped 12 conflicting prompt groups; see data_conflicts.json
+Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 3/3 [00:00<00:00, 126.72it/s]
+phase=post_sync implementation=gpu_vllm_hf adapter=/mnt/mydata/wja/grace/runs/pr18-20261014/followup-fast-3gpu/core8_grace-seed17/lora/step-2 lora_id=2 (lora/step-N is the vLLM adapter id, not state.step; first sync is step-2)
+phase=train_loop_begin method=grace n_steps=50 n_start=32 n_prompts=8
+phase=train_step_begin next_step=1 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+INFO 10-14 20:34:18 [__init__.py:216] Automatically detected platform cuda.
+phase=continue_done n_rewards=32 wall_s=65.2
+step 1 n=32 completed=32 audited=32 loss=-40.452598571777344 n_prescan=0 timings={'prescan': 3.8907863199710846e-05, 'prefix': 40.60678090713918, 'allocate': 4.5177992433309555e-05, 'continue': 65.2279552849941, 'backward': 9.119973023887724, 'audit': 0.006244773045182228, 'fresh_supervision': 0.0008423011749982834, 'behavior_probe': 0.14800562197342515, 'update': 0.04888816876336932, 'predictor': 0.17460213508456945, 'sync': 0.052926582749933004}
+phase=train_step_begin next_step=2 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=67.9
+step 2 n=32 completed=32 audited=32 loss=-167.45858764648438 n_prescan=0 timings={'prescan': 6.468826904892921e-05, 'prefix': 38.60154722677544, 'allocate': 3.486219793558121e-05, 'continue': 67.85124940890819, 'backward': 9.578015081118792, 'audit': 0.004831742960959673, 'fresh_supervision': 1.7837155610322952e-05, 'behavior_probe': 0.05047370260581374, 'update': 0.007853223010897636, 'predictor': 0.04921960039064288, 'sync': 0.0550480168312788}
+phase=train_step_begin next_step=3 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=69.4
+step 3 n=32 completed=32 audited=32 loss=-89.3995132446289 n_prescan=0 timings={'prescan': 5.7626981288194656e-05, 'prefix': 39.16268356796354, 'allocate': 2.514803782105446e-05, 'continue': 69.36955427704379, 'backward': 9.967354549095035, 'audit': 0.004690300673246384, 'fresh_supervision': 2.3385044187307358e-05, 'behavior_probe': 0.05108521319925785, 'update': 0.007101400755345821, 'predictor': 0.06286882236599922, 'sync': 0.04146848386153579}
+phase=train_step_begin next_step=4 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=137.5
+step 4 n=32 completed=32 audited=32 loss=-237.39617919921875 n_prescan=0 timings={'prescan': 6.855279207229614e-05, 'prefix': 39.16538476292044, 'allocate': 2.9835384339094162e-05, 'continue': 137.5216090879403, 'backward': 14.360146232880652, 'audit': 0.006002944894134998, 'fresh_supervision': 2.004997804760933e-05, 'behavior_probe': 0.052492338232696056, 'update': 0.006820598617196083, 'predictor': 0.06421241629868746, 'sync': 0.04927915520966053}
+phase=train_step_begin next_step=5 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=70.2
+step 5 n=32 completed=32 audited=32 loss=-68.88712310791016 n_prescan=0 timings={'prescan': 5.787797272205353e-05, 'prefix': 39.149722854141146, 'allocate': 3.4221913665533066e-05, 'continue': 70.19791228603572, 'backward': 9.567234619054943, 'audit': 0.005509189795702696, 'fresh_supervision': 2.017989754676819e-05, 'behavior_probe': 0.049438676331192255, 'update': 0.007213203702121973, 'predictor': 0.0754689872264862, 'sync': 0.04917980497702956}
+phase=train_step_begin next_step=6 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=103.7
+step 6 n=32 completed=32 audited=32 loss=-120.13118743896484 n_prescan=0 timings={'prescan': 6.572995334863663e-05, 'prefix': 39.04890917101875, 'allocate': 2.8823036700487137e-05, 'continue': 103.66226881369948, 'backward': 12.225618682336062, 'audit': 0.00579789699986577, 'fresh_supervision': 1.795683056116104e-05, 'behavior_probe': 0.04232295695692301, 'update': 0.0077327401377260685, 'predictor': 0.06363651901483536, 'sync': 0.05099839996546507}
+phase=train_step_begin next_step=7 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=38.8
+step 7 n=32 completed=32 audited=32 loss=0.9299211502075195 n_prescan=0 timings={'prescan': 6.564892828464508e-05, 'prefix': 37.92133896006271, 'allocate': 3.622518852353096e-05, 'continue': 38.83309210697189, 'backward': 7.898802674841136, 'audit': 0.004555610939860344, 'fresh_supervision': 1.708604395389557e-05, 'behavior_probe': 0.04907387821003795, 'update': 0.007431725971400738, 'predictor': 0.09963619196787477, 'sync': 0.04704793682321906}
+phase=train_step_begin next_step=8 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=95.0
+step 8 n=32 completed=32 audited=32 loss=-155.41766357421875 n_prescan=0 timings={'prescan': 5.798693746328354e-05, 'prefix': 37.44416121812537, 'allocate': 2.6689842343330383e-05, 'continue': 95.04971056524664, 'backward': 12.024192356038839, 'audit': 0.006480841897428036, 'fresh_supervision': 2.072984352707863e-05, 'behavior_probe': 0.05165594210848212, 'update': 0.007472680881619453, 'predictor': 0.09212741209194064, 'sync': 0.043434029910713434}
+phase=train_step_begin next_step=9 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=75.6
+step 9 n=32 completed=32 audited=32 loss=-125.06642150878906 n_prescan=0 timings={'prescan': 7.025385275483131e-05, 'prefix': 37.49190815817565, 'allocate': 3.1807925552129745e-05, 'continue': 75.61899876687676, 'backward': 10.074315519072115, 'audit': 0.005869136191904545, 'fresh_supervision': 2.0931009203195572e-05, 'behavior_probe': 0.04583615995943546, 'update': 0.007640229072421789, 'predictor': 0.08650066098198295, 'sync': 0.050828391686081886}
+phase=train_step_begin next_step=10 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=97.0
+step 10 n=32 completed=32 audited=32 loss=-198.8285369873047 n_prescan=0 timings={'prescan': 5.892803892493248e-05, 'prefix': 37.38163385819644, 'allocate': 3.457069396972656e-05, 'continue': 96.95752847241238, 'backward': 12.312453866004944, 'audit': 0.006604650989174843, 'fresh_supervision': 1.9428785890340805e-05, 'behavior_probe': 0.04900411516427994, 'update': 0.008362714666873217, 'predictor': 0.11834191996604204, 'sync': 0.052781589794903994}
+phase=train_step_begin next_step=11 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=36.3
+step 11 n=32 completed=20 audited=20 loss=144.97349548339844 n_prescan=0 timings={'prescan': 6.208335980772972e-05, 'prefix': 36.39963843394071, 'allocate': 0.0006258236244320869, 'continue': 36.25798628432676, 'backward': 5.541304559912533, 'audit': 0.004314243793487549, 'fresh_supervision': 1.2989155948162079e-05, 'behavior_probe': 0.048669966869056225, 'update': 0.007440133020281792, 'predictor': 0.09469271916896105, 'sync': 0.03776420699432492}
+phase=train_step_begin next_step=12 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=60.0
+step 12 n=32 completed=17 audited=17 loss=-326.5542907714844 n_prescan=0 timings={'prescan': 5.1266979426145554e-05, 'prefix': 37.44359007710591, 'allocate': 0.0006054947152733803, 'continue': 60.04935842612758, 'backward': 6.717867383733392, 'audit': 0.005221812054514885, 'fresh_supervision': 1.6523990780115128e-05, 'behavior_probe': 0.041730196215212345, 'update': 0.0075606307946145535, 'predictor': 0.09441460110247135, 'sync': 0.04143280116841197}
+phase=train_step_begin next_step=13 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=23.7
+step 13 n=32 completed=13 audited=13 loss=18.17254066467285 n_prescan=0 timings={'prescan': 5.138665437698364e-05, 'prefix': 37.47660060925409, 'allocate': 0.0007196268998086452, 'continue': 23.711309586185962, 'backward': 3.2509699519723654, 'audit': 0.003986728843301535, 'fresh_supervision': 1.9929837435483932e-05, 'behavior_probe': 0.039885986130684614, 'update': 0.007596963085234165, 'predictor': 0.10282656783238053, 'sync': 0.039421290159225464}
+phase=train_step_begin next_step=14 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=81.1
+step 14 n=32 completed=16 audited=16 loss=-236.55389404296875 n_prescan=0 timings={'prescan': 6.260303780436516e-05, 'prefix': 37.52918011602014, 'allocate': 0.0006057168357074261, 'continue': 81.14866215409711, 'backward': 7.547515016049147, 'audit': 0.00551554886624217, 'fresh_supervision': 1.6535166651010513e-05, 'behavior_probe': 0.04229483287781477, 'update': 0.007501946296542883, 'predictor': 0.1034644627943635, 'sync': 0.049503731075674295}
+phase=train_step_begin next_step=15 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=78.2
+step 15 n=32 completed=20 audited=20 loss=-389.1524658203125 n_prescan=0 timings={'prescan': 5.8677978813648224e-05, 'prefix': 37.5086648860015, 'allocate': 0.0006000399589538574, 'continue': 78.21146129211411, 'backward': 8.624418683815747, 'audit': 0.006122055929154158, 'fresh_supervision': 1.7136335372924805e-05, 'behavior_probe': 0.043148268945515156, 'update': 0.00752530200406909, 'predictor': 0.12140885600820184, 'sync': 0.05251975078135729}
+phase=train_step_begin next_step=16 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=23.6
+step 16 n=32 completed=23 audited=23 loss=34.53221130371094 n_prescan=0 timings={'prescan': 5.793711170554161e-05, 'prefix': 36.162318794988096, 'allocate': 0.0006086439825594425, 'continue': 23.57664300687611, 'backward': 5.558476611971855, 'audit': 0.004373034927994013, 'fresh_supervision': 1.461198553442955e-05, 'behavior_probe': 0.04243687819689512, 'update': 0.006774018984287977, 'predictor': 0.1087382328696549, 'sync': 0.0422866428270936}
+phase=train_step_begin next_step=17 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=26.3
+step 17 n=32 completed=20 audited=20 loss=-144.6198272705078 n_prescan=0 timings={'prescan': 4.9754977226257324e-05, 'prefix': 37.10502919694409, 'allocate': 0.0006760950200259686, 'continue': 26.341077610850334, 'backward': 5.140721454285085, 'audit': 0.004763132892549038, 'fresh_supervision': 1.8007121980190277e-05, 'behavior_probe': 0.042234249878674746, 'update': 0.007254024036228657, 'predictor': 0.11584590282291174, 'sync': 0.04106919886544347}
+phase=train_step_begin next_step=18 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=42.3
+step 18 n=32 completed=17 audited=17 loss=-108.7253646850586 n_prescan=0 timings={'prescan': 4.4197309762239456e-05, 'prefix': 35.54557937104255, 'allocate': 0.0004996508359909058, 'continue': 42.32401381712407, 'backward': 5.609891125932336, 'audit': 0.004908774979412556, 'fresh_supervision': 1.6916077584028244e-05, 'behavior_probe': 0.04102035192772746, 'update': 0.0074933678843081, 'predictor': 0.12190296594053507, 'sync': 0.04062712099403143}
+phase=train_step_begin next_step=19 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=91.6
+step 19 n=32 completed=15 audited=15 loss=-344.5769348144531 n_prescan=0 timings={'prescan': 4.7791749238967896e-05, 'prefix': 37.40515430038795, 'allocate': 0.0006324397400021553, 'continue': 91.62630781112239, 'backward': 6.802129622083157, 'audit': 0.005375219974666834, 'fresh_supervision': 1.8847640603780746e-05, 'behavior_probe': 0.0400606831535697, 'update': 0.007598462980240583, 'predictor': 0.1223496962338686, 'sync': 0.058186361100524664}
+phase=train_step_begin next_step=20 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=30.9
+step 20 n=32 completed=18 audited=18 loss=22.2666015625 n_prescan=0 timings={'prescan': 5.829799920320511e-05, 'prefix': 36.55793675687164, 'allocate': 0.000659021083265543, 'continue': 30.901478769257665, 'backward': 4.692392456810921, 'audit': 0.004666557069867849, 'fresh_supervision': 1.6313977539539337e-05, 'behavior_probe': 0.03992054611444473, 'update': 0.007561119738966227, 'predictor': 0.12817034218460321, 'sync': 0.039366121869534254}
+phase=train_step_begin next_step=21 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=54.3
+step 21 n=32 completed=15 audited=15 loss=-354.2685546875 n_prescan=0 timings={'prescan': 6.0741789638996124e-05, 'prefix': 37.6174807632342, 'allocate': 0.000601824838668108, 'continue': 54.27112365886569, 'backward': 6.0119596011936665, 'audit': 0.0053428648971021175, 'fresh_supervision': 1.419195905327797e-05, 'behavior_probe': 0.04583366587758064, 'update': 0.007811419200152159, 'predictor': 0.16464036889374256, 'sync': 0.0509383836761117}
+phase=train_step_begin next_step=22 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=51.6
+step 22 n=32 completed=21 audited=21 loss=-188.74533081054688 n_prescan=0 timings={'prescan': 5.7025812566280365e-05, 'prefix': 37.29663442727178, 'allocate': 0.0006774887442588806, 'continue': 51.621738876216114, 'backward': 6.757644803728908, 'audit': 0.005815138109028339, 'fresh_supervision': 1.7126090824604034e-05, 'behavior_probe': 0.04952040687203407, 'update': 0.008005223236978054, 'predictor': 0.15378237795084715, 'sync': 0.04118727194145322}
+phase=train_step_begin next_step=23 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=49.1
+step 23 n=32 completed=18 audited=18 loss=-184.43626403808594 n_prescan=0 timings={'prescan': 5.8989040553569794e-05, 'prefix': 37.81558746891096, 'allocate': 0.0006206240504980087, 'continue': 49.13088692398742, 'backward': 6.052977620624006, 'audit': 0.004991891328245401, 'fresh_supervision': 1.5202909708023071e-05, 'behavior_probe': 0.04302328499034047, 'update': 0.007426263764500618, 'predictor': 0.1214955784380436, 'sync': 0.04449221631512046}
+phase=train_step_begin next_step=24 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=35.5
+step 24 n=32 completed=18 audited=18 loss=-90.62130737304688 n_prescan=0 timings={'prescan': 4.5989640057086945e-05, 'prefix': 37.567394461948425, 'allocate': 0.000668876338750124, 'continue': 35.46828751685098, 'backward': 5.084125009831041, 'audit': 0.0046076541766524315, 'fresh_supervision': 1.3479962944984436e-05, 'behavior_probe': 0.039890388026833534, 'update': 0.0073915328830480576, 'predictor': 0.12040041293948889, 'sync': 0.042151091154664755}
+phase=train_step_begin next_step=25 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=43.6
+step 25 n=32 completed=22 audited=22 loss=-135.37242126464844 n_prescan=0 timings={'prescan': 5.122693255543709e-05, 'prefix': 34.869600389152765, 'allocate': 0.0006449809297919273, 'continue': 43.59278129693121, 'backward': 6.256315048318356, 'audit': 0.00512305973097682, 'fresh_supervision': 1.3309996575117111e-05, 'behavior_probe': 0.0420653591863811, 'update': 0.007816113997250795, 'predictor': 0.11822792375460267, 'sync': 0.0518722883425653}
+phase=train_step_begin next_step=26 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=27.4
+step 26 n=32 completed=23 audited=23 loss=-92.8249740600586 n_prescan=0 timings={'prescan': 4.55779954791069e-05, 'prefix': 36.284004588611424, 'allocate': 0.0005326820537447929, 'continue': 27.414145563263446, 'backward': 5.49654831783846, 'audit': 0.004748006816953421, 'fresh_supervision': 1.4872290194034576e-05, 'behavior_probe': 0.04126537870615721, 'update': 0.006805644370615482, 'predictor': 0.11137217888608575, 'sync': 0.03917153785005212}
+phase=train_step_begin next_step=27 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=38.6
+step 27 n=32 completed=15 audited=15 loss=-151.80694580078125 n_prescan=0 timings={'prescan': 5.310028791427612e-05, 'prefix': 36.82608594978228, 'allocate': 0.0005982411094009876, 'continue': 38.555477960035205, 'backward': 4.671856469940394, 'audit': 0.004893365781754255, 'fresh_supervision': 1.71060673892498e-05, 'behavior_probe': 0.055738409981131554, 'update': 0.007795404177159071, 'predictor': 0.14164907671511173, 'sync': 0.04867053125053644}
+phase=train_step_begin next_step=28 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=53.4
+step 28 n=32 completed=14 audited=14 loss=-238.30859375 n_prescan=0 timings={'prescan': 4.8663001507520676e-05, 'prefix': 37.404061869718134, 'allocate': 0.0007916023023426533, 'continue': 53.410503037739545, 'backward': 5.484729428309947, 'audit': 0.0053032939322292805, 'fresh_supervision': 1.0845717042684555e-05, 'behavior_probe': 0.044977887999266386, 'update': 0.007974595297127962, 'predictor': 0.14639164367690682, 'sync': 0.05026328517124057}
+phase=train_step_begin next_step=29 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=77.1
+step 29 n=32 completed=24 audited=24 loss=-244.11622619628906 n_prescan=0 timings={'prescan': 4.4596847146749496e-05, 'prefix': 35.005936606321484, 'allocate': 0.0004993318580091, 'continue': 77.06094598490745, 'backward': 9.01320089912042, 'audit': 0.0056807128712534904, 'fresh_supervision': 1.1708121746778488e-05, 'behavior_probe': 0.04812214383855462, 'update': 0.007038300856947899, 'predictor': 0.1369829853065312, 'sync': 0.04340732982382178}
+phase=train_step_begin next_step=30 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=49.8
+step 30 n=32 completed=24 audited=24 loss=-117.51849365234375 n_prescan=0 timings={'prescan': 5.930894985795021e-05, 'prefix': 35.40274872025475, 'allocate': 0.00048242369666695595, 'continue': 49.822571222204715, 'backward': 6.949288913980126, 'audit': 0.0056183841079473495, 'fresh_supervision': 1.4371704310178757e-05, 'behavior_probe': 0.04258091514930129, 'update': 0.006889502052217722, 'predictor': 0.12023882893845439, 'sync': 0.050245340913534164}
+phase=train_step_begin next_step=31 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=44.6
+step 31 n=32 completed=19 audited=19 loss=-70.07882690429688 n_prescan=0 timings={'prescan': 4.29847277700901e-05, 'prefix': 37.507797634229064, 'allocate': 0.0004835156723856926, 'continue': 44.64902433427051, 'backward': 5.653220750857145, 'audit': 0.0048457481898367405, 'fresh_supervision': 1.4421064406633377e-05, 'behavior_probe': 0.07885526306927204, 'update': 0.008211712818592787, 'predictor': 0.556058453861624, 'sync': 0.06023908359929919}
+phase=train_step_begin next_step=32 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=54.8
+step 32 n=32 completed=15 audited=15 loss=-140.921630859375 n_prescan=0 timings={'prescan': 5.366979166865349e-05, 'prefix': 37.77877817908302, 'allocate': 0.0006094551645219326, 'continue': 54.804923383984715, 'backward': 4.876139034051448, 'audit': 0.0047020940110087395, 'fresh_supervision': 1.962995156645775e-05, 'behavior_probe': 0.041367373894900084, 'update': 0.007534821052104235, 'predictor': 0.12569916294887662, 'sync': 0.05460252985358238}
+phase=train_step_begin next_step=33 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=32.4
+step 33 n=32 completed=15 audited=15 loss=-73.1120834350586 n_prescan=0 timings={'prescan': 4.9244146794080734e-05, 'prefix': 37.101340177003294, 'allocate': 0.0004949239082634449, 'continue': 32.403922968078405, 'backward': 4.086716230027378, 'audit': 0.004366081207990646, 'fresh_supervision': 1.7706770449876785e-05, 'behavior_probe': 0.04533026600256562, 'update': 0.0070119681768119335, 'predictor': 0.14188678888604045, 'sync': 0.046733946073800325}
+phase=train_step_begin next_step=34 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=35.1
+step 34 n=32 completed=15 audited=15 loss=-42.85095977783203 n_prescan=0 timings={'prescan': 4.5828986912965775e-05, 'prefix': 37.606978703755885, 'allocate': 0.0006154249422252178, 'continue': 35.060385259334, 'backward': 4.921577109955251, 'audit': 0.004505353048443794, 'fresh_supervision': 1.3649929314851761e-05, 'behavior_probe': 0.03956626681610942, 'update': 0.007338040973991156, 'predictor': 0.12405742518603802, 'sync': 0.04189384635537863}
+phase=train_step_begin next_step=35 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=51.8
+step 35 n=32 completed=17 audited=17 loss=-205.02261352539062 n_prescan=0 timings={'prescan': 4.732096567749977e-05, 'prefix': 37.769979855977, 'allocate': 0.0004882938228547573, 'continue': 51.781261248048395, 'backward': 6.310899031814188, 'audit': 0.0053219120018184185, 'fresh_supervision': 1.3831071555614471e-05, 'behavior_probe': 0.04111013235524297, 'update': 0.0067840698175132275, 'predictor': 0.11914786882698536, 'sync': 0.0495983948931098}
+phase=train_step_begin next_step=36 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=27.7
+step 36 n=32 completed=14 audited=14 loss=-29.544403076171875 n_prescan=0 timings={'prescan': 4.0180981159210205e-05, 'prefix': 37.357565260026604, 'allocate': 0.0005047791637480259, 'continue': 27.749865226913244, 'backward': 3.8583568851463497, 'audit': 0.003874255809932947, 'fresh_supervision': 1.410115510225296e-05, 'behavior_probe': 0.03943985980004072, 'update': 0.006584981922060251, 'predictor': 0.1252998560667038, 'sync': 0.040553413797169924}
+phase=train_step_begin next_step=37 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=36.1
+step 37 n=32 completed=12 audited=12 loss=-68.87525177001953 n_prescan=0 timings={'prescan': 4.656100645661354e-05, 'prefix': 35.50178562896326, 'allocate': 0.0006358358077704906, 'continue': 36.114724757149816, 'backward': 3.007049878127873, 'audit': 0.004018042702227831, 'fresh_supervision': 1.933937892317772e-05, 'behavior_probe': 0.04020125372335315, 'update': 0.0075893341563642025, 'predictor': 0.12625998491421342, 'sync': 0.04795086896046996}
+phase=train_step_begin next_step=38 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=25.0
+step 38 n=32 completed=13 audited=13 loss=-97.93975830078125 n_prescan=0 timings={'prescan': 5.164695903658867e-05, 'prefix': 37.58565770089626, 'allocate': 0.0006132423877716064, 'continue': 25.029693466611207, 'backward': 3.546843103133142, 'audit': 0.0043836538679897785, 'fresh_supervision': 1.5112105756998062e-05, 'behavior_probe': 0.04083900898694992, 'update': 0.007429244928061962, 'predictor': 0.13883313816040754, 'sync': 0.042358473874628544}
+phase=train_step_begin next_step=39 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=28.1
+step 39 n=32 completed=11 audited=11 loss=-65.18700408935547 n_prescan=0 timings={'prescan': 5.481299012899399e-05, 'prefix': 37.632854513358325, 'allocate': 0.0004856400191783905, 'continue': 28.059803070966154, 'backward': 2.8510012975893915, 'audit': 0.0038253343664109707, 'fresh_supervision': 1.3039913028478622e-05, 'behavior_probe': 0.039926481898874044, 'update': 0.006545577198266983, 'predictor': 0.13777849078178406, 'sync': 0.04554433189332485}
+phase=train_step_begin next_step=40 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=52.9
+step 40 n=32 completed=18 audited=18 loss=-34.28148651123047 n_prescan=0 timings={'prescan': 5.5273063480854034e-05, 'prefix': 37.05317980190739, 'allocate': 0.0006224061362445354, 'continue': 52.93153040576726, 'backward': 5.670177218969911, 'audit': 0.004830576945096254, 'fresh_supervision': 1.6545411199331284e-05, 'behavior_probe': 0.04484594892710447, 'update': 0.007373553700745106, 'predictor': 0.1306352880783379, 'sync': 0.048045003321021795}
+phase=train_step_begin next_step=41 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=62.9
+step 41 n=32 completed=17 audited=17 loss=-151.09182739257812 n_prescan=0 timings={'prescan': 6.644986569881439e-05, 'prefix': 37.61230057384819, 'allocate': 0.0005900082178413868, 'continue': 62.93643258791417, 'backward': 6.816563181113452, 'audit': 0.005430981982499361, 'fresh_supervision': 1.2357719242572784e-05, 'behavior_probe': 0.041834797244518995, 'update': 0.006641131825745106, 'predictor': 0.12574871722608805, 'sync': 0.05001752870157361}
+phase=train_step_begin next_step=42 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=54.9
+step 42 n=32 completed=22 audited=22 loss=-200.51832580566406 n_prescan=0 timings={'prescan': 5.576387047767639e-05, 'prefix': 37.07553240004927, 'allocate': 0.0006815260276198387, 'continue': 54.94884320907295, 'backward': 7.070158923976123, 'audit': 0.0052718729712069035, 'fresh_supervision': 1.3410113751888275e-05, 'behavior_probe': 0.043254817835986614, 'update': 0.016582381911575794, 'predictor': 0.12763946736231446, 'sync': 0.04802723880857229}
+phase=train_step_begin next_step=43 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=35.9
+step 43 n=32 completed=17 audited=17 loss=-186.12158203125 n_prescan=0 timings={'prescan': 4.6629924327135086e-05, 'prefix': 37.53558747796342, 'allocate': 0.00046945596113801, 'continue': 35.91924942424521, 'backward': 5.199538222979754, 'audit': 0.0045064520090818405, 'fresh_supervision': 1.2859702110290527e-05, 'behavior_probe': 0.03987063840031624, 'update': 0.0069840699434280396, 'predictor': 0.11704577505588531, 'sync': 0.03879408910870552}
+phase=train_step_begin next_step=44 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=45.1
+step 44 n=32 completed=16 audited=16 loss=-146.8626708984375 n_prescan=0 timings={'prescan': 4.447717219591141e-05, 'prefix': 37.56173867871985, 'allocate': 0.0004886663518846035, 'continue': 45.12136352574453, 'backward': 5.610954334028065, 'audit': 0.005084421020001173, 'fresh_supervision': 1.658499240875244e-05, 'behavior_probe': 0.048440598882734776, 'update': 0.007683803327381611, 'predictor': 0.13824132084846497, 'sync': 0.041647275909781456}
+phase=train_step_begin next_step=45 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=56.3
+step 45 n=32 completed=19 audited=19 loss=-211.70700073242188 n_prescan=0 timings={'prescan': 5.043623968958855e-05, 'prefix': 35.116604167968035, 'allocate': 0.00048462999984622, 'continue': 56.34294831659645, 'backward': 6.294609342236072, 'audit': 0.005004821810871363, 'fresh_supervision': 1.3180077075958252e-05, 'behavior_probe': 0.04041077708825469, 'update': 0.006600283086299896, 'predictor': 0.12683143885806203, 'sync': 0.04880855605006218}
+phase=train_step_begin next_step=46 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=46.0
+step 46 n=32 completed=16 audited=16 loss=-22.826496124267578 n_prescan=0 timings={'prescan': 5.1136594265699387e-05, 'prefix': 37.7959818453528, 'allocate': 0.0006033480167388916, 'continue': 45.96720946673304, 'backward': 5.130359171889722, 'audit': 0.004795978311449289, 'fresh_supervision': 1.4431774616241455e-05, 'behavior_probe': 0.04608252504840493, 'update': 0.007309271022677422, 'predictor': 0.13010774599388242, 'sync': 0.048107482958585024}
+phase=train_step_begin next_step=47 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=69.0
+step 47 n=32 completed=26 audited=26 loss=-116.44269561767578 n_prescan=0 timings={'prescan': 5.517341196537018e-05, 'prefix': 35.802381466608495, 'allocate': 0.0004950752481818199, 'continue': 69.00336383003742, 'backward': 9.024285261053592, 'audit': 0.00551372766494751, 'fresh_supervision': 1.2209173291921616e-05, 'behavior_probe': 0.04158279625698924, 'update': 0.006617508828639984, 'predictor': 0.12119087297469378, 'sync': 0.04977818997576833}
+phase=train_step_begin next_step=48 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=32.7
+step 48 n=32 completed=11 audited=11 loss=-90.17633819580078 n_prescan=0 timings={'prescan': 4.595005884766579e-05, 'prefix': 37.47093967581168, 'allocate': 0.0005932631902396679, 'continue': 32.70867044571787, 'backward': 3.4220471722073853, 'audit': 0.004179641138762236, 'fresh_supervision': 1.663481816649437e-05, 'behavior_probe': 0.04046150902286172, 'update': 0.007408069912344217, 'predictor': 0.12645727302879095, 'sync': 0.048025053925812244}
+phase=train_step_begin next_step=49 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=70.6
+step 49 n=32 completed=20 audited=20 loss=-335.6279296875 n_prescan=0 timings={'prescan': 5.8348290622234344e-05, 'prefix': 37.53289895365015, 'allocate': 0.0005028271116316319, 'continue': 70.55639534723014, 'backward': 8.028479716740549, 'audit': 0.005940381903201342, 'fresh_supervision': 1.4201272279024124e-05, 'behavior_probe': 0.041330618783831596, 'update': 0.006826695054769516, 'predictor': 0.12403789488598704, 'sync': 0.05259717581793666}
+phase=train_step_begin next_step=50 n_prompts=8 starts_per=4
+phase=prefix n=32 decision=512
+phase=continue_done n_rewards=32 wall_s=56.6
+step 50 n=32 completed=18 audited=18 loss=-87.786376953125 n_prescan=0 timings={'prescan': 4.833284765481949e-05, 'prefix': 37.630115202162415, 'allocate': 0.0006059319712221622, 'continue': 56.55605795700103, 'backward': 5.993965592700988, 'audit': 0.005461110267788172, 'fresh_supervision': 1.6233883798122406e-05, 'behavior_probe': 0.05681967409327626, 'update': 0.0075784469954669476, 'predictor': 0.12923418963328004, 'sync': 0.05016355495899916}

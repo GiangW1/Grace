@@ -1,0 +1,142 @@
+eval start 2026-10-14T11:56:08.729523+00:00 backend=gpu_verl n_problems=128 n=4 k=4 dir=/mnt/mydata/wja/grace/runs/pr18-20261014/followup-fast-3gpu/core8_uniform_ht-seed17-eval
+Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 3/3 [00:00<00:00, 127.01it/s]
+INFO 10-14 19:57:23 [__init__.py:216] Automatically detected platform cuda.
+INFO 10-14 19:57:24 [utils.py:233] non-default args: {'trust_remote_code': True, 'dtype': 'bfloat16', 'seed': 17, 'max_model_len': 9280, 'enable_prefix_caching': True, 'gpu_memory_utilization': 0.75, 'max_num_batched_tokens': 2048, 'max_num_seqs': 2, 'disable_log_stats': True, 'enable_lora': True, 'max_loras': 4, 'max_lora_rank': 8, 'lora_dtype': 'bfloat16', 'enable_chunked_prefill': True, 'worker_extension_cls': 'grace_gc.backends.verl_trainer.VLLMWorkerCleanup', 'generation_config': 'vllm', 'model': '/mnt/mydata/wja/grace/assets/models/Qwen3-4B'}
+The argument `trust_remote_code` is to be used with Auto classes. It has no effect here and is ignored.
+INFO 10-14 19:57:24 [model.py:547] Resolved architecture: Qwen3ForCausalLM
+`torch_dtype` is deprecated! Use `dtype` instead!
+INFO 10-14 19:57:24 [model.py:1510] Using max model len 9280
+INFO 10-14 19:57:24 [scheduler.py:205] Chunked prefill is enabled with max_num_batched_tokens=2048.
+WARNING 10-14 19:57:24 [lora.py:92] `lora_extra_vocab_size` is deprecated and will be removed in v0.12.0. Additional vocabulary support for LoRA adapters is being phased out.
+WARNING 10-14 19:57:24 [__init__.py:3036] We must use the `spawn` multiprocessing start method. Overriding VLLM_WORKER_MULTIPROC_METHOD to 'spawn'. See https://docs.vllm.ai/en/latest/usage/troubleshooting.html#python-multiprocessing for more information. Reasons: CUDA is initialized
+INFO 10-14 19:58:08 [llm.py:306] Supported_tasks: ['generate']
+WARNING 10-14 19:58:09 [processor.py:215] vLLM has deprecated support for supporting different tokenizers for different LoRAs. By default, vLLM uses base model's tokenizer. If you are using a LoRA with its own tokenizer, consider specifying `--tokenizer [lora_path]` to use the LoRA tokenizer.
+phase=eval_problem_done problems=1/128 samples=4 problem_id=9a5554ea743dbc9c response_tokens=4062 truncated=0
+phase=eval_problem_done problems=2/128 samples=8 problem_id=27304254dfee5d97 response_tokens=3655 truncated=0
+phase=eval_problem_done problems=3/128 samples=12 problem_id=edc76d80b3d26c0a response_tokens=1184 truncated=0
+phase=eval_problem_done problems=4/128 samples=16 problem_id=7a741a2c395f7a78 response_tokens=2218 truncated=0
+phase=eval_problem_done problems=5/128 samples=20 problem_id=b8f8d2320ad189ea response_tokens=1663 truncated=0
+phase=eval_problem_done problems=6/128 samples=24 problem_id=eb3187c38ab27028 response_tokens=1475 truncated=0
+phase=eval_problem_done problems=7/128 samples=28 problem_id=dbd323191fa41977 response_tokens=1286 truncated=0
+phase=eval_problem_done problems=8/128 samples=32 problem_id=eee898cfa2cd6785 response_tokens=2714 truncated=0
+phase=eval_problem_done problems=9/128 samples=36 problem_id=09bee343ecbddf16 response_tokens=1598 truncated=0
+phase=eval_problem_done problems=10/128 samples=40 problem_id=26def20db88cf572 response_tokens=3020 truncated=0
+phase=eval_problem_done problems=11/128 samples=44 problem_id=e38a82f125692ef3 response_tokens=1171 truncated=0
+phase=eval_problem_done problems=12/128 samples=48 problem_id=7f3bd86e5e9247de response_tokens=837 truncated=0
+phase=eval_problem_done problems=13/128 samples=52 problem_id=1e6f33c6a63e30c4 response_tokens=8535 truncated=0
+phase=eval_problem_done problems=14/128 samples=56 problem_id=9659416657d19153 response_tokens=1170 truncated=0
+phase=eval_problem_done problems=15/128 samples=60 problem_id=2469e03a667adc08 response_tokens=2530 truncated=0
+phase=eval_problem_done problems=16/128 samples=64 problem_id=45d2328486552db2 response_tokens=3804 truncated=0
+phase=eval_problem_done problems=17/128 samples=68 problem_id=dbc9f46d79f3ce12 response_tokens=4085 truncated=0
+phase=eval_problem_done problems=18/128 samples=72 problem_id=2c3d89ca5aca2bca response_tokens=1616 truncated=0
+phase=eval_problem_done problems=19/128 samples=76 problem_id=2e9a888b0d010125 response_tokens=1878 truncated=0
+phase=eval_problem_done problems=20/128 samples=80 problem_id=9dadcec4ce9dd05f response_tokens=2865 truncated=0
+phase=eval_problem_done problems=21/128 samples=84 problem_id=a761c38205b1ac25 response_tokens=7168 truncated=0
+phase=eval_problem_done problems=22/128 samples=88 problem_id=7edb000570e7a5ad response_tokens=739 truncated=0
+phase=eval_problem_done problems=23/128 samples=92 problem_id=d1c9cde932510127 response_tokens=447 truncated=0
+phase=eval_problem_done problems=24/128 samples=96 problem_id=80883c8d718e7942 response_tokens=408 truncated=0
+phase=eval_problem_done problems=25/128 samples=100 problem_id=feb014ba14631d90 response_tokens=6045 truncated=0
+phase=eval_problem_done problems=26/128 samples=104 problem_id=f5ace075c490ab02 response_tokens=3446 truncated=0
+phase=eval_problem_done problems=27/128 samples=108 problem_id=07e22408c9d86bf1 response_tokens=2864 truncated=0
+phase=eval_problem_done problems=28/128 samples=112 problem_id=59b3380466ff1adb response_tokens=2021 truncated=0
+phase=eval_problem_done problems=29/128 samples=116 problem_id=b93d929414a806af response_tokens=3038 truncated=0
+phase=eval_problem_done problems=30/128 samples=120 problem_id=f25c15fb353535a8 response_tokens=1314 truncated=0
+phase=eval_problem_done problems=31/128 samples=124 problem_id=b366ba898e337926 response_tokens=736 truncated=0
+phase=eval_problem_done problems=32/128 samples=128 problem_id=c05b2b3a40b24579 response_tokens=4855 truncated=0
+phase=eval_problem_done problems=33/128 samples=132 problem_id=3b7adb5c0f931e75 response_tokens=4953 truncated=0
+phase=eval_problem_done problems=34/128 samples=136 problem_id=2bf2a416429c8a87 response_tokens=1081 truncated=0
+phase=eval_problem_done problems=35/128 samples=140 problem_id=d4b934f6ede28d75 response_tokens=1625 truncated=0
+phase=eval_problem_done problems=36/128 samples=144 problem_id=9b85603bc31a2030 response_tokens=2417 truncated=0
+phase=eval_problem_done problems=37/128 samples=148 problem_id=8c8f96252d975acd response_tokens=749 truncated=0
+phase=eval_problem_done problems=38/128 samples=152 problem_id=427075eaa37b40cc response_tokens=990 truncated=0
+phase=eval_problem_done problems=39/128 samples=156 problem_id=d708ac38968b58e5 response_tokens=8097 truncated=0
+phase=eval_problem_done problems=40/128 samples=160 problem_id=bd24d198763397d2 response_tokens=2000 truncated=0
+phase=eval_problem_done problems=41/128 samples=164 problem_id=0d263edcb5d8a946 response_tokens=2873 truncated=0
+phase=eval_problem_done problems=42/128 samples=168 problem_id=ec4a6e5635d208d7 response_tokens=3257 truncated=0
+phase=eval_problem_done problems=43/128 samples=172 problem_id=83864f8749594ce4 response_tokens=785 truncated=0
+phase=eval_problem_done problems=44/128 samples=176 problem_id=4f1949500aa128e9 response_tokens=14627 truncated=0
+phase=eval_problem_done problems=45/128 samples=180 problem_id=310d3a0451c5bb4a response_tokens=875 truncated=0
+phase=eval_problem_done problems=46/128 samples=184 problem_id=db31d840f82d7f2e response_tokens=22036 truncated=2
+phase=eval_problem_done problems=47/128 samples=188 problem_id=b85cd3a0d61d8d2a response_tokens=1910 truncated=0
+phase=eval_problem_done problems=48/128 samples=192 problem_id=4ad774d03e1d7ae9 response_tokens=842 truncated=0
+phase=eval_problem_done problems=49/128 samples=196 problem_id=80a5aa2cdf064d25 response_tokens=2223 truncated=0
+phase=eval_problem_done problems=50/128 samples=200 problem_id=f83aecab9faccb6c response_tokens=7132 truncated=0
+phase=eval_problem_done problems=51/128 samples=204 problem_id=08306232ef9ba7aa response_tokens=1674 truncated=0
+phase=eval_problem_done problems=52/128 samples=208 problem_id=cce9209bc28f76c1 response_tokens=558 truncated=0
+phase=eval_problem_done problems=53/128 samples=212 problem_id=0eb62fab1b21f001 response_tokens=2157 truncated=0
+phase=eval_problem_done problems=54/128 samples=216 problem_id=ee02cd5b28fb2464 response_tokens=1069 truncated=0
+phase=eval_problem_done problems=55/128 samples=220 problem_id=21e3aa0cdbfe761a response_tokens=698 truncated=0
+phase=eval_problem_done problems=56/128 samples=224 problem_id=b5dc33c4111f2507 response_tokens=2104 truncated=0
+phase=eval_problem_done problems=57/128 samples=228 problem_id=3447eebbdcaa37f9 response_tokens=1315 truncated=0
+phase=eval_problem_done problems=58/128 samples=232 problem_id=1e70b4456ea54b6e response_tokens=1309 truncated=0
+phase=eval_problem_done problems=59/128 samples=236 problem_id=cd12e854a059eefc response_tokens=1819 truncated=0
+phase=eval_problem_done problems=60/128 samples=240 problem_id=54691fce5a1342e9 response_tokens=2462 truncated=0
+phase=eval_problem_done problems=61/128 samples=244 problem_id=21082726712a2d5c response_tokens=1197 truncated=0
+phase=eval_problem_done problems=62/128 samples=248 problem_id=e87c54273a4f6dc8 response_tokens=483 truncated=0
+phase=eval_problem_done problems=63/128 samples=252 problem_id=8078ab59d4615f37 response_tokens=4052 truncated=0
+phase=eval_problem_done problems=64/128 samples=256 problem_id=d66dea6f6059efa9 response_tokens=4671 truncated=0
+phase=eval_problem_done problems=65/128 samples=260 problem_id=92992c0e162b3d6d response_tokens=2382 truncated=0
+phase=eval_problem_done problems=66/128 samples=264 problem_id=118be303d7abffbe response_tokens=3168 truncated=0
+phase=eval_problem_done problems=67/128 samples=268 problem_id=2aeafb5e569f94dd response_tokens=1763 truncated=0
+phase=eval_problem_done problems=68/128 samples=272 problem_id=d0cd918ebadbb111 response_tokens=2050 truncated=0
+phase=eval_problem_done problems=69/128 samples=276 problem_id=ca9cbef015dfaab2 response_tokens=798 truncated=0
+phase=eval_problem_done problems=70/128 samples=280 problem_id=4ecc75de961c1f8e response_tokens=1613 truncated=0
+phase=eval_problem_done problems=71/128 samples=284 problem_id=ced521d94764b4a3 response_tokens=29119 truncated=3
+phase=eval_problem_done problems=72/128 samples=288 problem_id=de2d1c474b9ee450 response_tokens=2285 truncated=0
+phase=eval_problem_done problems=73/128 samples=292 problem_id=57971ca6c2f0ea0b response_tokens=3361 truncated=0
+phase=eval_problem_done problems=74/128 samples=296 problem_id=0b7036ebe3423f42 response_tokens=8053 truncated=0
+phase=eval_problem_done problems=75/128 samples=300 problem_id=fdd18857dfc203ee response_tokens=916 truncated=0
+phase=eval_problem_done problems=76/128 samples=304 problem_id=953b683f2dc4237e response_tokens=6461 truncated=0
+phase=eval_problem_done problems=77/128 samples=308 problem_id=e86aeb48607d14cf response_tokens=3245 truncated=0
+phase=eval_problem_done problems=78/128 samples=312 problem_id=883f43c19b123b8c response_tokens=5952 truncated=0
+phase=eval_problem_done problems=79/128 samples=316 problem_id=ea0162ad089adfef response_tokens=9767 truncated=0
+phase=eval_problem_done problems=80/128 samples=320 problem_id=9762de06228ca9c9 response_tokens=996 truncated=0
+phase=eval_problem_done problems=81/128 samples=324 problem_id=ae0a8ba5912720e7 response_tokens=347 truncated=0
+phase=eval_problem_done problems=82/128 samples=328 problem_id=2ca7e059eeb0b7dd response_tokens=200 truncated=0
+phase=eval_problem_done problems=83/128 samples=332 problem_id=324f53c548e3de45 response_tokens=6965 truncated=0
+phase=eval_problem_done problems=84/128 samples=336 problem_id=ebfbf81b2d04ffc4 response_tokens=1900 truncated=0
+phase=eval_problem_done problems=85/128 samples=340 problem_id=1abaefe281529653 response_tokens=713 truncated=0
+phase=eval_problem_done problems=86/128 samples=344 problem_id=96a8c62f9c87bbff response_tokens=2052 truncated=0
+phase=eval_problem_done problems=87/128 samples=348 problem_id=53216a75c996f35c response_tokens=1632 truncated=0
+phase=eval_problem_done problems=88/128 samples=352 problem_id=a0be6631f332b996 response_tokens=796 truncated=0
+phase=eval_problem_done problems=89/128 samples=356 problem_id=04fc13556e3fc4c6 response_tokens=2710 truncated=0
+phase=eval_problem_done problems=90/128 samples=360 problem_id=a3f40663ba19390b response_tokens=2811 truncated=0
+phase=eval_problem_done problems=91/128 samples=364 problem_id=0743e3798eac5d75 response_tokens=6870 truncated=0
+phase=eval_problem_done problems=92/128 samples=368 problem_id=50586870d07058f9 response_tokens=6640 truncated=0
+phase=eval_problem_done problems=93/128 samples=372 problem_id=5a8c50102096a59a response_tokens=4084 truncated=0
+phase=eval_problem_done problems=94/128 samples=376 problem_id=5c91e3632a6bed3d response_tokens=1365 truncated=0
+phase=eval_problem_done problems=95/128 samples=380 problem_id=4aec4eb79c20b809 response_tokens=1855 truncated=0
+phase=eval_problem_done problems=96/128 samples=384 problem_id=b884ea4dff439d89 response_tokens=4553 truncated=0
+phase=eval_problem_done problems=97/128 samples=388 problem_id=3d356b3168ea8edc response_tokens=704 truncated=0
+phase=eval_problem_done problems=98/128 samples=392 problem_id=6c3d09ab3690acaa response_tokens=694 truncated=0
+phase=eval_problem_done problems=99/128 samples=396 problem_id=d3161eafd1210d42 response_tokens=2593 truncated=0
+phase=eval_problem_done problems=100/128 samples=400 problem_id=c09864a50ddd773b response_tokens=3506 truncated=0
+phase=eval_problem_done problems=101/128 samples=404 problem_id=6fe518888bc76580 response_tokens=1452 truncated=0
+phase=eval_problem_done problems=102/128 samples=408 problem_id=d41930bf262e749b response_tokens=1059 truncated=0
+phase=eval_problem_done problems=103/128 samples=412 problem_id=a4a92af384d88e0b response_tokens=861 truncated=0
+phase=eval_problem_done problems=104/128 samples=416 problem_id=d2abc39647ebd5cc response_tokens=1282 truncated=0
+phase=eval_problem_done problems=105/128 samples=420 problem_id=63fb0c19be9bfc02 response_tokens=881 truncated=0
+phase=eval_problem_done problems=106/128 samples=424 problem_id=3dd318b44a98a85d response_tokens=2085 truncated=0
+phase=eval_problem_done problems=107/128 samples=428 problem_id=18a164d5c1185eef response_tokens=249 truncated=0
+phase=eval_problem_done problems=108/128 samples=432 problem_id=214693f141327f81 response_tokens=2000 truncated=0
+phase=eval_problem_done problems=109/128 samples=436 problem_id=c97bae96c69a7454 response_tokens=2445 truncated=0
+phase=eval_problem_done problems=110/128 samples=440 problem_id=ba83e92e963aa63c response_tokens=1450 truncated=0
+phase=eval_problem_done problems=111/128 samples=444 problem_id=a325f288a314fe56 response_tokens=556 truncated=0
+phase=eval_problem_done problems=112/128 samples=448 problem_id=3b7c38f5c3019d26 response_tokens=10079 truncated=0
+phase=eval_problem_done problems=113/128 samples=452 problem_id=607ec7f40a3b19a9 response_tokens=1567 truncated=0
+phase=eval_problem_done problems=114/128 samples=456 problem_id=ad5b14b23ed9a9ea response_tokens=986 truncated=0
+phase=eval_problem_done problems=115/128 samples=460 problem_id=fdc8aba1c1ade2de response_tokens=3917 truncated=0
+phase=eval_problem_done problems=116/128 samples=464 problem_id=5031411c952b356b response_tokens=1310 truncated=0
+phase=eval_problem_done problems=117/128 samples=468 problem_id=b3d768736d644cfc response_tokens=3619 truncated=0
+phase=eval_problem_done problems=118/128 samples=472 problem_id=1adc8b1cc0568611 response_tokens=4890 truncated=0
+phase=eval_problem_done problems=119/128 samples=476 problem_id=a5b3b535a7854a82 response_tokens=2311 truncated=0
+phase=eval_problem_done problems=120/128 samples=480 problem_id=1274ec9221321d04 response_tokens=1077 truncated=0
+phase=eval_problem_done problems=121/128 samples=484 problem_id=c16492850cbf8813 response_tokens=1399 truncated=0
+phase=eval_problem_done problems=122/128 samples=488 problem_id=dbe25f76577aa227 response_tokens=17843 truncated=1
+phase=eval_problem_done problems=123/128 samples=492 problem_id=0f74f3328993b34b response_tokens=1532 truncated=0
+phase=eval_problem_done problems=124/128 samples=496 problem_id=98ba12c744ebd5e7 response_tokens=1539 truncated=0
+phase=eval_problem_done problems=125/128 samples=500 problem_id=b4c65e92228af5bd response_tokens=1555 truncated=0
+phase=eval_problem_done problems=126/128 samples=504 problem_id=86e623556487463d response_tokens=1558 truncated=0
+phase=eval_problem_done problems=127/128 samples=508 problem_id=869fd921a94c4dc5 response_tokens=1741 truncated=0
+phase=eval_problem_done problems=128/128 samples=512 problem_id=cb1c77331e55a5a0 response_tokens=958 truncated=0
+eval done avg=0.734375 pass_at_k=0.875

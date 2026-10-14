@@ -1,0 +1,13 @@
+{
+  "data_path": "/mnt/mydata/wja/grace/assets/datasets/math500.jsonl",
+  "eval_split": "eval",
+  "n_source": 500,
+  "n_loaded": 128,
+  "n_problems": 128,
+  "looks_like_math500": true,
+  "load": {
+    "n_raw": 500,
+    "n_kept": 500,
+    "n_conflict_groups": 0
+  }
+}

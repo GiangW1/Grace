@@ -1,0 +1,16 @@
+audit start 2026-10-14T14:35:48.248234+00:00 backend=gpu_verl n_problems=4 grid=[512] dir=/mnt/mydata/wja/grace/runs/pr18-20261014/followup-fast-3gpu/core8_grace-seed17-audit
+Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 3/3 [00:00<00:00, 133.21it/s]
+phase=audit_problem_begin problem=1/4 problem_id=3c982955-961b-4020-996d-785e03736223 n_bundles=0
+INFO 10-14 22:37:43 [__init__.py:216] Automatically detected platform cuda.
+phase=audit_prefix_done problem=1/4 t=512 path=0 n_bundles=1
+phase=audit_prefix_done problem=1/4 t=512 path=1 n_bundles=2
+phase=audit_problem_begin problem=2/4 problem_id=33490cb3-5df6-4837-b40f-912337b71133 n_bundles=2
+phase=audit_prefix_done problem=2/4 t=512 path=0 n_bundles=3
+phase=audit_prefix_done problem=2/4 t=512 path=1 n_bundles=4
+phase=audit_problem_begin problem=3/4 problem_id=8268468a-b6b2-4df2-9d56-e1a020f6dfe7 n_bundles=4
+phase=audit_prefix_done problem=3/4 t=512 path=0 n_bundles=5
+phase=audit_prefix_done problem=3/4 t=512 path=1 n_bundles=6
+phase=audit_problem_begin problem=4/4 problem_id=6c14c1d2-9f57-4c92-bd00-301ec2730bad n_bundles=6
+phase=audit_prefix_done problem=4/4 t=512 path=0 n_bundles=7
+phase=audit_prefix_done problem=4/4 t=512 path=1 n_bundles=8
+audit done n_bundles=8

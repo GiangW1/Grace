@@ -1,0 +1,7 @@
+{
+  "kind": "audit",
+  "started": "2026-10-14T14:35:48.248234+00:00",
+  "run_dir": "/mnt/mydata/wja/grace/runs/pr18-20261014/followup-fast-3gpu/core8_grace-seed17-audit",
+  "requested_run_dir": "/mnt/mydata/wja/grace/runs/pr18-20261014/followup-fast-3gpu/core8_grace-seed17-audit",
+  "redirected": false
+}

@@ -1,0 +1,55 @@
+{
+  "selection": "first",
+  "selection_seed": 17,
+  "n_problems": 4,
+  "prompt_normalization": "whitespace_v2_case_sensitive",
+  "problems": [
+    {
+      "problem_id": "3c982955-961b-4020-996d-785e03736223",
+      "prompt_sha256": "352c6efeeb974102b139126b2b021a288d7184e8b4946e7bf2b9527a2aed4093",
+      "gold_sha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451"
+    },
+    {
+      "problem_id": "33490cb3-5df6-4837-b40f-912337b71133",
+      "prompt_sha256": "25c7541d2628600dbf9083311ec012d0068ce7b13c18651ccd57af0aac1ad278",
+      "gold_sha256": "72d1b5da6eeaf1789df86487da50ad5e9dadb5ffaecb56b6de592aa286c9c1b8"
+    },
+    {
+      "problem_id": "8268468a-b6b2-4df2-9d56-e1a020f6dfe7",
+      "prompt_sha256": "e2b823bc650bbd302773112c92d2ded9764cb7ebc48d163dabba3a622fa647a0",
+      "gold_sha256": "b7a56873cd771f2c446d369b649430b65a756ba278ff97ec81bb6f55b2e73569"
+    },
+    {
+      "problem_id": "6c14c1d2-9f57-4c92-bd00-301ec2730bad",
+      "prompt_sha256": "c56c863f3b37cf2f4b9c84b93bc63794702d384d70892882083d77d6de955292",
+      "gold_sha256": "e7f6c011776e8db7cd330b54174fd76f7d0216b612387a5ffcfb81e6f0919683"
+    }
+  ],
+  "ordered_records_sha256": "78023593f9928a37afc2dba02712850a3da421fff262c6c3ee96b6d6d7cfeb2d",
+  "n_baseline": 16,
+  "n_continuations": 8,
+  "max_new_tokens": 8192,
+  "decision_grid": [
+    512
+  ],
+  "method": "grace",
+  "enable_thinking": false,
+  "difficulty_manifest": null,
+  "difficulty_manifest_sha256": null,
+  "difficulty_counts": null,
+  "functional_qualification": {
+    "enabled": false
+  },
+  "reward_protocol_version": 4,
+  "require_complete_answers": false,
+  "baseline_configuration": {
+    "ema_alpha": 0.7,
+    "mode": "fixed",
+    "fixed_value": 0.5,
+    "prescan_prior_strength": 0.0,
+    "prescan_prior_mean": 0.5
+  },
+  "audit_baseline_override": null,
+  "baseline_target_changed_from_configured_fixed": false,
+  "baseline_protocol": "Independent prescan with configured prior; explicit audit.baseline or configured fixed mode overrides both gradient and feature baseline."
+}
