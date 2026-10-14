@@ -1,0 +1,7 @@
+# Optional second experiment: identical measured training envelopes, fixed N.
+# The controller includes setup/sync/predictor/persistence; a batch may overshoot.
+# Keep evaluation/audit outside the training clock and report their cost separately.
+run_wall_seconds: 7200
+num_steps: 10000
+cost_control:
+  mode: fixed

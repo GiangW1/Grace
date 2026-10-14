@@ -592,7 +592,7 @@ def _bundles_from_engines(
 
 
 def _baseline_fn(cfg: dict[str, Any] | None):
-    """Only an explicit audit.baseline is a study override. Holdout problems use the independent pass rate."""
+    """Null inherits configured fixed mode; other modes use an independent pass rate."""
     if not cfg or (cfg.get("audit") or {}).get("baseline") is None:
         return lambda _pid: None
 
@@ -1036,6 +1036,8 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
         run.write_yaml("config.yaml", cfg)
         run.write_json("environment.json", versions)
         manifest = selection_manifest(recs, selection, selection_seed)
+        baseline_policy = baseline_from_config(cfg.get("baseline"))
+        audit_baseline_override = audit_cfg.get("baseline")
         manifest.update(n_baseline=int(audit_cfg.get("n_baseline", n_cont)), n_continuations=n_cont,
                         max_new_tokens=max_new, decision_grid=grid, method=spec.name,
                         enable_thinking=bool(cfg.get("enable_thinking", False)),
@@ -1049,7 +1051,12 @@ def run_audit(records: list[MathRecord], cfg: dict[str, Any], run_dir: str | Pat
                         reward_protocol_version=REWARD_PROTOCOL_VERSION,
                         require_complete_answers=bool(audit_cfg.get("require_complete_answers", False)
                                                       or cfg.get("enable_thinking", False)),
-                        baseline_configuration=baseline_from_config(cfg.get("baseline")).configuration(),
+                        baseline_configuration=baseline_policy.configuration(),
+                        audit_baseline_override=audit_baseline_override,
+                        baseline_target_changed_from_configured_fixed=(
+                            None if baseline_policy.mode != "fixed" else
+                            audit_baseline_override is not None and
+                            float(audit_baseline_override) != baseline_policy.fixed_value),
                         baseline_protocol="Independent prescan with configured prior; explicit audit.baseline or configured fixed mode overrides both gradient and feature baseline.")
         run.write_json("audit_manifest.json", manifest)
         persist_load_report(run, data_path=cfg.get("data_path"))

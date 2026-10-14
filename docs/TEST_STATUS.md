@@ -2,6 +2,35 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
+## 2026-10-14 后续审计的两项审查修复
+
+- small-core 审计默认继承配置中的固定训练 baseline，不再覆盖为 0.5；显式研究覆盖
+  仍可用，manifest 标记覆盖值与是否改变配置中的 fixed 目标，非 fixed 比较留 null。
+- 停止附加方差逐前缀计算：已结束前缀 p_i=1、贡献为零，仍保留其梯度能量与平均分母。
+- 新增 7 项参数化回归，并强化混合前缀的端到端报告检查：baseline 0/0.3、显式相同/不同
+  覆盖，真实 CPU autograd 标签与输入特征一致、无固定模式预扫，以及非零结束梯度、p=1。
+  修复前相关测试为 7 failed / 1 passed；修复后相关三文件 **48 passed in 6.00s**。
+- 全量 `python -m pytest tests -q -rs -o addopts=''`：
+  **974 passed, 18 skipped in 44.31s**；分析 CLI `--help` 与 `git diff --check` 通过。
+- 跳过项仍为 16 项可选 math_verify、1 项真实 GPU 栈、1 项历史本地归档。
+  没有运行新的 RTX5090 / Qwen3-4B GPU 实验；这些是 CPU 正确性回归，不是效果或速度结果。
+
+## 2026-10-14 PR17 后续对照与预测机制审计
+
+- 新增 `--followup`：共享零适配器 step-0 评测、core8 Uniform-HT、三种子 100 步、
+  25/50/75/最终检查点评测；保持 Qwen3-4B 非Thinking、8192 上限、四卡分工。
+- 付费审计使用冻结检查点预测器，不再把 `predictor_diagnostic: true` 的纯标签收集
+  当作预测器验证。新增 direct 坐标 MSE/零预测对照、续写噪声及未截零的条件均值去噪估计，
+  同固定 p 的停止附加方差仅为离线诊断，不宣称在线收益。
+- CPU 回归覆盖：共享初始只评一次、评测 seed 独立于训练 seed、对照协议一致、
+  四卡配置、禁止共享非零/SFT/续训初始、计划目录不覆盖、缺失墙钟快照记录、
+  检查点时钟/hash 验证、配对清单一致性、warmup 后健康统计、小样本与缺失预测。
+  实际 tiny checkpoint → 冻结 predictor audit → direct report 接线通过。
+- 全量命令：`python -m pytest tests -q -rs -o addopts=''`，
+  **967 passed, 18 skipped in 45.42s**。三个新增/扩展 CLI 的 `--help` 与 `git diff --check` 通过。
+- 跳过项：16 项缺可选 math_verify；1 项需要真实 GPU 栈；1 项缺历史本地归档。
+  本轮未执行新增 GPU 训练/审计，也未宣称新的显存、预测精度或加速结果。
+
 ## 2026-10-13 小核心实验切换为非Thinking
 
 - 默认权重仍为用户显式提供的Qwen3-4B（非Base）；共享实验配置改为

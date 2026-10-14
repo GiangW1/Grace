@@ -219,6 +219,10 @@ def test_direct_training_checkpoint_resume_and_no_pca(tmp_path, monkeypatch):
     summary = audit_bundles(bundles, _audit_u(bundles, audit_cfg),
                             {"gradient_target": "trajectory", "require_pre_emit": False}, np.random.default_rng(9))
     assert summary["orthogonal_energy"] < 1e-10
+    # Next-stage audits must score the loaded predictor, not just collect labels.
+    from grace_gc.audit.prefix_audit import bundle_to_dict
+    from scripts.analyze_small_core_prediction import prediction_row
+    assert all(prediction_row(bundle_to_dict(b))["status"] == "available" for b in bundles)
 
 
 def test_direct_audit_geometry_has_zero_omission():
