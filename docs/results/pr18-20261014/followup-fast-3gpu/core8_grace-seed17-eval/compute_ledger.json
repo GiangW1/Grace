@@ -1,0 +1,25 @@
+{
+  "hardware": "rtx5090",
+  "n_gpu": 3,
+  "gpu_reserved_seconds": 6780.8376766867,
+  "wall_seconds": 2260.2792255622335,
+  "cpu_seconds": 3728.0811362669997,
+  "cpu_scope": "current_process_excludes_workers",
+  "sessions": 1,
+  "note": "A100 and 5090 hours are recorded separately and never converted. Totals skip nested phases and steps only within the same session envelope. CPU seconds are null when unmeasured and exclude worker processes.",
+  "rows": [
+    {
+      "name": "eval",
+      "hardware": "rtx5090",
+      "wall_seconds": 2260.2792255622335,
+      "gpu_reserved_seconds": 6780.8376766867,
+      "cpu_seconds": 3728.0811362669997,
+      "cpu_scope": "current_process_excludes_workers",
+      "session_id": "088b00a743ce4b228550160cdaf2786a",
+      "overlap_excluded": true,
+      "at": "2026-10-14T14:35:02.984778+00:00",
+      "status": "completed",
+      "timing_scope": "Function entry through setup, computation and result/failure persistence; excludes final ledger publication and caller-side CLI/data loading."
+    }
+  ]
+}

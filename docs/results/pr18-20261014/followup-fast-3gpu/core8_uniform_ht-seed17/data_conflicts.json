@@ -1,0 +1,163 @@
+{
+  "prompt_normalization": "whitespace_v2_case_sensitive",
+  "path": "/mnt/mydata/wja/grace/assets/datasets/dapo-math-17k.parquet",
+  "n_raw": 1791700,
+  "n_kept": 17176,
+  "n_same_answer_dedup": 1773312,
+  "n_conflict_groups": 12,
+  "conflicts": [
+    {
+      "prompt_hash": "1f225674f23d473b324825438b7715434da65d9ed8e5f9bfaa7e5f54df3c4f96",
+      "problem_id": "af9089ec-686b-4471-ae02-8d196030763b",
+      "answers": [
+        "6",
+        "64"
+      ],
+      "first_loc": 36
+    },
+    {
+      "prompt_hash": "597fe677bf86db79882c8ae23096ec19a6f69d8f450627373f087faa9b3589e1",
+      "problem_id": "f09110c9-c0cc-4f50-ba00-07e47208efbf",
+      "answers": [
+        "15",
+        "25"
+      ],
+      "first_loc": 283
+    },
+    {
+      "prompt_hash": "a182560310199f40e1ea757c0eec092a6ac3965d6894f44d4ce973cc417b78c9",
+      "problem_id": "31aeb632-4fb7-47a6-9729-0ead200fca1b",
+      "answers": [
+        "21",
+        "99"
+      ],
+      "first_loc": 2041
+    },
+    {
+      "prompt_hash": "8053f75069d39ce606f65f984413608acfe720c6dcee53ec06e941f8f24e2059",
+      "problem_id": "b3bcfe10-8941-43b4-b0c6-d4885984f6d8",
+      "answers": [
+        "12",
+        "30"
+      ],
+      "first_loc": 2130
+    },
+    {
+      "prompt_hash": "d8bd954dbaf86f437f10e4580ffcbf4f55113a8be8e818af33cacaa5ee90ff47",
+      "problem_id": "8790d8ae-ed1d-4ae3-a5dc-b3bff1d87e35",
+      "answers": [
+        "248",
+        "36"
+      ],
+      "first_loc": 3471
+    },
+    {
+      "prompt_hash": "c433043dbdb2388bfa0a3815440478acdd7afa130cb927183a836ece3d2b943c",
+      "problem_id": "93811b75-3617-48c4-8f68-9ec28b123425",
+      "answers": [
+        "239",
+        "48"
+      ],
+      "first_loc": 4851
+    },
+    {
+      "prompt_hash": "7a8d5b17aaa8edbcefa2752ce04e8688f76ddf416b700647d822e18082219b21",
+      "problem_id": "de2e8f5b-ec62-4229-8880-395cb4bc476a",
+      "answers": [
+        "-1",
+        "554"
+      ],
+      "first_loc": 5786
+    },
+    {
+      "prompt_hash": "e444a0232c688a2809683c3c1f34a1e8b3d4aef5da2b4eb1464deca50e6ebeb0",
+      "problem_id": "22c60adf-1164-43da-82d0-ef9d082fbc38",
+      "answers": [
+        "-1",
+        "230"
+      ],
+      "first_loc": 5886
+    },
+    {
+      "prompt_hash": "9975a05602bdd6d1573e388a51356e48f0c84318c7ba6789d65c68a35fb52c2b",
+      "problem_id": "03eca081-5a68-4f3e-a5aa-ad59e6ddbe33",
+      "answers": [
+        "-1",
+        "683"
+      ],
+      "first_loc": 5916
+    },
+    {
+      "prompt_hash": "69be79cf1b5298b4ec8704bb6d33e533bf67428d63f3e1be38f8cedf1227a9e9",
+      "problem_id": "bac74bb3-d12d-4236-9e9c-08077c44994b",
+      "answers": [
+        "-1",
+        "913"
+      ],
+      "first_loc": 5938
+    },
+    {
+      "prompt_hash": "f3b914530b98e95ace65625328d5c5ba313f1a1056c6bd60cf2a34f80ae934b3",
+      "problem_id": "4b61ebe1-64b0-43ff-a434-0f65dc6e486e",
+      "answers": [
+        "108",
+        "180"
+      ],
+      "first_loc": 7695
+    },
+    {
+      "prompt_hash": "b85a5be9122eea1efd4a1c684f33e6f10f911d0cd9066e13b489ec564d55868d",
+      "problem_id": "cc639dd4-3163-4d29-ab20-66dce003e4c1",
+      "answers": [
+        "-1",
+        "-2"
+      ],
+      "first_loc": 11660
+    }
+  ],
+  "eval_exclusion": {
+    "status": "applied",
+    "eval_source": {
+      "path": "/mnt/mydata/wja/grace/assets/datasets/math500.jsonl",
+      "sha256": "35dc41080a3680858b27fa7e0533d2d547825316fc5dafe5d316f4ccc5a06132",
+      "n_problems": 500
+    },
+    "removed": [
+      {
+        "split": "train",
+        "problem_id": "84501b44-688d-4518-be16-d188f0a0e8d3",
+        "prompt_sha256": "06d5aeabb535b6a990b29e1f5210e010d81f9f767a3bbe9e9b07c62c1ca02c08",
+        "eval_problem_ids": [
+          "06d5aeabb535b6a9"
+        ]
+      },
+      {
+        "split": "train",
+        "problem_id": "5a9ea7d2-faa3-41b9-b097-875f39e7f1b1",
+        "prompt_sha256": "1ea3d389e0493b48d5a8f724aec8c99519fb42585d753edd20ce6251a281d43c",
+        "eval_problem_ids": [
+          "1ea3d389e0493b48"
+        ]
+      },
+      {
+        "split": "train",
+        "problem_id": "a208ad4e-651b-4b75-a619-31bf1314bbed",
+        "prompt_sha256": "07e22408c9d86bf198748e6e0ffd321d2d6b8d605ebab6f9a119cca4c7ce5785",
+        "eval_problem_ids": [
+          "07e22408c9d86bf1"
+        ]
+      },
+      {
+        "split": "train",
+        "problem_id": "c0659f3a-2792-4cc8-b669-9c50d7382147",
+        "prompt_sha256": "a153bf646bb8dfb046d7c75433a9e56cd7c552526ee5ec4085c5b284d4b6813a",
+        "eval_problem_ids": [
+          "a153bf646bb8dfb0"
+        ]
+      }
+    ],
+    "normalization": "whitespace_and_exact_dapo_wrapper_case_sensitive",
+    "scope": "train/calib/audit pools before SFT and sampling; all external eval problems",
+    "note": "No semantic near-duplicate detection; gold does not affect exclusion. This does not certify the exposure history of a reused actor/checkpoint."
+  }
+}

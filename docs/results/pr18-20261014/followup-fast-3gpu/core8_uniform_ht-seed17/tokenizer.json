@@ -1,0 +1,12 @@
+{
+  "name_or_path": "/mnt/mydata/wja/grace/assets/models/Qwen3-4B",
+  "vocab_size": 151643,
+  "has_chat_template": true,
+  "eos_token_id": 151645,
+  "pad_token_id": 151643,
+  "unk_token_id": null,
+  "stop_token_ids": [
+    151645,
+    151643
+  ]
+}

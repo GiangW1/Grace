@@ -1,0 +1,80 @@
+{
+  "status": "complete",
+  "source_commit": "332b816c8385d4cbd0105aaa0ea2e7c9cec078af",
+  "started_at": "2026-10-14T07:24:57.168259+00:00",
+  "finished_at": "2026-10-14T14:46:59.742002+00:00",
+  "total_wall_seconds": 26522.573743,
+  "completed_jobs": 9,
+  "training_steps_each": 50,
+  "training_seeds": [
+    17
+  ],
+  "physical_gpus": [
+    7,
+    2,
+    3
+  ],
+  "evaluations": [
+    {
+      "arm": "Initial zero adapter",
+      "n_problems": 128,
+      "n_samples": 512,
+      "correct_samples": 383,
+      "avg": 0.748046875,
+      "pass_at_4": 0.890625,
+      "parse_rate": 0.97265625,
+      "truncate_rate": 0.0078125
+    },
+    {
+      "arm": "Full-PG",
+      "n_problems": 128,
+      "n_samples": 512,
+      "correct_samples": 384,
+      "avg": 0.75,
+      "pass_at_4": 0.90625,
+      "parse_rate": 0.962890625,
+      "truncate_rate": 0.01171875
+    },
+    {
+      "arm": "Uniform-HT",
+      "n_problems": 128,
+      "n_samples": 512,
+      "correct_samples": 376,
+      "avg": 0.734375,
+      "pass_at_4": 0.875,
+      "parse_rate": 0.96484375,
+      "truncate_rate": 0.01171875
+    },
+    {
+      "arm": "GRACE",
+      "n_problems": 128,
+      "n_samples": 512,
+      "correct_samples": 371,
+      "avg": 0.724609375,
+      "pass_at_4": 0.875,
+      "parse_rate": 0.9609375,
+      "truncate_rate": 0.015625
+    }
+  ],
+  "frozen_prediction": {
+    "n_prefixes": 8,
+    "n_available": 8,
+    "n_problems": 4,
+    "zero_prediction_mse": 762.3473580259277,
+    "frozen_prediction_mse": 762.3473580259277,
+    "conditional_noise_trace": 716.9498486848859,
+    "noise_corrected_mean_energy": 45.39750934104202,
+    "noise_corrected_mean_error_sq": 45.39750934104202,
+    "cosine_to_empirical_mean": null,
+    "realized_gradient_mse_ratio_vs_zero": 1.0,
+    "fixed_p": 0.5,
+    "uniform_ht_added_variance_trace": 762.3473580259277,
+    "uniform_cv_added_variance_trace": 762.3473580259277
+  },
+  "limitations": [
+    "Single training seed and 128-problem diagnostic; not evidence of a quality improvement.",
+    "Frozen effective prediction has zero norm for all 8 prefixes; MSE ratio versus zero is 1.0 and no predictive benefit is demonstrated.",
+    "Frozen audit has 4 independent problems; the 64 continuations are not 64 independent problems.",
+    "Training command runtimes are sequential observations and do not establish a replicated speedup."
+  ]
+}

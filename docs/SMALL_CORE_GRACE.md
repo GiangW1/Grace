@@ -3,7 +3,9 @@
 本实现基于 PR #16 的 `6656fb53af616c8d3f5285f6678e9498b80c4a66`，继承其中
 PR #12–#15 的实验/审计框架及修复。它是用户要求重新验证 GRACE 的独立、可选实验；
 不改写既有分析论文结论，不把旧结果当作本次结果。PR17 后来上传了 20 步 pilot；
-它不替代下文的正式对照或预测机制证据。本次追加代码没有执行新的 GPU 实验。
+它不替代下文的正式对照或预测机制证据。PR18 三卡快速诊断已于 2026-10-14 完成，
+见[本轮实测结果](results/pr18-20261014/followup-fast-3gpu/README.md)：三臂各 50 步，128 题 × 4 回答与冻结审计全部完成；
+当前结果未显示 GRACE 的预测收益。
 
 ## 改了什么
 
@@ -244,7 +246,8 @@ python scripts/summarize_small_core_experiment.py --suite runs/core8-quick/suite
 [RTX5090_MEMORY_TEST.md](RTX5090_MEMORY_TEST.md)。当前诊断用1张actor+2张生成卡，旧四卡配置仍可选；
 新增合成满长度梯度探针与真实4步训练显存报告；仍需服务器GPU实测。
 
-- 本次后续只实现代码和本机合成/CPU 检查；没有运行新的 Qwen3-4B GPU RL 或速度测量。
+- PR18 已运行 Qwen3-4B 三卡 GPU 训练、评测与冻结审计；详见[结果报告](results/pr18-20261014/followup-fast-3gpu/README.md)。
+  这是一轮单 seed 快速诊断，不能当作多 seed 效果或加速结论。独立的满长度显存探针尚未补测。
 - CPU tiny 的 direct 模式只验证算法接线，不模拟真实小核心的语言建模能力。
 - 小型随机初始化 Qwen3 的 PEFT 导出一致性测试不需要下载模型，不是 4B 效果实验。
 - 固定基底构造一次用 FP32 完整 SVD；可能较慢，计入 setup 成本。恢复时仍有构造开销，

@@ -1,0 +1,7 @@
+{
+  "kind": "train",
+  "started": "2026-10-14T07:24:57.285211+00:00",
+  "run_dir": "/mnt/mydata/wja/grace/runs/pr18-20261014/followup-fast-3gpu/core8_full_pg-seed17",
+  "requested_run_dir": "/mnt/mydata/wja/grace/runs/pr18-20261014/followup-fast-3gpu/core8_full_pg-seed17",
+  "redirected": false
+}

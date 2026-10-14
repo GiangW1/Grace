@@ -1,0 +1,249 @@
+{
+  "step": 50,
+  "written_at": "2026-10-14T11:56:03.968965+00:00",
+  "basis_id": 1,
+  "predictor_synced_basis_id": -1,
+  "reservoir_n": 0,
+  "n_problems": 8,
+  "n_parsed": 19,
+  "n_parsed_completed": 19,
+  "n_parsed_stopped_prefix": 0,
+  "n_truncated": 0,
+  "n_prompt_truncated": 0,
+  "n_reward_pos": 9,
+  "mean_response_tokens": 711.03125,
+  "mean_generated_response_tokens": 919.03125,
+  "mean_completed_response_tokens": 1197.5263157894738,
+  "mean_suffix_tokens": 410.5625,
+  "n_short_response": 0,
+  "n_prefix_finished": 1,
+  "n_eligible": 31,
+  "n_continued": 18,
+  "n_zero_adv": 0,
+  "all_reward_zero": false,
+  "all_completed_adv_zero": false,
+  "all_p_one": false,
+  "predictor_loss_null": true,
+  "warmup_steps": 10,
+  "steps_after_warmup": 40,
+  "predictor_untrained": true,
+  "grad_norm": 3.966516912347704,
+  "grad_norm_preclip": 3.966516912347704,
+  "logprob_probe": {
+    "status": "compared",
+    "timing": "before_actor_update",
+    "source": "observed_behavior_batch",
+    "meaning": "numerical evidence; coverage and missing scores do not certify policy equality",
+    "eligible_sequences": 32,
+    "checked_sequences": 1,
+    "coverage_complete": false,
+    "status_counts": {
+      "compared": 1
+    },
+    "n_tokens": 64,
+    "mean_abs": 0.0030899125920669235,
+    "max_abs": 0.041335463523864746,
+    "full_observed_tokens_checked": false,
+    "numerics": {
+      "hf_compute_dtype": "bfloat16",
+      "hf_log_softmax_dtype": "float32",
+      "hf_probe_microbatch_size": 1,
+      "hf_use_cache": false,
+      "hf_training": true,
+      "hf_attention_implementation": "sdpa",
+      "hf_parameter_dtypes": [
+        "torch.bfloat16",
+        "torch.float32"
+      ],
+      "lora_parameter_dtypes": [
+        "torch.float32"
+      ],
+      "active_adapters": null,
+      "lora_configuration": {},
+      "lora_request": {
+        "lora_name": "grace-gc-51",
+        "lora_int_id": 51,
+        "lora_path": "/mnt/mydata/wja/grace/runs/pr18-20261014/followup-fast-3gpu/core8_uniform_ht-seed17/lora/step-51"
+      },
+      "vllm_dtype": null,
+      "vllm_lora_dtype": null,
+      "scope": "Host metadata; not a vLLM worker tensor hash or kernel equivalence check. Join step with trajectory snapshot_sha for frozen actor provenance."
+    },
+    "worst_token": {
+      "response_index": 13,
+      "sequence_index": 623,
+      "logit_index": 622,
+      "token_id": 553,
+      "phase": "prefix",
+      "hf_logprob": -0.16086047887802124,
+      "behavior_logprob": -0.202195942401886,
+      "signed_error": 0.041335463523864746,
+      "absolute_error": 0.041335463523864746,
+      "record_index": 0,
+      "problem_id": "d3e8830e-769f-4302-95ad-2b041cd53ea4",
+      "observed_scope": "stopped_prefix",
+      "request_seeds": {
+        "prefix": 576097849,
+        "continuation": null
+      }
+    }
+  },
+  "adapter_path": "/mnt/mydata/wja/grace/runs/pr18-20261014/followup-fast-3gpu/core8_uniform_ht-seed17/lora/step-52",
+  "lora_id": 52,
+  "sampling": {
+    "used": {
+      "max_tokens": 7680,
+      "temperature": 1.0,
+      "top_p": 1.0,
+      "top_k": -1,
+      "n": 1,
+      "stop": [],
+      "repetition_penalty": 1.0,
+      "min_p": 0.0,
+      "logprobs": 1,
+      "seed": 21795315,
+      "stop_token_ids": [
+        151645,
+        151643
+      ]
+    },
+    "dropped": [],
+    "request_seeds": [
+      1084647238,
+      1715799812,
+      1780772712,
+      475544738,
+      910657934,
+      1451869411,
+      1462921527,
+      28357838,
+      1728037599,
+      1571522664,
+      436723249,
+      1279302421,
+      31811753,
+      646266615,
+      1183175717,
+      44826566,
+      2126892511,
+      21795315
+    ]
+  },
+  "allocating_with_untrained_predictor": false,
+  "allocation_ready": false,
+  "allocation_uniform_shrink": 0.0,
+  "control_variate_enabled": true,
+  "control_variate_used": false,
+  "baseline_configuration": {
+    "ema_alpha": 0.7,
+    "mode": "fixed",
+    "fixed_value": 0.5,
+    "prescan_prior_strength": 0.0,
+    "prescan_prior_mean": 0.5
+  },
+  "basis_id_at_allocate": 1,
+  "allocating_with_init_basis": false,
+  "token_cost_proxy_used": 919.03125,
+  "token_cost_proxy_full": 1215.548611111111,
+  "token_cost_proxy_ratio": 0.7560629345460155,
+  "mean_actual_response_tokens": 1197.5263157894738,
+  "basis_rank": null,
+  "m_shrink": null,
+  "coord_kind": null,
+  "mean_baseline_b": null,
+  "n_baseline": 0,
+  "n_baseline_zero": 0,
+  "baseline_collapsed_with_zero_reward": false,
+  "lora_A_norm_sq": 0.0,
+  "lora_B_norm_sq": 0.0,
+  "lora_A_grad_norm_sq": 0.0,
+  "lora_B_grad_norm_sq": 0.0,
+  "n_lora_A": 0,
+  "n_lora_B": 0,
+  "n_lora_A_grad_missing": 0,
+  "n_lora_B_grad_missing": 0,
+  "n_lora_A_grad_zero": 0,
+  "n_lora_B_grad_zero": 0,
+  "lora_A_near_zero": false,
+  "lora_B_near_zero": false,
+  "lora_A_grad_zero_expected": false,
+  "n_small_cores": 72,
+  "small_core_dim": 4608,
+  "small_core_grad_missing": 0,
+  "small_core_grad_norm_sq": 15.73325643595308,
+  "resources": {
+    "pid": 2636713,
+    "nvidia_smi": "0, NVIDIA GeForce RTX 5090, 1246, 32607, 0\n1, NVIDIA GeForce RTX 5090, 5389, 32607, 86\n2, NVIDIA GeForce RTX 5090, 24719, 32607, 0\n3, NVIDIA GeForce RTX 5090, 24719, 32607, 0\n4, NVIDIA GeForce RTX 5090, 4, 32607, 0\n5, NVIDIA GeForce RTX 5090, 4, 32607, 0\n6, NVIDIA GeForce RTX 5090, 4, 32607, 0\n7, NVIDIA GeForce RTX 5090, 22765, 32607, 0",
+    "nvidia_compute_processes": "GPU-3529cecd-95a8-0ba6-626f-582dc307e183, 2240063, /usr/local/bin/ollama, 502\nGPU-3529cecd-95a8-0ba6-626f-582dc307e183, 2602621, /home/hjq/.conda/envs/gmemory/bin/python, 730\nGPU-419354f7-cddc-d427-4cb8-4b36a7c4f1d9, 2240063, /usr/local/bin/ollama, 5380\nGPU-6b7b35b1-9e70-ae60-f975-4681a64a2bac, 2639115, VLLM::EngineCore, 24710\nGPU-e69b2f0c-f05e-e6d4-b6a9-ff36584ce0f0, 2639120, VLLM::EngineCore, 24710\nGPU-a3d9b4d1-76ff-6622-a349-0035db2778f9, 2636713, /mnt/mydata/wja/grace/venv/bin/python, 22756",
+    "nvidia_power_clocks": [
+      {
+        "index": "0",
+        "uuid": "GPU-3529cecd-95a8-0ba6-626f-582dc307e183",
+        "power_draw_watts": 50.66,
+        "sm_clock_mhz": 2415.0,
+        "memory_clock_mhz": 13801.0
+      },
+      {
+        "index": "1",
+        "uuid": "GPU-419354f7-cddc-d427-4cb8-4b36a7c4f1d9",
+        "power_draw_watts": 221.65,
+        "sm_clock_mhz": 2887.0,
+        "memory_clock_mhz": 13801.0
+      },
+      {
+        "index": "2",
+        "uuid": "GPU-6b7b35b1-9e70-ae60-f975-4681a64a2bac",
+        "power_draw_watts": 69.73,
+        "sm_clock_mhz": 2415.0,
+        "memory_clock_mhz": 13801.0
+      },
+      {
+        "index": "3",
+        "uuid": "GPU-e69b2f0c-f05e-e6d4-b6a9-ff36584ce0f0",
+        "power_draw_watts": 73.9,
+        "sm_clock_mhz": 2407.0,
+        "memory_clock_mhz": 13801.0
+      },
+      {
+        "index": "4",
+        "uuid": "GPU-f713877d-3e6d-c960-a8fc-e4e0ba2878c6",
+        "power_draw_watts": 6.64,
+        "sm_clock_mhz": 195.0,
+        "memory_clock_mhz": 405.0
+      },
+      {
+        "index": "5",
+        "uuid": "GPU-1bbae37b-e21a-c96f-f97f-79802a77714a",
+        "power_draw_watts": 13.75,
+        "sm_clock_mhz": 195.0,
+        "memory_clock_mhz": 405.0
+      },
+      {
+        "index": "6",
+        "uuid": "GPU-738119ec-c073-f086-513b-96165ee267ac",
+        "power_draw_watts": 8.91,
+        "sm_clock_mhz": 195.0,
+        "memory_clock_mhz": 405.0
+      },
+      {
+        "index": "7",
+        "uuid": "GPU-a3d9b4d1-76ff-6622-a349-0035db2778f9",
+        "power_draw_watts": 98.09,
+        "sm_clock_mhz": 2917.0,
+        "memory_clock_mhz": 13801.0
+      }
+    ],
+    "disk": {
+      "free_bytes": 255233183744,
+      "total_bytes": 467657834496,
+      "cwd": "/home/wja/grace-pr18-fast"
+    },
+    "torch_cuda_allocated_bytes": 8130692608,
+    "torch_cuda_reserved_bytes": 23230152704,
+    "torch_cuda_peak_allocated_bytes": 21860717056,
+    "torch_cuda_peak_reserved_bytes": 32371638272,
+    "peak_memory_scope": "current_process_since_last_peak_reset"
+  },
+  "checkpoint_saved": true,
+  "last_saved_step": 50
+}

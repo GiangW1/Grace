@@ -2,6 +2,15 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
+## 2026-10-15 PR18 三卡实测结果归档
+
+- 实测源文件与 PR18 `332b816c8385d4cbd0105aaa0ea2e7c9cec078af` 的 blob 哈希一致；训练时保存的源文件也逐项一致。旧本地 Git 元数据不作为本次版本证据。
+- 2026-10-14 北京时间 15:24:57–22:46:59，9/9 命令退出码 0。Full-PG / Uniform-HT / GRACE 各 50 步、seed 17；128 道 MATH-500 × 4 回答，含共享初始评测及三臂最终评测；冻结 GRACE 审计 4 题 × 2 前缀 × 8 续写。
+- 物理卡 7 为 actor，2、3 为 TP=1 rollout worker。实际耗时见 `suite.json`；单次顺序运行不能证明可重复的加速。
+- 初始 / Full-PG / Uniform-HT / GRACE 平均正确率分别为 74.8047% / 75.0000% / 73.4375% / 72.4609%。冻结预测对零预测 MSE 比值 1.0，8 个前缀有效预测向量范数均为 0；本轮没有证明预测收益，原因尚待定位。
+- 本次上传前 CPU 回归：`tests/test_small_core_followup.py tests/test_small_core.py tests/test_5090_memory.py tests/test_rollout_pool.py`，**68 passed in 46.59s**；`git diff --check` 通过。没有重跑全量 CPU suite 或 GPU 训练。
+- [完整报告和精简结果](results/pr18-20261014/followup-fast-3gpu/README.md)包含配置、版本/数据/源文件哈希、按题分数、50 步记录、审计及导出校验和；不提交权重、检查点或完整轨迹。下面的“未运行”是各历史代码开发阶段当时的状态。
+
 ## 2026-10-14 PR18 快速诊断与三卡5090
 
 - `--followup` 默认改为 core8 Full-PG / Uniform-HT / GRACE、seed 17、每臂 50 步，
