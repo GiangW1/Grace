@@ -1,0 +1,7 @@
+num_steps: 20
+checkpoint_every: 20
+eval:
+  n_problems: 64
+  n: 4
+  k: 4
+  sample_batch_size: 4

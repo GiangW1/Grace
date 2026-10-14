@@ -125,6 +125,8 @@ def main(argv=None) -> int:
     cfg = replay_config(payload, args.model_path, args.config, args.bundles)
     check_snapshot_identity(payload, cfg)
     actor = load_lora_actor(args.model_path, cfg.get("lora") or {})
+    from grace_gc.backends.small_core import restore_fixed_bases
+    restore_fixed_bases(actor, payload)
     named = named_lora_params(actor)
     load_numpy_module_state(named, payload.get("actor") or {})
     source_meta = audit_file(args.bundles).parent / "actor_source.json"

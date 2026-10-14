@@ -1,0 +1,81 @@
+{
+  "status": "complete",
+  "smoke_only": false,
+  "jobs": [
+    {
+      "arm": "core8_full_pg",
+      "seed": 17,
+      "phase": "train",
+      "command": [
+        "/mnt/mydata/wja/grace/venv/bin/python",
+        "/home/wja/grace-pr17/scripts/train.py",
+        "--config",
+        "/mnt/mydata/wja/grace/runs/pr17-20261013/deadline-pilot-20step/core8-two-way/core8_full_pg-seed17.yaml",
+        "--run-dir",
+        "/mnt/mydata/wja/grace/runs/pr17-20261013/deadline-pilot-20step/core8-two-way/core8_full_pg-seed17"
+      ],
+      "status": "complete",
+      "returncode": 0,
+      "command_wall_seconds": 2345.5876036449336
+    },
+    {
+      "arm": "core8_full_pg",
+      "seed": 17,
+      "phase": "eval",
+      "command": [
+        "/mnt/mydata/wja/grace/venv/bin/python",
+        "/home/wja/grace-pr17/scripts/evaluate.py",
+        "--generate",
+        "--config",
+        "/mnt/mydata/wja/grace/runs/pr17-20261013/deadline-pilot-20step/core8-two-way/core8_full_pg-seed17.yaml",
+        "--data-path",
+        "/mnt/mydata/wja/grace/assets/datasets/math500.jsonl",
+        "--checkpoint",
+        "/mnt/mydata/wja/grace/runs/pr17-20261013/deadline-pilot-20step/core8-two-way/core8_full_pg-seed17/checkpoint.npz",
+        "--run-dir",
+        "/mnt/mydata/wja/grace/runs/pr17-20261013/deadline-pilot-20step/core8-two-way/core8_full_pg-seed17-eval"
+      ],
+      "status": "complete",
+      "returncode": 0,
+      "command_wall_seconds": 1200.18845108198
+    },
+    {
+      "arm": "core8_grace",
+      "seed": 17,
+      "phase": "train",
+      "command": [
+        "/mnt/mydata/wja/grace/venv/bin/python",
+        "/home/wja/grace-pr17/scripts/train.py",
+        "--config",
+        "/mnt/mydata/wja/grace/runs/pr17-20261013/deadline-pilot-20step/core8-two-way/core8_grace-seed17.yaml",
+        "--run-dir",
+        "/mnt/mydata/wja/grace/runs/pr17-20261013/deadline-pilot-20step/core8-two-way/core8_grace-seed17"
+      ],
+      "status": "complete",
+      "returncode": 0,
+      "command_wall_seconds": 2078.2512613041326
+    },
+    {
+      "arm": "core8_grace",
+      "seed": 17,
+      "phase": "eval",
+      "command": [
+        "/mnt/mydata/wja/grace/venv/bin/python",
+        "/home/wja/grace-pr17/scripts/evaluate.py",
+        "--generate",
+        "--config",
+        "/mnt/mydata/wja/grace/runs/pr17-20261013/deadline-pilot-20step/core8-two-way/core8_grace-seed17.yaml",
+        "--data-path",
+        "/mnt/mydata/wja/grace/assets/datasets/math500.jsonl",
+        "--checkpoint",
+        "/mnt/mydata/wja/grace/runs/pr17-20261013/deadline-pilot-20step/core8-two-way/core8_grace-seed17/checkpoint.npz",
+        "--run-dir",
+        "/mnt/mydata/wja/grace/runs/pr17-20261013/deadline-pilot-20step/core8-two-way/core8_grace-seed17-eval"
+      ],
+      "status": "complete",
+      "returncode": 0,
+      "command_wall_seconds": 1138.921186329797
+    }
+  ],
+  "note": "No experimental results are implied by a generated plan. Full-PG first within each parameterization."
+}

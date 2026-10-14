@@ -45,6 +45,9 @@ def sha256_file(path: str | Path) -> str:
 
 
 def sha256_array(arr) -> str:
+    from grace_gc.core.coordinates import IdentityBasis
+    if isinstance(arr, IdentityBasis):
+        return hashlib.sha256(f"identity-basis-v1:{arr.dim}".encode()).hexdigest()
     data = np.ascontiguousarray(np.asarray(arr))
     return hashlib.sha256(data).hexdigest()
 
@@ -53,6 +56,9 @@ def sha256_named(named) -> str:
     digest = hashlib.sha256()
     for name, param in named:
         digest.update(str(name).encode("utf-8"))
+        fixed_geometry = getattr(param, "_grace_fixed_geometry_sha", None)
+        if fixed_geometry is not None:
+            digest.update(str(fixed_geometry).encode("utf-8"))
         if hasattr(param, "detach"):
             arr = param.detach().float().cpu().numpy()
         else:

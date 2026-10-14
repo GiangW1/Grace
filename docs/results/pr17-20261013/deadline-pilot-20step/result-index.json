@@ -1,0 +1,54 @@
+{
+  "protocol": "deadline_pilot_20step",
+  "scope_note": "Time-boxed pilot. It is not equivalent to the original 100-step suite.",
+  "results": [
+    {
+      "arm": "lora16_full_pg",
+      "n_problems": 64,
+      "n_samples": 256,
+      "requested_k": 4,
+      "avg": 0.82421875,
+      "pass_at_k": 0.90625,
+      "parse_rate": 0.96875,
+      "truncate_rate": 0.01171875,
+      "checkpoint_step": 20,
+      "checkpoint_sha256": "2be758e5f18bd6af51effef29da0e50cf58989645c0c1e0c0599b5cfc4bb6c56"
+    },
+    {
+      "arm": "lora16_grace",
+      "n_problems": 64,
+      "n_samples": 256,
+      "requested_k": 4,
+      "avg": 0.72265625,
+      "pass_at_k": 0.84375,
+      "parse_rate": 0.9765625,
+      "truncate_rate": 0.00390625,
+      "checkpoint_step": 20,
+      "checkpoint_sha256": "932b04a233964f1d15e8c4e10e9eda21e55601a23724f602fdbd75fae7a8b6ca"
+    },
+    {
+      "arm": "core8_full_pg",
+      "n_problems": 64,
+      "n_samples": 256,
+      "requested_k": 4,
+      "avg": 0.75390625,
+      "pass_at_k": 0.90625,
+      "parse_rate": 0.984375,
+      "truncate_rate": 0.0078125,
+      "checkpoint_step": 20,
+      "checkpoint_sha256": "3395059abcf4660aa3f7a943288ba7a2d1f5410c08a32ebe770425681150c3fa"
+    },
+    {
+      "arm": "core8_grace",
+      "n_problems": 64,
+      "n_samples": 256,
+      "requested_k": 4,
+      "avg": 0.7578125,
+      "pass_at_k": 0.921875,
+      "parse_rate": 0.984375,
+      "truncate_rate": 0.00390625,
+      "checkpoint_step": 20,
+      "checkpoint_sha256": "bf81f9d9ad73a1f47dfac9e68771a1645e1d4325d98acc46b52c8a3037966372"
+    }
+  ]
+}

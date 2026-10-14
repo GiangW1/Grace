@@ -13,6 +13,8 @@ def initialize_actor(actor, cfg, run=None):
         raise ValueError("init_checkpoint and resume describe different starting states")
     payload = load_checkpoint(path)
     check_snapshot_identity(payload, cfg)
+    from grace_gc.backends.small_core import restore_fixed_bases
+    restore_fixed_bases(actor, payload)
     if hasattr(actor, "named_all_params"):
         if not payload.get("actor_full"):
             raise ValueError("CPU shared initialization needs the frozen base too")

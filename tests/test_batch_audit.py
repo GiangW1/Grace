@@ -218,7 +218,10 @@ def test_gpu_entry_wiring_and_failed_envelope_without_gpu(tmp_path, monkeypatch)
     assert result["manifest"]["horizon"] == 4 and result["fixed_n"] == 1
     assert result["optimizer_replay"]["grad_clip"] == .25
     assert result["manifest"]["training_settings_sources"]["optim"] == "checkpoint.run_config"
-    with pytest.raises(ValueError, match="exactly one GPU"):
+    result = batch_audit.run_batch_audit(records, {**cfg, "hardware": {"n_gpu": 4},
+                                                 "rollout": {"workers": 3}}, tmp_path / "four-gpu")
+    assert result["fixed_n"] == 1
+    with pytest.raises(ValueError, match="rollout.workers"):
         batch_audit.run_batch_audit(records, {**cfg, "hardware": {"n_gpu": 2}}, tmp_path / "multi-gpu")
     save_checkpoint(checkpoint, {"spec": "full_pg"})
     with pytest.raises(ValueError, match="optimizer state"):

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from grace_gc.core.coordinates import as_basis
 
 from grace_gc.core.layout import layout_hash
 from grace_gc.data.reward import extract_answer
@@ -112,7 +113,7 @@ def trajectory_row(
         if norm is None:
             norm = float(np.dot(g, g))
         if u is not None:
-            coords = (np.asarray(u, dtype=np.float64).T @ g).tolist()
+            coords = (as_basis(u).T @ g).tolist()
     return {
         "run_id": ctx.get("run_id"),
         "domain": ctx.get("domain", "math"),
@@ -383,6 +384,13 @@ def step_health(state, last: dict[str, Any], cfg: dict[str, Any] | None = None) 
     }
     if named is not None:
         out.update(lora_param_health(named))
+        cores = [(name, param) for name, param in named if "lora_core" in name]
+        if cores:
+            out.update(n_small_cores=len(cores),
+                       small_core_dim=sum(param.numel() for _, param in cores),
+                       small_core_grad_missing=sum(param.grad is None for _, param in cores),
+                       small_core_grad_norm_sq=sum(float(param.grad.detach().float().square().sum())
+                                                   for _, param in cores if param.grad is not None))
     from grace_gc.versions import resource_snapshot
 
     out["resources"] = resource_snapshot()

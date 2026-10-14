@@ -122,9 +122,15 @@ def make_gpu_engines(actor, llm, tokenizer, cfg: dict[str, Any], adapter_dir: Pa
 
     def features(prefixes, prompt_lens, baselines):
         pcfg = cfg.get("predictor") or {}
-        return prefix_feature_bundle(actor, prefixes, prompt_lens, baselines, pad_id, eos_id=eos_id,
+        bundle = prefix_feature_bundle(actor, prefixes, prompt_lens, baselines, pad_id, eos_id=eos_id,
                                      feature_mode=pcfg.get("feature_mode", "legacy"),
                                      batch_size=int(pcfg.get("feature_batch_size", 1)))
+        if pcfg.get("include_actor_state", False):
+            z = np.concatenate([param.detach().float().cpu().numpy().reshape(-1)
+                                for _, param in named_lora_params(actor)])
+            for key in ("features", "prompt_features"):
+                bundle[key] = np.concatenate((bundle[key], np.broadcast_to(z, (len(prefixes), len(z)))), axis=1)
+        return bundle
 
     def continue_grouped(jobs, rng):
         remaining = {job["max_new"] for job in jobs}

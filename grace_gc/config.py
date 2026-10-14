@@ -46,6 +46,21 @@ def _deep_merge(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
 
 def validate_config(cfg: dict[str, Any]) -> dict[str, Any]:
     """Raise only when the program cannot run or the math is undefined."""
+    pcfg, lcfg = cfg.get("predictor") or {}, cfg.get("lora") or {}
+    if pcfg.get("target_space", "projected") not in {"direct", "projected"}:
+        raise ValueError("unknown predictor.target_space")
+    if lcfg.get("parameterization", "lora") not in {"lora", "small_core"}:
+        raise ValueError("unknown lora.parameterization")
+    if cfg.get("backend", "cpu_tiny") == "cpu_tiny" and (
+            lcfg.get("parameterization") == "small_core" or pcfg.get("include_actor_state", False)):
+        raise ValueError("small-core HF adapter / actor-state features require gpu_verl; CPU tiny is only a math fixture")
+    if pcfg.get("include_actor_state", False) and lcfg.get("parameterization") != "small_core":
+        raise ValueError("actor-state features are restricted to the small-core experiment")
+    if (cfg.get("backend") == "gpu_verl" and pcfg.get("target_space") == "direct"
+            and lcfg.get("parameterization") != "small_core"):
+        raise ValueError("GPU direct prediction requires small_core to avoid a millions-dimensional output head")
+    if pcfg.get("target_space") == "direct" and cfg.get("offline_predictor"):
+        raise ValueError("direct mode currently uses online predictor training, not legacy offline artifacts")
     method = cfg.get("method", "grace")
     alloc = cfg.get("allocation", {})
     p_min = float(alloc.get("p_min", cfg.get("p_min", 0.2)))

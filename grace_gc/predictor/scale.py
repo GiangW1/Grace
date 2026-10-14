@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+from grace_gc.core.coordinates import as_basis
 
 
 def _finite_std(x: np.ndarray, axis: int = 0) -> np.ndarray:
@@ -169,7 +170,7 @@ def design_shrink_gamma(
     """
     g = np.asarray(grads, dtype=np.float64)
     f = np.asarray(f, dtype=np.float64)
-    u = np.asarray(u, dtype=np.float64)
+    u = as_basis(u)
     p = np.asarray(p, dtype=np.float64).reshape(-1)
     if g.ndim == 1:
         g = g[None, :]

@@ -72,6 +72,9 @@ def _publish_basis_artifact(directory, reference, write):
 
 def _externalize_fixed_basis(directory, payload):
     basis = payload.get("basis")
+    from grace_gc.core.coordinates import IdentityBasis
+    if isinstance(basis, dict) and isinstance(basis.get("u"), IdentityBasis):
+        return {**payload, "basis": {**basis, "u": {"identity_dim": basis["u"].dim}}}, None
     if not isinstance(basis, dict) or not basis.get("fixed", False):
         return payload, None
     u = np.asarray(basis["u"])
@@ -206,6 +209,9 @@ def load_checkpoint(path: str | Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("checkpoint payload is not a mapping")
     basis = payload.get("basis")
+    if isinstance(basis, dict) and isinstance(basis.get("u"), dict) and "identity_dim" in basis["u"]:
+        from grace_gc.core.coordinates import IdentityBasis
+        basis["u"] = IdentityBasis(int(basis["u"]["identity_dim"]))
     if payload.get("offline_predictor") is not None:
         from grace_gc.predictor.offline import read_predictor
         reference = payload["offline_predictor"]

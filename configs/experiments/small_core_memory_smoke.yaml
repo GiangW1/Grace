@@ -1,0 +1,14 @@
+# Load after small_core_comparison.yaml and small_core_r8.yaml.
+# Capacity/implementation test only, not an efficacy experiment.
+method: full_pg
+num_steps: 4
+n_start: 4
+n_prompts: 2
+prompt_max_tokens: 1024
+max_new_tokens: 8192
+checkpoint_every: 1
+memory_profile:
+  enabled: true
+  full_length_probe: true
+predictor:
+  warmup_steps: 2

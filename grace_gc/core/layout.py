@@ -9,7 +9,7 @@ import numpy as np
 
 
 DEFAULT_TARGETS = ("q_proj", "v_proj")
-LORA_MARKERS = ("lora_a", "lora_b", "lora_A", "lora_B")
+LORA_MARKERS = ("lora_a", "lora_b", "lora_A", "lora_B", "lora_core")
 
 
 @dataclass

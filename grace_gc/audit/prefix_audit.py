@@ -7,6 +7,7 @@ from dataclasses import dataclass, fields, replace
 from pathlib import Path
 
 import numpy as np
+from grace_gc.core.coordinates import as_basis, basis_pinv
 
 from grace_gc.audit.stats import (
     elf,
@@ -166,11 +167,11 @@ def jl_project(g: np.ndarray, dim: int, seed: int) -> np.ndarray:
 
 def orthogonal_energy(g: np.ndarray, u: np.ndarray) -> float:
     g = np.asarray(g, dtype=np.float64)
-    u = np.asarray(u, dtype=np.float64)
+    u = as_basis(u)
     coords = g @ u
     # PU need not be orthonormal. This is the projection in the supplied
     # coordinate space, not a reconstruction of full-space energy from a sketch.
-    captured = np.sum((coords @ np.linalg.pinv(u.T @ u)) * coords, axis=-1)
+    captured = np.sum((coords @ basis_pinv(u.T @ u)) * coords, axis=-1)
     return float(np.mean(np.maximum(np.sum(g * g, axis=-1) - captured, 0.0)))
 
 
