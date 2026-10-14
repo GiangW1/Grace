@@ -2,9 +2,9 @@
 # Generate fresh continuations on the held-out audit split; never refit here.
 audit:
   predictor_diagnostic: false
-  n_problems: 16
+  n_problems: 4
   n_prefixes: 2
-  n_continuations: 16
+  n_continuations: 8
   decision_grid: [512]
   baseline: null  # Clear earlier study overrides; use the shared training baseline by default.
   jl_dim: 0

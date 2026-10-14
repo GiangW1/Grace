@@ -1,13 +1,13 @@
-# Shared follow-up, not a claim that 100 steps or three seeds are sufficient.
-num_steps: 100
-checkpoint_every: 25
+# Fast single-seed diagnostic; not a substitute for multi-seed validation.
+num_steps: 50
+checkpoint_every: 50
 save_initial_checkpoint: true
 enable_thinking: false
 max_new_tokens: 8192
 predictor:
   warmup_steps: 10
 eval:
-  n_problems: 500
+  n_problems: 128
   selection: seeded
   selection_seed: 20261013
   n: 4

@@ -13,7 +13,7 @@ from scripts.summarize_small_core_experiment import paired_delta, summarize_suit
 
 def arguments(root):
     return ["--model-path", "Qwen3-4B", "--data-path", "train.parquet", "--eval-data-path", "math500.jsonl",
-            "--hardware", "configs/hardware/rtx5090_rollout_4.yaml", "--followup", "--run-dir", str(root)]
+            "--followup", "--run-dir", str(root)]
 
 
 def test_followup_plan_shared_initial_frozen_audit_and_matched_controls(tmp_path):
@@ -22,11 +22,16 @@ def test_followup_plan_shared_initial_frozen_audit_and_matched_controls(tmp_path
     manifest = json.loads((root / "suite.json").read_text())
     assert manifest["status"] == "planned"
     jobs = manifest["jobs"]
-    assert jobs[0]["phase"] == "train" and jobs[0]["arm"] == "lora16_full_pg"
+    assert jobs[0]["phase"] == "train" and jobs[0]["arm"] == "core8_full_pg"
     assert len([j for j in jobs if j["phase"] == "initial_eval"]) == 1
-    assert len([j for j in jobs if j["phase"] == "train"]) == 12
-    assert len([j for j in jobs if j["phase"] == "eval_snapshot"]) == 36
-    assert len([j for j in jobs if j["phase"] == "audit"]) == 3
+    assert len([j for j in jobs if j["phase"] == "train"]) == 3
+    assert len([j for j in jobs if j["phase"] == "eval"]) == 3
+    assert not any(j["phase"] == "eval_snapshot" for j in jobs)
+    assert len([j for j in jobs if j["phase"] == "audit"]) == 1
+    assert len([j for j in jobs if j["phase"] == "prediction_report"]) == 1
+    assert {j["seed"] for j in jobs} == {17}
+    assert {j["arm"] for j in jobs} == {"core8_full_pg", "core8_uniform_ht", "core8_grace"}
+    assert len(jobs) == 9  # 3 train + 1 initial + 3 final + 1 audit + 1 CPU report
     for j in jobs:
         if j["phase"] in {"eval", "eval_snapshot", "initial_eval"}:
             assert j["command"][j["command"].index("--seed") + 1] == "17"
@@ -38,12 +43,63 @@ def test_followup_plan_shared_initial_frozen_audit_and_matched_controls(tmp_path
                {k: v for k, v in cfgs[0].items() if k != "method"} for cfg in cfgs)
     cfg = cfgs[-1]
     assert cfg["audit"]["predictor_diagnostic"] is False
-    assert cfg["eval"]["n_problems"] == 500
-    assert cfg["num_steps"] == 100 and cfg["predictor"]["warmup_steps"] == 10
+    assert cfg["eval"]["n_problems"] == 128 and cfg["eval"]["n"] == cfg["eval"]["k"] == 4
+    assert cfg["num_steps"] == cfg["checkpoint_every"] == 50
+    assert cfg["predictor"]["warmup_steps"] == 10
+    assert [cfg["audit"][k] for k in ["n_problems", "n_prefixes", "n_continuations"]] == [4, 2, 8]
+    assert cfg["audit"]["decision_grid"] == [512] and cfg["audit"]["baseline"] is None
     assert cfg["enable_thinking"] is False and cfg["max_new_tokens"] == 8192
     assert cfg["predictor"]["target_space"] == "direct"
-    assert cfg["hardware"]["n_gpu"] == 4 and cfg["rollout"]["workers"] == 3
+    assert cfg["hardware"]["n_gpu"] == 3 and cfg["rollout"]["workers"] == 2
+    from grace_gc.backends.rollout_pool import validate_layout
+    assert validate_layout(cfg) == 2
+    assert cfg["lora"]["rank"] == 8 and cfg["n_start"] == 32 and cfg["n_prompts"] == 8
     assert cfg["cost_control"]["mode"] == "fixed"
+
+
+def test_followup_explicit_overrides_keep_multiseed_four_card_and_snapshot_support(tmp_path):
+    config = tmp_path / "expanded.yaml"
+    config.write_text(yaml.safe_dump({"num_steps": 100, "checkpoint_every": 25}))
+    root = tmp_path / "suite"
+    plan(arguments(root) + ["--config", str(config), "--seeds", "17", "23", "--eval-steps", "25", "50", "75",
+                            "--hardware", "configs/hardware/rtx5090_rollout_4.yaml", "--no-audit"])
+    jobs = json.loads((root / "suite.json").read_text())["jobs"]
+    assert len([j for j in jobs if j["phase"] == "train"]) == 6
+    assert len([j for j in jobs if j["phase"] == "eval_snapshot"]) == 18
+    assert len([j for j in jobs if j["phase"] == "initial_eval"]) == 1
+    cfg = yaml.safe_load((root / "core8_grace-seed23.yaml").read_text())
+    assert cfg["hardware"]["n_gpu"] == 4 and cfg["rollout"]["workers"] == 3
+    assert cfg["num_steps"] == 100
+
+
+def test_non_followup_keeps_legacy_seeds_and_single_card_default(tmp_path):
+    root = tmp_path / "suite"
+    args = arguments(root)
+    args.remove("--followup")
+    plan(args + ["--arms", "core8_full_pg"])
+    jobs = json.loads((root / "suite.json").read_text())["jobs"]
+    assert {j["seed"] for j in jobs} == {17, 23, 42}
+    assert not any(j["phase"] in {"initial_eval", "eval_snapshot", "audit"} for j in jobs)
+    cfg = yaml.safe_load((root / "core8_full_pg-seed17.yaml").read_text())
+    assert cfg["hardware"]["n_gpu"] == 1
+    assert cfg["num_steps"] == 100
+
+
+def test_execute_quick_plan_launches_only_initial_and_final_evaluations(tmp_path, monkeypatch):
+    import scripts.run_small_core_experiment as runner
+    calls = []
+    monkeypatch.setattr(runner.subprocess, "run", lambda command, **kwargs:
+                        (calls.append(command) or SimpleNamespace(returncode=0)))
+    root = tmp_path / "suite"
+    plan(arguments(root) + ["--execute"])
+    manifest = json.loads((root / "suite.json").read_text())
+    assert len(calls) == 9 and manifest["status"] == "complete"
+    assert all(j["status"] == "complete" for j in manifest["jobs"])
+    evaluations = [c for c in calls if c[1].endswith("/evaluate.py")]
+    assert len(evaluations) == 4
+    checkpoints = [c[c.index("--checkpoint") + 1] for c in evaluations]
+    assert sum(c.endswith("/checkpoints/step_0.npz") for c in checkpoints) == 1
+    assert sum(c.endswith("/checkpoint.npz") for c in checkpoints) == 3
 
 
 @pytest.mark.parametrize("fixed_value,audit_override", [(0., None), (.3, None), (.3, .5), (.3, .3)])
@@ -124,7 +180,8 @@ def test_execute_skips_unreached_wall_budget_snapshots_but_runs_final(tmp_path, 
     monkeypatch.setattr(runner.subprocess, "run", run)
     root = tmp_path / "suite"
     plan(arguments(root) + ["--execute", "--no-audit", "--arms", "core8_full_pg", "--seeds", "17",
-                            "--run-wall-seconds", "100"])
+                            "--config", "configs/experiments/small_core_followup_wall.yaml",
+                            "--eval-steps", "50", "100", "150", "--run-wall-seconds", "100"])
     manifest = json.loads((root / "suite.json").read_text())
     assert len(calls) == 3  # train, initial, final; snapshots weren't produced
     assert len([j for j in manifest["jobs"] if j["status"] == "skipped"]) == 3

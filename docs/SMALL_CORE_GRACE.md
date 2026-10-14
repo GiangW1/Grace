@@ -131,44 +131,52 @@ GRACE 相对 Full-PG 的准确率/成本，再比较小核心 Full-PG 与普通 
 相同学习率不是等效步长；应在独立验证集以同等调参预算选择各参数化学习率，
 再比较测试集和等墙钟结果。前缀噪声/预测误差的改善与表达能力保留是两个独立问题。
 
-## PR17 pilot 后续实验（2026-10-14）
+## PR18 快速诊断：三卡5090（2026-10-14）
 
 新增 `--followup` 仍调用原训练、评测、分卡审计入口，不改策略梯度/HT 数学。
-默认四臂：LoRA16 Full-PG（能力参考）、core8 Full-PG、core8 Uniform-HT、core8 GRACE。
-三训练种子 17/23/42；100 步，其中 10 步 warmup；每 25 步保存并独立评测，最终检查点
-总是评测。使用相同 MATH-500 500 题、每题四次、相同题序与评测采样种子。
+默认三臂：core8 Full-PG、core8 Uniform-HT、core8 GRACE；只运行训练种子 17。
+每臂 50 步，其中 10 步 warmup；保存 step-0 与第 50 步，不默认评测中间快照。
+使用相同 MATH-500 子集 128 题、每题四次、相同题序与评测采样种子。
+默认硬件 `rtx5090_rollout_3.yaml`：第一张可见卡放 actor，其余两张各运行独立 TP=1
+vLLM worker；训练、评测和审计继承同一布局。每卡仍是 32GB，actor 不分片。
 先运行 Full-PG。共享 step-0 只评测一次，不重复支付每臂初始评测；它在首个训练作业
 完成后读取保存的 step-0，绝不拿最终检查点充当基线。零适配器在模型函数上相同，
 但 BF16 内核/采样仍存在数值波动，共享一次基线不是对这类波动的估计。
 
 ```bash
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=0,1,2
 export MODEL=/path/to/Qwen3-4B
 export TRAIN_DATA=/path/to/dapo-math.parquet
 export EVAL_DATA=/path/to/math500.jsonl
 
 # 默认仅生成计划：检查目录内 YAML 和 suite.json 后再执行。
 python scripts/run_small_core_experiment.py --followup \
-  --hardware configs/hardware/rtx5090_rollout_4.yaml \
+  --hardware configs/hardware/rtx5090_rollout_3.yaml \
   --model-path "$MODEL" --data-path "$TRAIN_DATA" --eval-data-path "$EVAL_DATA" \
-  --run-dir runs/core8-followup-plan
+  --run-dir runs/core8-quick-plan
 
 # 先验证新增流程（4步、2题；不能用于效果判断）。会包含初始评测及 frozen audit。
 python scripts/run_small_core_experiment.py --followup --smoke --seeds 17 \
-  --hardware configs/hardware/rtx5090_rollout_4.yaml \
+  --hardware configs/hardware/rtx5090_rollout_3.yaml \
   --model-path "$MODEL" --data-path "$TRAIN_DATA" --eval-data-path "$EVAL_DATA" \
-  --run-dir runs/core8-followup-smoke --execute
+  --run-dir runs/core8-quick-smoke --execute
 
-# 完整后续：12个训练作业、49次独立评测、3个付费审计，顺序占用四卡。
-# 这比20步/64题pilot昂贵很多；可先 --seeds 17，或 --no-audit 分阶段运行。
-python scripts/run_small_core_experiment.py --followup \
-  --hardware configs/hardware/rtx5090_rollout_4.yaml \
+# 快速诊断：3个训练作业、4次评测（1次共享初始+3次最终）、1次GRACE审计。
+# 不自动运行LoRA16参考、多种子或25/50/75的中间评测。
+python scripts/run_small_core_experiment.py --followup --seeds 17 \
+  --hardware configs/hardware/rtx5090_rollout_3.yaml \
   --model-path "$MODEL" --data-path "$TRAIN_DATA" --eval-data-path "$EVAL_DATA" \
-  --run-dir runs/core8-followup --execute
+  --run-dir runs/core8-quick --execute
 ```
 
-`--arms` 可缩为三个 core8 臂，或换成 `core16_full_pg core16_uniform_ht core16_grace`；
-`--config` 可覆盖步数、LR、评测数量；`--eval-steps 25 50 75` 可选择中间已保存快照。
+正常诊断计划只有 9 条命令：3 train + 1 initial_eval + 3 eval + 1 audit + 1 CPU prediction_report。
+评测计划为 2048 条答案；审计最多 64 条续写及对应梯度，提前自然结束的路径不重复续写。
+这只是任务量，不是实际耗时或速度收益；单种子、小审计也不替代正式验证。
+
+`--arms` 可显式加入 `lora16_full_pg` 能力参考，或换成三个 core16 臂；
+`--seeds 17 23 42` 可扩展种子；四卡仍可显式选择 `rtx5090_rollout_4.yaml`。
+`--config` 可覆盖步数、checkpoint_every、LR、评测数量；中间评测只在显式传入
+`--eval-steps` 时执行，例如先覆盖为 100 步/每 25 步保存，再指定 `--eval-steps 25 50 75`。
 不因小样本/无信号禁止运行。常规步数实验不得把同 step 当作同成本。
 第二轮等墙钟实验可给上述命令加 `--config configs/experiments/small_core_followup_wall.yaml`
 并更换 run-dir：每臂训练预算 7200 秒、步数上限 10000，仍固定 N，不自动缩小 batch。
@@ -181,6 +189,7 @@ python scripts/run_small_core_experiment.py --followup \
 ```bash
 python scripts/audit.py --generate \
   --config /path/to/core8_grace-seed17.yaml \
+  --config configs/hardware/rtx5090_rollout_3.yaml \
   --config configs/experiments/small_core_audit.yaml \
   --config configs/experiments/small_core_followup_audit.yaml \
   --data-path "$TRAIN_DATA" \
@@ -190,9 +199,10 @@ python scripts/analyze_small_core_prediction.py \
   --audit-dir runs/core8-existing-frozen-audit
 ```
 
-原训练 YAML 必须含四卡布局、非 Thinking 以及原模型路径；审计使用独立 audit split。
+原训练 YAML 必须保留非 Thinking 以及原模型路径；上面明确覆盖为当前三卡布局，
+也可审计之前四卡训练产生的同一检查点。审计使用独立 audit split。
 新配置加载检查点冻结预测器（包括 shrinkage），不在审计标签上重新拟合；默认只审计
-GRACE 最终检查点，每种子 16 题 × 2 前缀 × 16 后缀，决策点 512。自然结束的路径不强行延长。
+GRACE 最终检查点，4 题 × 2 前缀 × 8 后缀，决策点 512。自然结束的路径不强行延长。
 两份 small-core 审计配置的 `audit.baseline: null` 默认继承共享训练配置的固定 baseline，
 同时用于梯度标签和预测器输入；不会重新写死为 0.5。若研究目的需要覆盖，最后加载的
 YAML 可显式设置 `audit.baseline`。审计 manifest 保留该覆盖值与
@@ -221,7 +231,7 @@ YAML 可显式设置 `audit.baseline`。审计 manifest 保留该覆盖值与
 可在部分作业完成后手工重汇总（不触发 GPU）：
 
 ```bash
-python scripts/summarize_small_core_experiment.py --suite runs/core8-followup/suite.json
+python scripts/summarize_small_core_experiment.py --suite runs/core8-quick/suite.json
 ```
 
 先问 core8 Full-PG 相比初始有没有学到，再问 GRACE 相比 Uniform-HT 是否有额外收益；
@@ -230,8 +240,8 @@ python scripts/summarize_small_core_experiment.py --suite runs/core8-followup/su
 
 ## 当前边界
 
-四卡5090的rank8/8192 Full-PG显存测试与分卡审计命令见
-[RTX5090_MEMORY_TEST.md](RTX5090_MEMORY_TEST.md)。训练和审计均使用1张actor+3张生成卡，
+三/四卡5090的rank8/8192 Full-PG显存测试与分卡审计命令见
+[RTX5090_MEMORY_TEST.md](RTX5090_MEMORY_TEST.md)。当前诊断用1张actor+2张生成卡，旧四卡配置仍可选；
 新增合成满长度梯度探针与真实4步训练显存报告；仍需服务器GPU实测。
 
 - 本次后续只实现代码和本机合成/CPU 检查；没有运行新的 Qwen3-4B GPU RL 或速度测量。

@@ -22,7 +22,7 @@ ARMS = {"lora16_full_pg": (None, "full_pg"), "lora16_grace": (None, "grace"),
         "core8_full_pg": (8, "full_pg"), "core8_grace": (8, "grace"),
         "core16_full_pg": (16, "full_pg"), "core16_grace": (16, "grace"),
         "core8_uniform_ht": (8, "uniform_ht"), "core16_uniform_ht": (16, "uniform_ht")}
-FOLLOWUP_ARMS = ["lora16_full_pg", "core8_full_pg", "core8_uniform_ht", "core8_grace"]
+FOLLOWUP_ARMS = ["core8_full_pg", "core8_uniform_ht", "core8_grace"]
 
 
 def suite_directory(requested):
@@ -60,15 +60,16 @@ def main(argv=None):
                         help="explicit Qwen3-4B non-Base checkpoint; non-thinking by default; no automatic download")
     parser.add_argument("--data-path", required=True)
     parser.add_argument("--eval-data-path", required=True)
-    parser.add_argument("--hardware", default="configs/hardware/a100_1.yaml")
+    parser.add_argument("--hardware", help="default: RTX5090 three-card for --followup, otherwise single A100")
     parser.add_argument("--config", action="append", default=[], help="shared overrides, e.g. LR/budget")
     parser.add_argument("--arms", nargs="+", choices=list(ARMS))
     parser.add_argument("--followup", action="store_true",
-                        help="PR17 follow-up: shared step-0 eval, Uniform-HT, learning curves and frozen-predictor audit")
+                        help="fast diagnostic: core8 three-way, seed 17, 50 steps, initial/final eval and frozen audit")
     parser.add_argument("--initial-eval", action="store_true", help="evaluate one shared zero-adapter start")
     parser.add_argument("--eval-seed", type=int, default=17, help="shared answer-sampling seed, independent of training seed")
     parser.add_argument("--eval-steps", nargs="+", type=int, help="saved intermediate steps; final is always evaluated")
-    parser.add_argument("--seeds", nargs="+", type=int, default=[17, 23, 42])
+    parser.add_argument("--seeds", nargs="+", type=int,
+                        help="default: 17 for --followup; 17 23 42 otherwise")
     parser.add_argument("--run-dir", default="runs/small-core")
     parser.add_argument("--smoke", action="store_true", help="4 steps; keeps long-context length, not an efficacy test")
     parser.add_argument("--run-wall-seconds", type=float)
@@ -86,7 +87,9 @@ def main(argv=None):
     initial_eval = args.initial_eval or args.followup
     import yaml
     common = {}
-    paths = [ROOT / "configs/default.yaml", ROOT / args.hardware,
+    hardware = args.hardware or ("configs/hardware/rtx5090_rollout_3.yaml" if args.followup else
+                                 "configs/hardware/a100_1.yaml")
+    paths = [ROOT / "configs/default.yaml", ROOT / hardware,
              ROOT / "configs/experiments/small_core_comparison.yaml"]
     if args.followup:
         paths.append(ROOT / "configs/experiments/small_core_followup.yaml")
@@ -112,7 +115,8 @@ def main(argv=None):
     arms = sorted(dict.fromkeys(args.arms or (FOLLOWUP_ARMS if args.followup else list(ARMS)[:6])),
                   key=lambda arm: (ARMS[arm][0] or 0, ARMS[arm][1] != "full_pg"))
     initial_pending = initial_eval
-    for seed in dict.fromkeys(args.seeds):
+    seeds = args.seeds or ([17] if args.followup else [17, 23, 42])
+    for seed in dict.fromkeys(seeds):
         for arm in arms:
             dest = root / f"{arm}-seed{seed}"
             config = root / f"{arm}-seed{seed}.yaml"
@@ -132,7 +136,7 @@ def main(argv=None):
                 initial[initial.index("--run-dir") + 1] = str(root / "initial-eval")
                 commands.append(("initial_eval", initial))
                 initial_pending = False
-            eval_steps = args.eval_steps if args.eval_steps is not None else ([25, 50, 75] if args.followup else [])
+            eval_steps = args.eval_steps or []  # Intermediate evaluations are opt-in, including follow-up.
             for step in sorted(set(eval_steps)):
                 if step >= int(cfg["num_steps"]):
                     continue

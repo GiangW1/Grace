@@ -2,6 +2,21 @@
 
 记录已跑与未跑检查。不虚构 GPU 数字。
 
+## 2026-10-14 PR18 快速诊断与三卡5090
+
+- `--followup` 默认改为 core8 Full-PG / Uniform-HT / GRACE、seed 17、每臂 50 步，
+  128 题 × 4 回答，仅共享 step-0 与三臂最终评测；GRACE 审计 4 题 × 2 前缀 × 8 续写。
+  普通计划共 9 条命令，不再默认添加 LoRA16、多种子或中间评测。
+- 新增 `rtx5090_rollout_3.yaml`：1 actor + 2 TP=1 vLLM workers；训练、评测和审计共享。
+  仍用 Qwen3-4B 非 Thinking、rank8、8192 输出上限、32 starts / 8 prompts 与 10 步 warmup。
+- 回归覆盖默认计划的精确作业数、真实执行分派的初始/最终 checkpoint 路径、三臂协议一致、
+  显式多种子/四卡/中间快照覆盖、非 followup 原有默认值、三卡显存配置与分卡审计/训练
+  pool 接线及成功/失败资源清理。设备调用使用 CPU 替身，不是实际 GPU 检查。
+- 全量 `python -m pytest tests -q -rs -o addopts=''`：
+  **986 passed, 18 skipped in 44.06s**；runner `--help` 与 `git diff --check` 通过。
+- 跳过项仍为 16 项可选 math_verify、1 项真实 GPU 栈、1 项历史本地归档。
+  没有运行新的三卡 RTX5090 / Qwen3-4B 实验；减少任务量不等于已经测得墙钟加速。
+
 ## 2026-10-14 后续审计的两项审查修复
 
 - small-core 审计默认继承配置中的固定训练 baseline，不再覆盖为 0.5；显式研究覆盖

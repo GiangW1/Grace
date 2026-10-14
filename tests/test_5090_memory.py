@@ -13,16 +13,17 @@ from grace_gc.logging_util.run_dir import RunDirectory
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_5090_capacity_config_preserves_full_response_horizon():
+@pytest.mark.parametrize("n_gpu", [3, 4])
+def test_5090_capacity_config_preserves_full_response_horizon(n_gpu):
     from grace_gc.backends.rollout_pool import validate_layout
     from grace_gc.backends.verl_trainer import vllm_needed_max_model_len
     cfg = merge_configs(*(load_config(ROOT / p) for p in [
-        "configs/hardware/rtx5090_rollout_4.yaml",
+        f"configs/hardware/rtx5090_rollout_{n_gpu}.yaml",
         "configs/experiments/small_core_comparison.yaml",
         "configs/experiments/small_core_r8.yaml",
         "configs/experiments/small_core_memory_smoke.yaml",
     ]))
-    assert validate_layout(cfg) == 3
+    assert validate_layout(cfg) == n_gpu - 1
     assert cfg["lora"]["rank"] == 8 and cfg["lora"]["gradient_checkpointing"]
     assert cfg["method"] == "full_pg" and cfg["max_new_tokens"] == 8192
     assert cfg["enable_thinking"] is False
@@ -33,12 +34,13 @@ def test_5090_capacity_config_preserves_full_response_horizon():
                              load_config(ROOT / "configs/experiments/small_core_audit_smoke.yaml"))
     assert audit_cfg["enable_thinking"] is False
     assert audit_cfg["audit"]["max_new_tokens"] == 8192
-    assert validate_layout(audit_cfg) == 3
+    assert validate_layout(audit_cfg) == n_gpu - 1
 
 
 @pytest.mark.parametrize("fail", [False, True])
 @pytest.mark.parametrize("external_cache", [False, True])
-def test_gpu_audit_uses_separate_pool_and_closes_owned_resources(monkeypatch, fail, external_cache):
+@pytest.mark.parametrize("n_gpu", [3, 4])
+def test_gpu_audit_uses_separate_pool_and_closes_owned_resources(monkeypatch, fail, external_cache, n_gpu):
     from grace_gc.audit import run
     from grace_gc.backends import gpu_engine, hf_actor, rollout_pool, verl_trainer
     from grace_gc.data import reward, tokenize
@@ -53,12 +55,12 @@ def test_gpu_audit_uses_separate_pool_and_closes_owned_resources(monkeypatch, fa
     monkeypatch.setattr(state_io, "check_snapshot_identity", lambda *args: None)
     monkeypatch.setattr(run, "load_numpy_module_state", lambda *args: None)
     monkeypatch.setattr(verl_trainer, "build_vllm_engine", lambda *args: pytest.fail("colocated engine"))
-    pool = SimpleNamespace(metadata={"actor_device": "0", "rollout_devices": ["1", "2", "3"]},
+    pool = SimpleNamespace(metadata={"actor_device": "0", "rollout_devices": [str(i) for i in range(1, n_gpu)]},
                            close=lambda: events.append("closed"))
-    def launch(model, cfg, rank, n_gpu):
+    def launch(model, cfg, rank, gpu_count):
         assert cfg["gpu_memory_utilization"] == .75  # Not capped for colocation.
         assert cfg["max_model_len"] == 9280
-        assert rank == 8 and n_gpu == 4
+        assert rank == 8 and gpu_count == n_gpu
         return pool
     monkeypatch.setattr(rollout_pool.RolloutPool, "launch", launch)
     def build_engines(actor, llm, *args):
@@ -69,8 +71,8 @@ def test_gpu_audit_uses_separate_pool_and_closes_owned_resources(monkeypatch, fa
                 raise RuntimeError("sync failed")
         return object(), {"sync": sync}
     monkeypatch.setattr(gpu_engine, "make_gpu_engines", build_engines)
-    cfg = {"model_path": "org/model", "checkpoint": "unused", "hardware": {"n_gpu": 4},
-           "rollout": {"workers": 3}, "lora": {"rank": 8}, "audit": {"max_new_tokens": 8192},
+    cfg = {"model_path": "org/model", "checkpoint": "unused", "hardware": {"n_gpu": n_gpu},
+           "rollout": {"workers": n_gpu - 1}, "lora": {"rank": 8}, "audit": {"max_new_tokens": 8192},
            "vllm": {"gpu_memory_utilization": .75}}
     cache = {} if external_cache else None
     def call():
