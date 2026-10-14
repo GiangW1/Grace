@@ -1,0 +1,109 @@
+method: grace
+backend: gpu_verl
+seed: 17
+n_start: 32
+n_prompts: 8
+decision_tokens: 512
+max_new_tokens: 8192
+format_warmup:
+  steps: 0
+  batch_size: 8
+temperature: 1.0
+enable_thinking: false
+eval_temperature: 0.6
+eval_top_p: 0.95
+eval:
+  k: 4
+  n: 4
+  max_new_tokens: 8192
+  temperature: 0.6
+  top_p: 0.95
+  selection: seeded
+  selection_seed: 20261013
+  n_problems: 64
+  sample_batch_size: 4
+allocation:
+  p_min: 0.2
+  beta: 0.5
+  bisection_iters: 20
+predictor:
+  k: 8
+  hidden_coord: 128
+  hidden_risk: 64
+  lr: 0.001
+  epochs: 2
+  warmup_steps: 10
+  audit_s: 1.0
+  reservoir_size: 512
+  refresh_every: 0
+  constant_cost: true
+  coord_kind: mlp
+  ridge_l2: 1.0
+  use_affine: true
+  shrink_m: true
+  align_basis: true
+  target_space: direct
+  include_actor_state: true
+  feature_mode: decision
+  feature_batch_size: 1
+  fixed_basis: true
+  shrink_calibration: holdout
+  feature_scaler: fixed
+  train_auxiliary: false
+  fresh_samples_per_problem: 0
+lora:
+  rank: 8
+  alpha: 16.0
+  dropout: 0.0
+  gradient_checkpointing: true
+  targets:
+  - q_proj
+  - v_proj
+  parameterization: small_core
+  compute_dtype: bfloat16
+  basis: svd
+  basis_seed: 17
+optim:
+  lr: 0.0001
+  betas:
+  - 0.9
+  - 0.99
+  weight_decay: 0.0
+  grad_clip: 50.0
+  log_update_geometry: true
+colocated_vllm_memory_utilization: 0.3
+colocated_vllm_max_num_seqs: 2
+baseline:
+  ema_alpha: 0.7
+  prescan: 0
+  mode: fixed
+  fixed_value: 0.5
+hardware:
+  name: rtx5090
+  n_gpu: 4
+  gpu_memory_gb: 32
+analysis:
+  answer_undecided: 0.15
+  nonzero_signal_kappa: 0.05
+  delta_answer: 0.05
+  epsilon_learn: 0.2
+rollout:
+  workers: 3
+vllm:
+  tensor_parallel: 1
+  dtype: bfloat16
+  gpu_memory_utilization: 0.75
+  max_num_seqs: 2
+  max_num_batched_tokens: 2048
+  enable_chunked_prefill: true
+  lora_dtype: bfloat16
+num_steps: 20
+cost_control:
+  mode: fixed
+dynamic_sampling:
+  enabled: false
+save_initial_checkpoint: true
+checkpoint_every: 20
+model_path: /mnt/mydata/wja/grace/assets/models/Qwen3-4B
+data_path: /mnt/mydata/wja/grace/assets/datasets/dapo-math-17k.parquet
+eval_data_path: /mnt/mydata/wja/grace/assets/datasets/math500.jsonl
